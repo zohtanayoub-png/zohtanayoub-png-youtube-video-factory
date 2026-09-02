@@ -41,6 +41,7 @@ class PixabayProvider(StockProvider):
                 "q": query,
                 # Pixabay rejects per_page below 3.
                 "per_page": max(3, min(int(per_page), 200)),
+                "page": max(1, int(filters.get("page", 1))),
                 "video_type": "all",
                 "safesearch": "true",
             },
@@ -78,6 +79,7 @@ class PixabayProvider(StockProvider):
                     file_size=int(best.get("size") or 0),
                     query=query,
                     tags=tags,
+                    description=" ".join(tags),
                 )
             )
         return [clip for clip in clips if clip.provider_id and clip.download_url]

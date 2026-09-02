@@ -14,8 +14,8 @@ video:
   duration_minutes: 20          # target length of the finished video
   resolution: 1920x1080
   fps: 30
-  min_clip_seconds: 4           # shortest single visual shot
-  max_clip_seconds: 8           # longest single visual shot
+  min_clip_seconds: 3           # shortest single visual shot
+  max_clip_seconds: 6           # longest single visual shot
   transition: cut               # "cut" (default, clean) or "crossfade"
   transition_seconds: 0.4       # only used when transition == crossfade
   motion: subtle                # "none" or "subtle" (slow ken-burns style zoom)
@@ -72,7 +72,9 @@ sources:
   pexels: true
   pixabay: true
   local: false                  # serve clips from assets/local_clips (media you own)
-  per_query_results: 20
+  per_query_results: 30
+  max_pages: 3                  # how deep to page a productive query
+  candidate_headroom: 1.35      # download this much more than the shot count
   min_width: 1280
   min_height: 720
   prefer_width: 1920
@@ -89,6 +91,10 @@ ranking:
     duration: 10
     novelty: 15
     quality: 10
+    aspirational: 20            # premium-channel look; see editorial_qc
+  enforce_aspirational: true    # reject plastic covers, building sites, cleaning
+  max_creator_share: 0.18       # no creator may supply more of the video than this
+  max_query_share: 0.22
   min_score: 28                 # clips below this are never used
   clip_reuse_cooldown_days: 45  # recently used clips are rejected
   max_uses_per_clip: 3
@@ -110,6 +116,19 @@ youtube:
 output:
   directory: output
   keep_workdir: false           # delete downloaded footage after a successful render
+
+# ---------------------------------------------------------------------------
+#  EDITORIAL quality gates. These catch the problems ffprobe cannot see:
+#  repeated footage, generic visuals, ideas that do not match the title.
+# ---------------------------------------------------------------------------
+editorial:
+  fail_on_error: true
+  max_source_reuse: 0           # a provider video may appear only once
+  min_unique_source_ratio: 0.95
+  max_generic_query_percentage: 0.35
+  min_title_alignment: 0.8
+  min_creator_diversity: 0.5
+  min_average_clip_score: 40.0
 
 quality:
   min_file_mb: 1.0

@@ -1,0 +1,74 @@
+# =============================================================================
+#  LOCAL MODEL FEASIBILITY BENCHMARK
+#  Answers one question honestly: can a standard GitHub Actions runner run the
+#  optional local script model fast enough to be worth using?
+#  Run it manually; it downloads about 1 GB the first time.
+# =============================================================================
+name: LLM Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      section_budget:
+        description: "Seconds per section the runner can afford"
+        required: false
+        type: string
+        default: "120"
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    name: Benchmark the local script model
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+
+      - name: Report the runner's capacity
+        run: |
+          echo "CPU cores: $(nproc)"
+          free -g | head -2
+          df -h / | tail -1
+
+      - name: Cache the model and llama.cpp binary
+        uses: actions/cache@v4
+        with:
+          path: .cache/llm
+          key: llm-qwen25-1_5b-q4km-v1
+
+      - name: Benchmark
+        id: bench
+        env:
+          SECTION_BUDGET: ${{ inputs.section_budget }}
+          # llama.cpp releases are fetched from the GitHub API.
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          python -m vidfactory llm-check --section-budget "${SECTION_BUDGET:-120}" | tee bench.txt
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Summarize
+        if: always()
+        run: |
+          {
+            echo "## Local model benchmark"
+            echo ""
+            echo '```'
+            cat bench.txt 2>/dev/null || echo "no output"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

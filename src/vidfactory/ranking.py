@@ -35,7 +35,94 @@ DEFAULT_WEIGHTS: dict[str, float] = {
     "duration": 10.0,
     "novelty": 15.0,
     "quality": 10.0,
+    "aspirational": 20.0,
 }
+
+# ---------------------------------------------------------------------------
+# Aspirational quality
+#
+# This is a premium home decor channel, so footage of someone vacuuming, a
+# room mid-renovation, or a sofa still wrapped in plastic is worse than no
+# footage at all. Providers give us captions (Pexels encodes one in its page
+# URL) and tags, and those are enough to keep the obvious offenders out.
+# ---------------------------------------------------------------------------
+
+#: Strong disqualifiers. Any of these and the clip is rejected outright.
+BLOCKING_SIGNALS: tuple[str, ...] = (
+    "plastic wrap", "plastic cover", "wrapped in plastic", "bubble wrap",
+    "construction site", "building site", "demolition", "renovation work",
+    "under construction", "unfinished building", "concrete shell",
+    "dirty", "messy room", "mess", "garbage", "trash", "rubbish", "junk",
+    "abandoned", "derelict", "ruined", "damaged", "flood", "mold", "mould",
+    "cleaning", "vacuum", "vacuuming", "mopping", "scrubbing",
+)
+
+#: Softer negatives - down-ranked rather than rejected, because a moving box
+#: or a paint roller is occasionally exactly what the narration is about.
+NEGATIVE_SIGNALS: tuple[str, ...] = (
+    "moving box", "cardboard box", "packing", "moving house", "relocation",
+    "renovate", "renovation", "remodel", "paint roller", "painting wall",
+    "drill", "hammer", "tool", "ladder", "dust sheet", "drop cloth",
+    "clutter", "cluttered", "untidy", "old furniture", "worn",
+    "empty room", "bare room", "vacant", "warehouse", "office cubicle",
+    "remote control", "television screen", "watching tv", "magazine",
+    "dark room", "dim", "gloomy", "low light",
+)
+
+#: What we actually want. Stock captions use these words constantly.
+POSITIVE_SIGNALS: tuple[str, ...] = (
+    "natural light", "sunlight", "sunlit", "bright", "daylight", "airy",
+    "styled", "stylish", "elegant", "beautiful", "luxury", "luxurious",
+    "modern", "contemporary", "minimal", "minimalist", "scandinavian", "nordic",
+    "mediterranean", "cozy", "cosy", "warm", "inviting", "comfortable",
+    "interior design", "architecture", "architectural", "designer",
+    "spacious", "clean", "tidy", "neat", "decor", "decorated",
+    "apartment", "living room", "bedroom", "kitchen", "home",
+    "plant", "greenery", "wood", "linen", "marble",
+)
+
+#: Terms that mean the clip is probably not an interior at all.
+OFF_TOPIC_SIGNALS: tuple[str, ...] = (
+    "beach", "forest", "mountain", "ocean", "street", "traffic", "city skyline",
+    "portrait", "face", "close up of a person", "business meeting", "laptop screen",
+    "food", "cooking", "restaurant", "cafe", "hotel lobby", "car", "animal",
+)
+
+
+def score_aspirational(clip: StockClip) -> tuple[float, list[str]]:
+    """How well footage matches a premium interiors channel (0.0 - 1.0).
+
+    Returns the score and the signals that drove it, so a rejection can be
+    explained in the editorial report rather than being a silent judgement.
+    """
+
+    text = f" {clip.signal_text} "
+    reasons: list[str] = []
+
+    blocking = [w for w in BLOCKING_SIGNALS if w in text]
+    if blocking:
+        return 0.0, [f"-{w}" for w in blocking[:3]]
+
+    negatives = [w for w in NEGATIVE_SIGNALS if w in text]
+    positives = [w for w in POSITIVE_SIGNALS if w in text]
+    off_topic = [w for w in OFF_TOPIC_SIGNALS if w in text]
+
+    # No caption at all is neutral, not bad: Pexels often has a thin slug and
+    # the clip may still be perfect.
+    if not clip.signal_text.strip():
+        return 0.55, ["no caption"]
+
+    score = 0.55 + 0.09 * len(positives) - 0.22 * len(negatives) - 0.3 * len(off_topic)
+    reasons.extend(f"+{w}" for w in positives[:3])
+    reasons.extend(f"-{w}" for w in (*negatives[:2], *off_topic[:2]))
+    return max(0.0, min(1.0, score)), reasons
+
+
+def is_blocked(clip: StockClip) -> bool:
+    """True when footage is disqualified outright for a premium channel."""
+
+    text = f" {clip.signal_text} "
+    return any(word in text for word in BLOCKING_SIGNALS)
 
 _STOP = {"the", "and", "for", "with", "interior", "home", "design", "video", "footage"}
 
@@ -155,6 +242,9 @@ class RankingContext:
     min_height: int = 720
     min_source_seconds: float = 3.0
     cooldown_days: float = 45.0
+    #: Reject footage carrying blocking signals (plastic covers, demolition,
+    #: someone vacuuming). Disabled only by tests and by the local provider.
+    enforce_aspirational: bool = True
     #: ``{"provider:id": (use_count, days_since_last_use | None)}``
     history: Mapping[str, tuple[int, float | None]] = None  # type: ignore[assignment]
     #: Clips already chosen for this video; repeats are penalized hard.
@@ -183,6 +273,7 @@ class ClipRanker:
     def score(self, clip: StockClip, context: RankingContext) -> tuple[float, dict[str, float]]:
         use_count, days_since = context.history.get(clip.key, (0, None))
 
+        aspirational, aspirational_reasons = score_aspirational(clip)
         raw = {
             "relevance": score_relevance(clip, context.query, context.keywords),
             "resolution": score_resolution(clip, context.prefer_width, context.min_width),
@@ -190,7 +281,9 @@ class ClipRanker:
             "duration": score_duration(clip, context.min_shot_seconds, context.max_shot_seconds),
             "novelty": score_novelty(clip, use_count, days_since, context.cooldown_days),
             "quality": score_quality(clip),
+            "aspirational": aspirational,
         }
+        clip.aspirational_reasons = aspirational_reasons
         breakdown = {name: raw[name] * self.weights.get(name, 0.0) for name in raw}
         total = sum(breakdown.values())
 
@@ -226,6 +319,11 @@ class ClipRanker:
             context.min_source_seconds, context.min_shot_seconds
         ):
             return False
+        # Footage that is actively wrong for a premium interiors channel is
+        # rejected here rather than merely down-ranked, so it can never be
+        # rescued by scoring well on resolution or novelty.
+        if context.enforce_aspirational and is_blocked(clip):
+            return False
         return bool(clip.download_url)
 
     def rank(self, clips: Sequence[StockClip], context: RankingContext) -> list[StockClip]:
@@ -247,38 +345,129 @@ class ClipRanker:
         return len(clips) - len(self.rank(list(clips), context))
 
 
-def diversify(clips: Sequence[StockClip], limit: int) -> list[StockClip]:
-    """Pick top clips while avoiding several near-identical picks in a row.
+@dataclass
+class DiversitySettings:
+    """Per-video caps that stop one creator or one query dominating the edit."""
 
-    Providers frequently return sequential IDs from the same shoot, which look
-    like the same footage. Spreading the selection across authors and ID ranges
-    keeps a video from feeling repetitive.
+    #: Share of the finished video any single creator may supply.
+    max_creator_share: float = 0.18
+    #: Share any single search query may supply.
+    max_query_share: float = 0.22
+    #: Share any single visual subject (sofa, curtains, kitchen...) may supply.
+    max_subject_share: float = 0.30
+    #: Absolute floor so the caps never block a very short video.
+    minimum_per_bucket: int = 2
+
+
+#: Coarse visual subjects used for the per-video subject counter.
+SUBJECT_WORDS: tuple[str, ...] = (
+    "curtain", "rug", "sofa", "chair", "bed", "lamp", "light", "mirror",
+    "plant", "shelf", "cabinet", "kitchen", "bathroom", "bedroom",
+    "living room", "table", "window", "wall", "floor", "art", "storage",
+)
+
+
+def visual_subject(clip: StockClip) -> str:
+    """The dominant thing a clip appears to show, for diversity accounting."""
+
+    text = clip.signal_text
+    for word in SUBJECT_WORDS:
+        if word in text:
+            return word
+    return "interior"
+
+
+def diversify(
+    clips: Sequence[StockClip],
+    limit: int,
+    settings: DiversitySettings | None = None,
+) -> list[StockClip]:
+    """Pick the best clips while keeping the finished video visually varied.
+
+    Ranking alone tends to return many clips from the same shoot, the same
+    creator and the same query, which is what makes a long video feel like it
+    is looping even when every source is technically distinct. This applies
+    per-video caps on creator, query and visual subject, and only relaxes them
+    if the caps would leave the video short of footage.
     """
 
+    settings = settings or DiversitySettings()
+    if limit <= 0:
+        return []
+
+    def cap(share: float) -> int:
+        return max(settings.minimum_per_bucket, int(limit * share))
+
+    creator_cap = cap(settings.max_creator_share)
+    query_cap = cap(settings.max_query_share)
+    subject_cap = cap(settings.max_subject_share)
+
     chosen: list[StockClip] = []
-    seen_authors: dict[str, int] = {}
+    creators: dict[str, int] = {}
+    queries: dict[str, int] = {}
+    subjects: dict[str, int] = {}
+
+    def accept(clip: StockClip) -> None:
+        chosen.append(clip)
+        author = (clip.author or "").lower()
+        if author:
+            creators[author] = creators.get(author, 0) + 1
+        queries[clip.query] = queries.get(clip.query, 0) + 1
+        subjects[visual_subject(clip)] = subjects.get(visual_subject(clip), 0) + 1
+
     for clip in clips:
         if len(chosen) >= limit:
             break
         author = (clip.author or "").lower()
-        if author and seen_authors.get(author, 0) >= max(2, limit // 4):
+        if author and creators.get(author, 0) >= creator_cap:
             continue
+        if queries.get(clip.query, 0) >= query_cap:
+            continue
+        if subjects.get(visual_subject(clip), 0) >= subject_cap:
+            continue
+        # Sequential IDs from one creator are usually the same shoot.
         if any(_looks_like_sibling(clip, other) for other in chosen):
             continue
-        chosen.append(clip)
-        if author:
-            seen_authors[author] = seen_authors.get(author, 0) + 1
+        accept(clip)
 
-    # If diversification was too strict, top up from the ranked remainder.
+    # The caps are a preference, not a reason to ship a video short of
+    # footage. When they bind, keep filling - but always take from the
+    # least-represented creator, query and subject next, so relaxing the caps
+    # still spreads the video around rather than handing the remainder to
+    # whichever prolific creator happens to rank highest.
     if len(chosen) < limit:
         keys = {c.key for c in chosen}
-        for clip in clips:
-            if len(chosen) >= limit:
-                break
-            if clip.key not in keys:
-                chosen.append(clip)
-                keys.add(clip.key)
+        remaining = [c for c in clips if c.key not in keys]
+        while remaining and len(chosen) < limit:
+            remaining.sort(
+                key=lambda c: (
+                    creators.get((c.author or "").lower(), 0),
+                    queries.get(c.query, 0),
+                    subjects.get(visual_subject(c), 0),
+                    -c.score,
+                )
+            )
+            accept(remaining.pop(0))
+
     return chosen[:limit]
+
+
+def diversity_report(clips: Sequence[StockClip]) -> dict[str, Any]:
+    """Measured diversity of a finished selection, for the editorial report."""
+
+    if not clips:
+        return {"creator_diversity": 0.0, "query_diversity": 0.0, "subject_diversity": 0.0}
+    creators = {(c.author or c.provider_id).lower() for c in clips}
+    queries = {c.query for c in clips if c.query}
+    subjects = {visual_subject(c) for c in clips}
+    return {
+        "creator_diversity": round(len(creators) / len(clips), 3),
+        "query_diversity": round(len(queries) / len(clips), 3) if queries else 0.0,
+        "subject_diversity": round(len(subjects) / len(clips), 3),
+        "distinct_creators": len(creators),
+        "distinct_queries": len(queries),
+        "distinct_subjects": len(subjects),
+    }
 
 
 def _looks_like_sibling(a: StockClip, b: StockClip) -> bool:

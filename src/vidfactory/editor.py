@@ -54,89 +54,245 @@ class Shot:
 MOTIONS = ("zoom_in", "zoom_out", "pan_right", "pan_left")
 
 
+@dataclass
+class ShotPlan:
+    """The result of laying clips onto the narration timeline."""
+
+    shots: list[Shot] = field(default_factory=list)
+    #: provider keys that had to be used more than once (should be empty)
+    reused_keys: list[str] = field(default_factory=list)
+    #: how many distinct source videos the finished edit draws on
+    unique_sources: int = 0
+    shortfall: int = 0
+
+    @property
+    def reuse_count(self) -> int:
+        return len(self.reused_keys)
+
+    @property
+    def unique_source_ratio(self) -> float:
+        return (self.unique_sources / len(self.shots)) if self.shots else 0.0
+
+
+def _clip_key(clip: Any) -> str:
+    """Stable per-source identity: ``provider:id``, never the file path."""
+
+    inner = getattr(clip, "clip", None)
+    key = getattr(inner, "key", "") if inner is not None else ""
+    return str(key or getattr(clip, "path", "") or id(clip))
+
+
+def _shot_lengths(total: float, min_shot: float, max_shot: float,
+                  rng: random.Random) -> list[float]:
+    """Split a scene into shot lengths with a deliberately irregular rhythm.
+
+    A constant cadence is what makes long stock-footage videos feel robotic,
+    so each shot is jittered around the mean instead of every cut landing on
+    the same beat.
+    """
+
+    total = max(0.05, float(total))
+    if total <= max_shot * 1.05:
+        return [total]
+
+    target = (min_shot + max_shot) / 2.0
+    count = max(1, int(round(total / target)))
+    # Never let a single shot exceed max_shot.
+    while total / count > max_shot and count < 200:
+        count += 1
+
+    weights = [rng.uniform(0.78, 1.22) for _ in range(count)]
+    scale = total / sum(weights)
+    lengths = [w * scale for w in weights]
+
+    # Pull any outlier back inside the window, then re-normalise.
+    for _ in range(3):
+        lengths = [min(max(v, min_shot * 0.7), max_shot) for v in lengths]
+        drift = total - sum(lengths)
+        if abs(drift) < 0.02:
+            break
+        lengths = [v + drift / len(lengths) for v in lengths]
+    lengths[-1] += total - sum(lengths)
+    return [round(v, 3) for v in lengths]
+
+
 def plan_shots(
     scene_durations: Sequence[tuple[str, float]],
     clips: Sequence[Any],
-    min_shot: float = 4.0,
-    max_shot: float = 8.0,
+    min_shot: float = 3.0,
+    max_shot: float = 6.0,
     motion: str = "subtle",
     rng: random.Random | None = None,
-) -> list[Shot]:
-    """Lay clips onto the narration timeline.
+    scene_affinity: dict[str, list[str]] | None = None,
+    allow_reuse: bool = True,
+) -> ShotPlan:
+    """Lay clips onto the narration timeline, one source video per shot.
 
-    Each scene gets as many shots as its narration needs (a long scene never
-    freezes on one clip), and when unique clips run out the planner reuses a
-    clip from a *different in-point* with different motion so the repetition
-    is not obvious.
+    The hard rule is that a provider video ID appears **at most once** in a
+    finished video. Taking a second segment from the same source at a
+    different timestamp is exactly what made earlier videos look repetitive,
+    so it is not treated as an acceptable substitute for finding more footage.
+
+    ``scene_affinity`` maps a scene id to the clip keys that were found for
+    that scene's own queries. Honouring it is what keeps the visuals grouped
+    coherently around each idea instead of cycling through unrelated rooms.
+
+    When there are genuinely fewer clips than shots, the shortfall is reported
+    on the returned :class:`ShotPlan` and reuse is a logged last resort - never
+    silent, and never in the original order.
     """
 
     rng = rng or random.Random(20240)
-    usable = [c for c in clips if getattr(c, "duration", 0) > 0.5 and Path(getattr(c, "path", "")).exists()]
+    usable = [
+        c for c in clips
+        if getattr(c, "duration", 0) > 0.5 and Path(getattr(c, "path", "")).exists()
+    ]
     if not usable:
         raise ValueError("No usable clips were downloaded - cannot build a video")
 
+    by_key: dict[str, Any] = {}
+    for clip in usable:
+        by_key.setdefault(_clip_key(clip), clip)
+
+    affinity = scene_affinity or {}
+    unused: list[str] = list(by_key)
+    rng.shuffle(unused)
+    consumed: set[str] = set()
+    reused: list[str] = []
+    # Creator of each of the last two placed shots, for the consecutive rule.
+    recent_authors: list[str] = []
+
+    def author_of(key: str) -> str:
+        inner = getattr(by_key[key], "clip", None)
+        return str(getattr(inner, "author", "") or "").lower()
+
+    def take(scene_id: str) -> tuple[str, bool]:
+        """Claim the best unused source for a scene. Returns (key, is_reuse)."""
+
+        preferred = [k for k in affinity.get(scene_id, []) if k in by_key and k not in consumed]
+        pools = (preferred, [k for k in unused if k not in consumed])
+
+        for pool in pools:
+            if not pool:
+                continue
+            # Enforce "no more than 2 consecutive clips from one creator".
+            blocked = ""
+            if len(recent_authors) >= 2 and recent_authors[-1] and recent_authors[-1] == recent_authors[-2]:
+                blocked = recent_authors[-1]
+            choice = next((k for k in pool if not blocked or author_of(k) != blocked), None)
+            if choice is None:
+                choice = pool[0]          # only that creator is left; take it
+            consumed.add(choice)
+            return choice, False
+
+        # Everything has been used once. Reuse is a genuine last resort.
+        if not allow_reuse:
+            raise ValueError("ran out of unique clips and reuse is disabled")
+        # Reuse the least recently placed source, never the original order.
+        candidates = [k for k in by_key if k not in reused] or list(by_key)
+        choice = rng.choice(candidates)
+        reused.append(choice)
+        return choice, True
+
     shots: list[Shot] = []
-    order = list(range(len(usable)))
-    rng.shuffle(order)
-    cursor = 0
-    # Tracks how far into each source clip we have already taken footage.
-    offsets: dict[int, float] = {index: 0.0 for index in order}
-    uses: dict[int, int] = {index: 0 for index in order}
+    used_offsets: dict[str, float] = {}
 
     for scene_id, scene_seconds in scene_durations:
-        remaining = max(0.4, float(scene_seconds))
-        # How many shots this scene needs to stay inside the shot-length window.
-        shot_count = max(1, int(math.ceil(remaining / max_shot)))
-        base_length = remaining / shot_count
-        # Very short scenes are allowed to fall below min_shot; forcing 4s
-        # there would push visuals out of sync with the narration.
-        for position in range(shot_count):
-            length = base_length if position < shot_count - 1 else remaining
-            length = min(length, remaining)
+        lengths = _shot_lengths(float(scene_seconds), min_shot, max_shot, rng)
+        for position, length in enumerate(lengths):
             if length <= 0.05:
-                break
-
-            index = order[cursor % len(order)]
-            cursor += 1
-            clip = usable[index]
+                continue
+            key, is_reuse = take(scene_id)
+            clip = by_key[key]
             clip_duration = float(getattr(clip, "duration", 0.0))
 
-            start = offsets.get(index, 0.0)
-            if start + length > clip_duration:
-                # Wrap around and take a different section next time.
-                start = 0.0 if clip_duration <= length else rng.uniform(
-                    0.0, max(0.0, clip_duration - length)
-                )
-            offsets[index] = start + length + 0.25
-            uses[index] = uses.get(index, 0) + 1
+            if is_reuse:
+                # Different section and different motion so a forced repeat is
+                # at least not a literal replay of the earlier shot.
+                previous = used_offsets.get(key, 0.0)
+                span = max(0.0, clip_duration - length)
+                start = rng.uniform(0.0, span) if span > 0.5 else 0.0
+                if abs(start - previous) < length:
+                    start = max(0.0, min(span, previous + length + 0.5))
+            else:
+                span = max(0.0, clip_duration - length)
+                # Skip the first moments: stock clips often start on a fade or
+                # a camera settle.
+                start = min(span, 0.35) if span > 1.0 else 0.0
+            used_offsets[key] = start
 
             chosen_motion = "none"
             if motion == "subtle":
-                # Reused clips always get motion so the repeat reads differently.
-                if uses[index] > 1 or rng.random() < 0.45:
-                    chosen_motion = MOTIONS[(uses[index] + position) % len(MOTIONS)]
+                if is_reuse or rng.random() < 0.5:
+                    chosen_motion = MOTIONS[(len(shots) + position) % len(MOTIONS)]
 
             shots.append(
                 Shot(
                     source=Path(getattr(clip, "path")),
-                    start=max(0.0, start),
+                    start=max(0.0, round(start, 3)),
                     duration=round(length, 3),
                     scene_id=scene_id,
-                    clip_key=getattr(getattr(clip, "clip", None), "key", "") or "",
+                    clip_key=key,
                     motion=chosen_motion,
                 )
             )
-            remaining -= length
-            if remaining <= 0.05:
-                break
+            recent_authors.append(author_of(key))
+            del recent_authors[:-2]
 
+    unique_sources = len({shot.clip_key for shot in shots})
+    plan = ShotPlan(
+        shots=shots,
+        reused_keys=reused,
+        unique_sources=unique_sources,
+        shortfall=max(0, len(shots) - len(by_key)),
+    )
+
+    if reused:
+        log.warning(
+            "FOOTAGE SHORTAGE: %d of %d shots reuse a source video "
+            "(%d unique sources available). Searches were exhausted; "
+            "widen the queries or raise sources.per_query_results.",
+            len(reused),
+            len(shots),
+            len(by_key),
+        )
     log.info(
-        "%d shots planned across %d scenes from %d clips",
+        "%d shots planned across %d scenes from %d unique source videos "
+        "(%.0f%% unique, %.1fs average shot)",
         len(shots),
         len(scene_durations),
-        len(usable),
+        unique_sources,
+        plan.unique_source_ratio * 100,
+        (sum(s.duration for s in shots) / len(shots)) if shots else 0.0,
     )
-    return shots
+    return plan
+
+
+def estimate_shot_count(
+    scene_durations: Sequence[tuple[str, float]],
+    min_shot: float = 3.0,
+    max_shot: float = 6.0,
+) -> int:
+    """How many shots a timeline will need.
+
+    The pipeline uses this to decide how much footage to gather. Guessing from
+    the total duration alone under-counts badly, because every scene rounds its
+    own shot count up independently - which is how earlier videos ended up
+    with fewer clips than shots and had to repeat footage.
+    """
+
+    target = (min_shot + max_shot) / 2.0
+    total = 0
+    for _, seconds in scene_durations:
+        seconds = max(0.05, float(seconds))
+        if seconds <= max_shot * 1.05:
+            total += 1
+            continue
+        count = max(1, int(round(seconds / target)))
+        while seconds / count > max_shot and count < 200:
+            count += 1
+        total += count
+    return total
 
 
 class VideoEditor:
@@ -337,9 +493,11 @@ class VideoEditor:
         return destination
 
     # ------------------------------------------------------------------
-    def build_video_track(self, shots: Sequence[Shot], fade_out: float = 0.0) -> Path:
+    def build_video_track(self, shots: Sequence[Shot] | ShotPlan, fade_out: float = 0.0) -> Path:
         """Render every shot and join them into one silent video track."""
 
+        if isinstance(shots, ShotPlan):
+            shots = shots.shots
         rendered: list[Path] = []
         last = len(shots)
         for index, shot in enumerate(shots, start=1):

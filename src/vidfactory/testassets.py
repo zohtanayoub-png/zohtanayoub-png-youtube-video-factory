@@ -16,15 +16,33 @@ log = get_logger("ASSETS")
 
 #: Names double as the searchable text for the local provider, so they are
 #: written to look like real home decor footage filenames.
+#: Enough distinct clips that an offline render can satisfy the one-source-
+#: per-shot rule for a short video without repeating footage.
 SAMPLE_CLIPS: tuple[tuple[str, str], ...] = (
-    ("living-room-sofa-interior", "0x8f7a66"),
-    ("curtains-window-daylight-interior", "0xb9a88a"),
-    ("bedroom-bed-linen-interior", "0x6f7f74"),
-    ("kitchen-counter-modern-interior", "0x9aa39b"),
+    ("bright-living-room-sofa-natural-light", "0x8f7a66"),
+    ("floor-to-ceiling-curtains-window-daylight", "0xb9a88a"),
+    ("styled-bedroom-linen-bedding-sunlight", "0x6f7f74"),
+    ("modern-kitchen-counter-natural-light", "0x9aa39b"),
     ("warm-lamp-lighting-evening-interior", "0xc4a06a"),
-    ("area-rug-floor-living-room", "0x7d6b58"),
-    ("indoor-plant-green-interior", "0x5f7a55"),
-    ("shelf-storage-organization-interior", "0xa08f7d"),
+    ("large-area-rug-floor-living-room", "0x7d6b58"),
+    ("indoor-plant-greenery-interior", "0x5f7a55"),
+    ("shelf-storage-organization-styled", "0xa08f7d"),
+    ("tall-mirror-reflecting-window-light", "0x8a8f96"),
+    ("wooden-console-table-styled-decor", "0x7a6a52"),
+    ("scandinavian-living-room-pale-wood", "0xc9c2b4"),
+    ("cozy-armchair-corner-reading-nook", "0x94764f"),
+    ("wide-shot-spacious-apartment-daylight", "0xa8a293"),
+    ("close-up-linen-texture-cushion", "0xbfb3a0"),
+    ("marble-surface-detail-kitchen", "0xd2cec6"),
+    ("brass-hardware-detail-cabinet", "0xa8863f"),
+    ("bathroom-folded-towels-spa-styled", "0xb6bcbc"),
+    ("dining-table-pendant-light-warm", "0x8d7250"),
+    ("bookshelf-full-of-books-interior", "0x6c5a48"),
+    ("white-painted-wall-trim-detail", "0xd8d4cc"),
+    ("ceramic-vase-branches-styled-table", "0x9e9384"),
+    ("woven-basket-natural-texture-storage", "0xb09a72"),
+    ("sunlight-shadows-on-plaster-wall", "0xcbbfa9"),
+    ("minimal-bedroom-neutral-palette-wide", "0xa39a8d"),
 )
 
 
@@ -67,6 +85,19 @@ def make_test_clip(
     return target
 
 
+def _shift(color: str, step: int) -> str:
+    """Nudge a hex color so extra generated clips are visually distinct."""
+
+    value = int(str(color).replace("0x", ""), 16)
+    r = (value >> 16) & 0xFF
+    g = (value >> 8) & 0xFF
+    b = value & 0xFF
+    r = (r + step * 23) % 200 + 40
+    g = (g + step * 41) % 200 + 40
+    b = (b + step * 17) % 200 + 40
+    return f"0x{r:02x}{g:02x}{b:02x}"
+
+
 def build_test_library(
     directory: str | Path,
     count: int = len(SAMPLE_CLIPS),
@@ -74,15 +105,50 @@ def build_test_library(
     width: int = 1920,
     height: int = 1080,
 ) -> list[Path]:
-    """Create a folder of synthetic clips usable by the ``local`` provider."""
+    """Create a folder of synthetic clips usable by the ``local`` provider.
+
+    ``count`` may exceed the curated list; extra clips are generated as
+    recognisable variations so an offline render can still satisfy the
+    one-source-per-shot rule for a longer video.
+    """
 
     target_dir = Path(directory)
     target_dir.mkdir(parents=True, exist_ok=True)
     made: list[Path] = []
-    for name, color in SAMPLE_CLIPS[: max(1, count)]:
+    wanted = max(1, int(count))
+
+    for index in range(wanted):
+        base_name, base_color = SAMPLE_CLIPS[index % len(SAMPLE_CLIPS)]
+        cycle = index // len(SAMPLE_CLIPS)
+        if cycle == 0:
+            name, color = base_name, base_color
+        else:
+            name = f"{base_name}-variation-{cycle + 1}"
+            color = _shift(base_color, cycle)
         path = target_dir / f"{name}.mp4"
         if not path.exists():
             make_test_clip(path, seconds=seconds, color=color, width=width, height=height)
         made.append(path)
+
     log.info("%d synthetic test clips ready in %s", len(made), target_dir)
     return made
+
+
+def clips_needed_for(
+    duration_minutes: float,
+    average_shot_seconds: float = 4.5,
+    safety: float = 1.8,
+) -> int:
+    """How many distinct clips a duration needs at one source video per shot.
+
+    Deliberately over-provisions. The finished narration is usually longer
+    than the requested duration - speech rate varies by TTS engine and every
+    scene carries a pause - and running short of clips is what forces footage
+    reuse. Synthetic clips are cheap; a repeated shot is not.
+    """
+
+    import math
+
+    seconds = max(10.0, float(duration_minutes) * 60.0)
+    base = seconds / max(1.0, average_shot_seconds)
+    return max(12, int(math.ceil(base * max(1.0, safety))) + 6)

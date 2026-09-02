@@ -84,7 +84,7 @@ def local_pipeline(tmp_path, has_ffmpeg, repo_root):
     from vidfactory.testassets import build_test_library
 
     clips = tmp_path / "clips"
-    build_test_library(clips, count=3, seconds=8.0, width=1280, height=720)
+    build_test_library(clips, count=24, seconds=8.0, width=1280, height=720)
     config = load_config(
         repo_root / "config.yaml",
         overrides={
@@ -134,7 +134,7 @@ def test_pipeline_fails_clearly_without_any_provider(tmp_path, repo_root):
         scene_timings: dict = {}
 
     with pytest.raises(PipelineError, match="provider"):
-        pipeline._gather_footage([], FakeNarration(), _dummy_topic())
+        pipeline._gather_footage([], FakeNarration(), _dummy_topic(), shots_needed=5)
 
 
 def test_scene_search_order_puts_item_leads_first():
@@ -170,7 +170,9 @@ def test_pipeline_runs_end_to_end_with_local_clips(local_pipeline):
 
 def test_a_failed_run_is_recorded(local_pipeline, monkeypatch):
     monkeypatch.setattr(
-        VideoPipeline, "_narrate", lambda self, scenes: (_ for _ in ()).throw(RuntimeError("boom"))
+        VideoPipeline,
+        "_narrate",
+        lambda self, scenes, engine=None: (_ for _ in ()).throw(RuntimeError("boom")),
     )
     with pytest.raises(RuntimeError):
         local_pipeline.run(topic_text="20 Cozy Bedroom Ideas")

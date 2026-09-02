@@ -21,7 +21,7 @@ from vidfactory.config import load_config
 from vidfactory.database import Database
 from vidfactory.ffmpeg_utils import probe_media
 from vidfactory.pipeline import VideoPipeline
-from vidfactory.testassets import build_test_library
+from vidfactory.testassets import build_test_library, clips_needed_for
 
 pytestmark = pytest.mark.integration
 
@@ -35,7 +35,11 @@ def rendered(tmp_path_factory, request):
 
     root = tmp_path_factory.mktemp("integration")
     clips_dir = root / "clips"
-    build_test_library(clips_dir, seconds=10.0, width=1920, height=1080)
+    # One distinct clip per shot, so the render is held to the same zero-reuse
+    # rule as production rather than being excused for being a test.
+    build_test_library(
+        clips_dir, count=clips_needed_for(0.7), seconds=10.0, width=1920, height=1080
+    )
 
     repo_root = Path(__file__).resolve().parents[1]
     config = load_config(
@@ -104,6 +108,29 @@ def test_quality_control_passed(rendered):
     result, *_ = rendered
     assert result.report.passed is True
     assert not result.report.failures
+
+
+def test_editorial_quality_control_passed(rendered):
+    """No repeated source footage, and the ideas match the title."""
+
+    result, *_ = rendered
+    assert result.editorial is not None
+    assert result.editorial.passed, [c.detail for c in result.editorial.failures]
+    assert result.editorial.metrics["source_video_reuse_count"] == 0
+    assert result.editorial.metrics["unique_source_ratio"] >= 0.95
+
+
+def test_every_shot_uses_a_different_source_video(rendered):
+    """The defect this whole upgrade exists to prevent."""
+
+    result, _, _, root = rendered
+    import json as _json
+
+    payload = _json.loads(
+        (result.video_path.parent / "editorial_quality_report.json").read_text(encoding="utf-8")
+    )
+    assert payload["source_video_reuse_count"] == 0
+    assert payload["unique_source_videos"] == payload["shot_count"]
 
 
 def test_no_black_opening_frame(rendered):
@@ -179,7 +206,14 @@ def test_the_script_is_original_prose(rendered):
     result, *_ = rendered
     text = result.script_path.read_text(encoding="utf-8")
     assert len(text.split()) > 60
-    assert "Number 1." in text or "Idea number 1." in text or "number 1" in text.lower()
+    # Flowing narration, not a bullet list or a template dump.
+    assert "\u2022" not in text
+    assert "<|" not in text
+    sentences = [s for s in text.split(".") if len(s.split()) > 4]
+    assert len(sentences) >= 5
+    # The formulaic connectives that made v1 sound generated must be gone.
+    for phrase in ("The thinking behind this is simple", "Here is how to apply it"):
+        assert phrase not in text
 
 
 def test_temporary_footage_was_cleaned_up(rendered):

@@ -130,8 +130,9 @@ def test_already_selected_clips_are_penalised():
 
 def test_scores_are_bounded_by_the_weights():
     ranker = ClipRanker()
+    ceiling = sum(ranker.weights.values())
     score, _ = ranker.score(clip(), RankingContext(query="modern living room interior"))
-    assert 0 <= score <= 100
+    assert 0 <= score <= ceiling
 
 
 def test_ranking_is_ordered_best_first():

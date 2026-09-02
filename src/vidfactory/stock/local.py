@@ -34,6 +34,8 @@ class LocalProvider(StockProvider):
     name = "local"
     license_name = "Supplied by the channel owner"
     min_interval = 0.0
+    #: A local folder has no second page - it is the whole catalog.
+    supports_pagination = False
 
     def __init__(self, api_key: str | None = None, **options: Any) -> None:
         super().__init__(api_key or "local", **options)
@@ -72,7 +74,10 @@ class LocalProvider(StockProvider):
                         height=info.height,
                         duration=info.duration,
                         page_url=str(path.resolve()),
-                        author="local",
+                        # Deliberately blank: local files have no creator, so
+                        # diversity accounting falls back to per-file identity
+                        # instead of reporting one creator for the whole video.
+                        author="",
                         license_name=self.license_name,
                         local_path=str(path.resolve()),
                         tags=sorted(_words(path.stem)),

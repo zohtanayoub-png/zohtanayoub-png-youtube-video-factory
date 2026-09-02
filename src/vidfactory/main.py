@@ -107,10 +107,13 @@ def command_generate(args: argparse.Namespace) -> int:
 def command_demo(args: argparse.Namespace) -> int:
     """Render a short video from synthetic clips - no API keys required."""
 
-    from .testassets import build_test_library
+    from .testassets import build_test_library, clips_needed_for
 
     clips_dir = Path(args.workdir or "work") / "demo_clips"
-    build_test_library(clips_dir, seconds=12.0, width=1920, height=1080)
+    # Generate one distinct clip per shot the timeline will need, so the demo
+    # can satisfy the same zero-reuse rule a real run is held to.
+    needed = clips_needed_for(float(args.duration or 1.0))
+    build_test_library(clips_dir, count=needed, seconds=12.0, width=1920, height=1080)
 
     args.local_clips = str(clips_dir)
     args.only_local = True
@@ -180,6 +183,14 @@ def command_doctor(args: argparse.Namespace) -> int:
         print(f"[FAIL] no TTS engine available: {exc}")
         problems += 1
 
+    llm_settings = dict(config.get("script.llm", {}) or {})
+    if llm_settings.get("enabled"):
+        print(f"[ok]   script engine   : local model preferred "
+              f"({llm_settings.get('model_file', '?')}), template fallback")
+    else:
+        print("[ok]   script engine   : template (deterministic, always works)")
+        print("       local model     : disabled - run 'vidfactory llm-check' to test it here")
+
     providers = build_providers(dict(config.get("sources", {}) or {}))
     if providers:
         print(f"[ok]   stock providers : {', '.join(p.name for p in providers)}")
@@ -202,6 +213,40 @@ def command_doctor(args: argparse.Namespace) -> int:
     print("=" * 62)
     print("READY" if problems == 0 else f"{problems} problem(s) found - see above")
     return 0 if problems == 0 else 1
+
+
+def command_llm_check(args: argparse.Namespace) -> int:
+    """Provision and benchmark the local model, then report whether it is viable.
+
+    This is what decides whether ``script.llm`` is worth enabling: it downloads
+    the llama.cpp binary and the GGUF, runs one real rewrite, and prints the
+    measured speed. Run it in CI rather than guessing.
+    """
+
+    from .llm import benchmark
+
+    config = load_config(args.config)
+    settings = dict(config.get("script.llm", {}) or {})
+    print("Benchmarking the local script model. The first run downloads ~1 GB.")
+    result = benchmark(settings)
+
+    print(json.dumps(result, indent=2)[:2000])
+    if result.get("available"):
+        seconds = float(result.get("rewrite_seconds", 0))
+        print()
+        print(f"[ok]   local model works: {result.get('model_mb')} MB, "
+              f"{seconds:.1f}s for a 45 word rewrite "
+              f"({result.get('words_per_second')} words/second)")
+        budget = float(args.section_budget)
+        if seconds <= budget:
+            print(f"[ok]   within the {budget:.0f}s per-section budget - "
+                  f"llm mode is practical on this machine")
+            return 0
+        print(f"[warn] slower than the {budget:.0f}s per-section budget - "
+              f"llm mode would time out often here")
+        return 3
+    print(f"[FAIL] local model unavailable: {result.get('reason', 'unknown')}")
+    return 1
 
 
 def command_state(args: argparse.Namespace) -> int:
@@ -268,6 +313,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     state = subparsers.add_parser("state", help="sync and report persistent history")
     state.set_defaults(func=command_state)
+
+    llm_check = subparsers.add_parser(
+        "llm-check", help="download and benchmark the optional local script model"
+    )
+    llm_check.add_argument(
+        "--section-budget", type=float, default=120.0,
+        help="seconds per section the runner can afford (default 120)",
+    )
+    llm_check.set_defaults(func=command_llm_check)
 
     return parser
 
