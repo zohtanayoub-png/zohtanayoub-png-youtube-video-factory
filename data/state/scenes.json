@@ -496,6 +496,204 @@
       "duration": null,
       "query": "bright styled living room natural light",
       "category": "living rooms"
+    },
+    {
+      "id": 56,
+      "video_id": 4,
+      "scene_id": "intro-000-00",
+      "narration": "Two rooms can have identical dimensions and feel completely different to stand in. The one that feels bigger is almost never the one with less furniture in it, and that surprises people.",
+      "duration": null,
+      "query": "bright styled living room natural light",
+      "category": "living rooms"
+    },
+    {
+      "id": 57,
+      "video_id": 4,
+      "scene_id": "intro-000-01",
+      "narration": "Over the next 2 minutes we will work through 5 ideas, and for each one I will explain why it works and how to actually do it.",
+      "duration": null,
+      "query": "sunlit living room wide shot",
+      "category": "living rooms"
+    },
+    {
+      "id": 58,
+      "video_id": 4,
+      "scene_id": "item-001-00",
+      "narration": "Next, number 1. What would you change first in a room like that? Almost always this: hang your curtains close to the ceiling, not to the window frame.",
+      "duration": null,
+      "query": "floor to ceiling curtains living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 59,
+      "video_id": 4,
+      "scene_id": "item-001-01",
+      "narration": "The eye reads the top of the curtain rod as the top of the wall, so mounting the rod high stretches the whole room upward and makes a standard eight-foot ceiling feel far taller than it is.",
+      "duration": null,
+      "query": "tall curtains modern interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 60,
+      "video_id": 4,
+      "scene_id": "item-001-02",
+      "narration": "Mount the rod four to six inches below the ceiling line and let the panels break just barely on the floor.",
+      "duration": null,
+      "query": "elegant living room window drapes",
+      "category": "living rooms"
+    },
+    {
+      "id": 61,
+      "video_id": 4,
+      "scene_id": "item-001-03",
+      "narration": "Buy the longest ready-made length you can find, usually ninety-six or one hundred and eight inches, and widen the rod so the panels stack off the glass.",
+      "duration": null,
+      "query": "linen curtains sunlight living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 62,
+      "video_id": 4,
+      "scene_id": "item-001-04",
+      "narration": "Worth doing even if you change nothing else on this list.",
+      "duration": null,
+      "query": "floor to ceiling curtains living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 63,
+      "video_id": 4,
+      "scene_id": "item-002-00",
+      "narration": "Number 2 on the list. Worth pausing on, because the fix is easy and the mistake is expensive. Make the window treatments oversized.",
+      "duration": null,
+      "query": "full length curtains luxury interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 64,
+      "video_id": 4,
+      "scene_id": "item-002-01",
+      "narration": "Generous fabric is one of the clearest signals of money in a room, because skimpy curtains are the default in every rental.",
+      "duration": null,
+      "query": "generous drapes living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 65,
+      "video_id": 4,
+      "scene_id": "item-002-02",
+      "narration": "Panels roughly twice the width of the window so they still look full when closed, hung high and wide, and hemmed to just kiss the floor.",
+      "duration": null,
+      "query": "linen curtain panels window",
+      "category": "living rooms"
+    },
+    {
+      "id": 66,
+      "video_id": 4,
+      "scene_id": "item-003-00",
+      "narration": "There is a related idea worth covering here. Number 3. Here is the one: use the sixty thirty ten split. It is an old rule because it works.",
+      "duration": null,
+      "query": "balanced color palette living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 67,
+      "video_id": 4,
+      "scene_id": "item-003-01",
+      "narration": "It gives a room a dominant tone, a supporting tone and a small amount of energy, in proportions the eye finds restful.",
+      "duration": null,
+      "query": "neutral interior with accent color",
+      "category": "living rooms"
+    },
+    {
+      "id": 68,
+      "video_id": 4,
+      "scene_id": "item-003-02",
+      "narration": "Sixty percent walls and large surfaces, thirty percent upholstery and curtains, ten percent accessories and art. The ten percent is the only part you should change often.",
+      "duration": null,
+      "query": "coordinated room colors",
+      "category": "living rooms"
+    },
+    {
+      "id": 69,
+      "video_id": 4,
+      "scene_id": "item-003-03",
+      "narration": "This is the sort of thing people cannot name but always notice.",
+      "duration": null,
+      "query": "modern interior color scheme",
+      "category": "living rooms"
+    },
+    {
+      "id": 70,
+      "video_id": 4,
+      "scene_id": "item-004-00",
+      "narration": "Moving on, and this one is quick. That takes us to number 4. Leave the corners of the room resolved.",
+      "duration": null,
+      "query": "corner plant floor lamp living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 71,
+      "video_id": 4,
+      "scene_id": "item-004-01",
+      "narration": "Empty, awkward corners are where a room visibly runs out of ideas, and stuffing them with random small objects makes it worse.",
+      "duration": null,
+      "query": "styled room corner interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 72,
+      "video_id": 4,
+      "scene_id": "item-004-02",
+      "narration": "A tall plant, a floor lamp, a leaning mirror or a single chair with a small table. One considered object beats three leftovers.",
+      "duration": null,
+      "query": "reading nook corner chair",
+      "category": "living rooms"
+    },
+    {
+      "id": 73,
+      "video_id": 4,
+      "scene_id": "item-004-03",
+      "narration": "Once you have seen it, you cannot unsee it in other people's homes either.",
+      "duration": null,
+      "query": "living room corner decor",
+      "category": "living rooms"
+    },
+    {
+      "id": 74,
+      "video_id": 4,
+      "scene_id": "item-005-00",
+      "narration": "Idea number 5. Do not block the window. Keep anything above windowsill height away from the window wall. If a piece must go there, choose something low or open in construction.",
+      "duration": null,
+      "query": "clear window living room interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 75,
+      "video_id": 4,
+      "scene_id": "item-005-01",
+      "narration": "Daylight is the most valuable thing in a room, and a tall piece of furniture in front of the glass costs you light in every direction.",
+      "duration": null,
+      "query": "low furniture under window",
+      "category": "living rooms"
+    },
+    {
+      "id": 76,
+      "video_id": 4,
+      "scene_id": "item-005-02",
+      "narration": "That single adjustment does more than another round of shopping ever will.",
+      "duration": null,
+      "query": "bright window natural light room",
+      "category": "living rooms"
+    },
+    {
+      "id": 77,
+      "video_id": 4,
+      "scene_id": "outro-000-00",
+      "narration": "So that is the full list. If you found something here worth trying, there are more videos like this on the channel.",
+      "duration": null,
+      "query": "bright styled living room natural light",
+      "category": "living rooms"
     }
   ]
 }
