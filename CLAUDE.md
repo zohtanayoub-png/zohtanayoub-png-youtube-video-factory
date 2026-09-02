@@ -91,6 +91,14 @@ src/vidfactory/
 * **The template script engine is the default, not a fallback of last resort.**
   It is deterministic, fast and always works. The LLM path exists for quality
   experiments and must never become required.
+* **The local llama.cpp path stays opt-in because provisioning it on a GitHub
+  Actions runner is not reliable.** Measured over four CI runs: ggml-org
+  publishes prebuilt binaries only on rolling `bNNNN` tags while marking a
+  stale `v0.3.0` (containing one text file) as "latest", and the releases API
+  is rate limited from runners. `vidfactory llm-check` reports what actually
+  happens on a given machine; enable `script.llm.enabled` only if it passes
+  there. Model choice if you do: Qwen2.5-1.5B-Instruct Q4_K_M, Apache-2.0,
+  about 1.0 GB on disk and 2 GB of RAM at a 4k context.
 * **`data/state/*.json` is the durable store; SQLite is the working copy.**
   Runners are ephemeral and a binary `.db` is hostile to git.
 * **`autopilot.videos_per_week` is enforced by the workflow**, which counts

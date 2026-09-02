@@ -257,6 +257,32 @@ at least about five seconds.
 
 ---
 
+## Optional: the local AI script model
+
+The scripts are written by a built-in engine that needs no model and no
+network. There is also an optional local AI model (Qwen2.5-1.5B, free and
+open source, roughly a 1 GB download) that can rewrite the wording.
+
+It is **off by default**, because downloading the engine it needs is currently
+unreliable on GitHub's runners. To see whether it works for you:
+
+```bash
+python -m vidfactory llm-check
+```
+
+If that prints `[ok] local model works`, you can switch it on in
+`config.yaml`:
+
+```yaml
+script:
+  llm:
+    enabled: true
+```
+
+If it fails, leave it off. The videos are produced exactly as before.
+
+---
+
 ## Frequently hit problems
 
 **"No stock footage provider is usable"**
@@ -267,6 +293,13 @@ be exactly `PEXELS_API_KEY`.
 That is the eSpeak NG fallback, which means the Piper voice could not be
 downloaded. Re-run the workflow; it is nearly always a temporary network
 problem. The run log says which engine was used.
+
+**The video repeats the same footage**
+This should no longer happen: a Pexels video may be used only once per video,
+and the run fails if that is broken. Check
+`editorial_quality_report.json` in the artifact - `source_video_reuse_count`
+should be `0`. If it is not, the log will say `FOOTAGE SHORTAGE` and name the
+cause.
 
 **The video is shorter than I asked for**
 A topic only has so much genuinely distinct material. The system tells you in
