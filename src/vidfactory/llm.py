@@ -48,6 +48,43 @@ class LLMUnavailable(RuntimeError):
 # Binary + model provisioning
 # ---------------------------------------------------------------------------
 
+def _api_headers() -> dict[str, str]:
+    """Authenticate GitHub API calls when a token is available.
+
+    Unauthenticated API access from a GitHub Actions runner shares a 60
+    requests/hour quota across the whole runner pool, so it returns 403 far
+    more often than not. ``GITHUB_TOKEN`` is always present in Actions.
+    """
+
+    headers = {"User-Agent": "vidfactory/1.0", "Accept": "application/vnd.github+json"}
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
+
+
+def _latest_release_tag() -> str | None:
+    """Find the newest llama.cpp release tag without using the API.
+
+    ``/releases/latest`` on github.com redirects to ``/releases/tag/bNNNN``,
+    which needs no authentication and is not rate limited, so it works when
+    the API refuses.
+    """
+
+    request = urllib.request.Request(
+        "https://github.com/ggml-org/llama.cpp/releases/latest",
+        headers={"User-Agent": "vidfactory/1.0"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            final_url = response.geturl()
+    except Exception as exc:
+        log.debug("Could not resolve the latest release tag: %s", exc)
+        return None
+    match = re.search(r"/releases/tag/([A-Za-z0-9._-]+)", final_url or "")
+    return match.group(1) if match else None
+
+
 def _download(url: str, target: Path, timeout: int = 900) -> Path:
     target.parent.mkdir(parents=True, exist_ok=True)
     if target.exists() and target.stat().st_size > 1024:
@@ -73,24 +110,12 @@ def find_llama_binary() -> Path | None:
     if cached.exists():
         return cached
 
-    try:
-        request = urllib.request.Request(
-            LLAMA_RELEASE_API, headers={"User-Agent": "vidfactory/1.0"}
-        )
-        with urllib.request.urlopen(request, timeout=60) as response:
-            release = json.loads(response.read().decode("utf-8"))
-    except Exception as exc:
-        log.warning("Could not query llama.cpp releases: %s", exc)
-        return None
-
-    asset_url = None
-    for asset in release.get("assets", []):
-        name = str(asset.get("name", "")).lower()
-        if name.endswith(".zip") and "ubuntu" in name and "x64" in name and "cuda" not in name:
-            asset_url = asset.get("browser_download_url")
-            break
+    asset_url = _find_release_asset()
     if not asset_url:
-        log.warning("No suitable prebuilt llama.cpp asset found for this runner")
+        log.warning(
+            "Could not locate a prebuilt llama.cpp build for this runner; "
+            "the optional local model will be skipped"
+        )
         return None
 
     archive = CACHE_DIR / "llama.zip"
@@ -113,6 +138,52 @@ def find_llama_binary() -> Path | None:
         return cached
 
     log.warning("llama-cli was not present in the downloaded archive")
+    return None
+
+
+def _find_release_asset() -> str | None:
+    """URL of a prebuilt CPU llama.cpp build for x86-64 Linux, or None."""
+
+    def usable(name: str) -> bool:
+        name = name.lower()
+        return (
+            name.endswith(".zip")
+            and "ubuntu" in name
+            and ("x64" in name or "x86_64" in name)
+            and not any(gpu in name for gpu in ("cuda", "vulkan", "hip", "sycl", "arm"))
+        )
+
+    # Strategy 1: the API, authenticated when a token is available.
+    try:
+        request = urllib.request.Request(LLAMA_RELEASE_API, headers=_api_headers())
+        with urllib.request.urlopen(request, timeout=60) as response:
+            release = json.loads(response.read().decode("utf-8"))
+        for asset in release.get("assets", []):
+            if usable(str(asset.get("name", ""))):
+                return str(asset.get("browser_download_url"))
+        log.debug("No usable asset in the latest release listing")
+    except Exception as exc:
+        log.info("llama.cpp release API unavailable (%s); trying the direct URL", exc)
+
+    # Strategy 2: construct the download URL from the redirect tag. No API,
+    # no authentication, no rate limit.
+    tag = _latest_release_tag()
+    if not tag:
+        return None
+    for pattern in (
+        f"llama-{tag}-bin-ubuntu-x64.zip",
+        f"llama-{tag}-bin-ubuntu-vulkan-x64.zip",
+    ):
+        url = f"https://github.com/ggml-org/llama.cpp/releases/download/{tag}/{pattern}"
+        try:
+            probe = urllib.request.Request(
+                url, method="HEAD", headers={"User-Agent": "vidfactory/1.0"}
+            )
+            with urllib.request.urlopen(probe, timeout=30) as response:
+                if response.status < 400:
+                    return url
+        except Exception:
+            continue
     return None
 
 
@@ -469,7 +540,10 @@ def benchmark(settings: dict[str, Any] | None = None) -> dict[str, Any]:
     binary = find_llama_binary()
     result["binary"] = str(binary) if binary else ""
     if binary is None:
-        result["reason"] = "no llama.cpp binary could be obtained"
+        result["reason"] = (
+            "no llama.cpp binary could be obtained (release lookup failed - "
+            "set GITHUB_TOKEN, or check outbound access to github.com)"
+        )
         return result
 
     model = find_model(
@@ -478,7 +552,10 @@ def benchmark(settings: dict[str, Any] | None = None) -> dict[str, Any]:
     )
     result["model"] = str(model) if model else ""
     if model is None:
-        result["reason"] = "no GGUF model could be obtained"
+        result["reason"] = (
+            "no GGUF model could be obtained (check outbound access to "
+            "huggingface.co)"
+        )
         return result
     result["model_mb"] = round(model.stat().st_size / 1_000_000, 1)
     result["provision_seconds"] = round(time.time() - started, 1)

@@ -66,6 +66,8 @@ PROMISES: tuple[Promise, ...] = (
             ("sightline", "continuous", "flow", "uninterrupted", "open", "path"),
             ("contrast", "outline", "edges", "recede", "same color", "low-contrast"),
             ("storage", "vertical storage", "hidden", "conceal"),
+            ("visual weight", "heavy", "heavier", "lighter", "weight", "bulky",
+             "reads as", "the eye", "your brain", "perceived"),
         ),
         required_groups=2,
         counter_signals=(
@@ -222,12 +224,20 @@ def detect_promise(title: str, angle: str = "") -> Promise:
 
 
 def _tip_text(tip: Tip) -> str:
+    """All the text that describes an idea, including its visual queries.
+
+    The queries are hand-written descriptions of what the idea looks like
+    ("airy small living space"), so they carry real signal about what the idea
+    is for and are included deliberately.
+    """
+
     parts = [
         str(tip.get("title", "")),
         str(tip.get("why", "")),
         str(tip.get("how", "")),
         str(tip.get("mistake", "")),
         " ".join(str(t) for t in tip.get("tags", [])),
+        " ".join(str(q) for q in tip.get("queries", [])),
     ]
     return " ".join(parts).lower()
 

@@ -430,15 +430,24 @@ def diversify(
             continue
         accept(clip)
 
-    # The caps are a preference, not a reason to ship a video short of footage.
+    # The caps are a preference, not a reason to ship a video short of
+    # footage. When they bind, keep filling - but always take from the
+    # least-represented creator, query and subject next, so relaxing the caps
+    # still spreads the video around rather than handing the remainder to
+    # whichever prolific creator happens to rank highest.
     if len(chosen) < limit:
         keys = {c.key for c in chosen}
-        for clip in clips:
-            if len(chosen) >= limit:
-                break
-            if clip.key not in keys:
-                accept(clip)
-                keys.add(clip.key)
+        remaining = [c for c in clips if c.key not in keys]
+        while remaining and len(chosen) < limit:
+            remaining.sort(
+                key=lambda c: (
+                    creators.get((c.author or "").lower(), 0),
+                    queries.get(c.query, 0),
+                    subjects.get(visual_subject(c), 0),
+                    -c.score,
+                )
+            )
+            accept(remaining.pop(0))
 
     return chosen[:limit]
 

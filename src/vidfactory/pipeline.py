@@ -334,9 +334,11 @@ class VideoPipeline:
                                 bucket.append(clip.key)
                         if not query.is_generic:
                             found_specific = True
-                    if found_specific and len(bucket) >= 6:
+                    # Enough footage for this idea; move to the next scene
+                    # rather than burning rate limit on more of the same.
+                    if found_specific and len(bucket) >= 12:
                         break
-                if found_specific and len(bucket) >= 8:
+                if found_specific and len(bucket) >= 12:
                     break
             return added
 
@@ -344,10 +346,19 @@ class VideoPipeline:
 
         # A provider that has stopped returning anything new is exhausted, and
         # hammering it just burns rate limit. Track consecutive dry scenes.
-        def sweep(pages: int, include_generic: bool, stop_after_dry: int = 6) -> None:
+        def sweep(
+            pages: int,
+            include_generic: bool,
+            stop_after_dry: int = 6,
+            visit_every_scene: bool = False,
+        ) -> None:
             dry = 0
             for scene in scene_order:
-                if len(candidates) >= needed * 2:
+                # The first pass always visits every scene even once there is
+                # plenty of footage: each idea has to contribute its own
+                # queries, or its shots end up drawn from another idea's
+                # search results and stop illustrating the narration.
+                if not visit_every_scene and len(candidates) >= needed * 2:
                     return
                 before = len(candidates)
                 harvest(scene, pages=pages, include_generic=include_generic)
@@ -364,8 +375,8 @@ class VideoPipeline:
                 else:
                     dry = 0
 
-        # Pass 1: specific queries only, one page each. Cheap and precise.
-        sweep(pages=1, include_generic=False)
+        # Pass 1: every scene's own specific queries, one page each.
+        sweep(pages=1, include_generic=False, visit_every_scene=True)
 
         # Pass 2: still short, so go deeper before ever loosening the rules.
         if len(candidates) < needed * 1.5:
