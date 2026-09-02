@@ -1,0 +1,6 @@
+# Core runtime dependencies for the YouTube Video Factory.
+# Everything here is free / open source. No paid API SDKs.
+PyYAML>=6.0
+requests>=2.31
+# Local, offline, open-source neural TTS (CPU friendly).
+piper-tts>=1.7.0 ; platform_machine == "x86_64" and sys_platform == "linux"

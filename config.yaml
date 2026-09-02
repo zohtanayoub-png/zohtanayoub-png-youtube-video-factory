@@ -1,0 +1,117 @@
+# ============================================================================
+#  HOME DECOR YOUTUBE VIDEO FACTORY - main configuration
+#  Everything in this file is safe to edit by hand. Nothing here is a secret.
+#  API keys live in GitHub Secrets / environment variables, never in this file.
+# ============================================================================
+
+channel:
+  name: HomeeDeeco
+  language: en-US
+  audience_country: US
+  niche: home decor
+
+video:
+  duration_minutes: 20          # target length of the finished video
+  resolution: 1920x1080
+  fps: 30
+  min_clip_seconds: 4           # shortest single visual shot
+  max_clip_seconds: 8           # longest single visual shot
+  transition: cut               # "cut" (default, clean) or "crossfade"
+  transition_seconds: 0.4       # only used when transition == crossfade
+  motion: subtle                # "none" or "subtle" (slow ken-burns style zoom)
+  tail_seconds: 1.2             # small silent tail so the video never freezes abruptly
+  fade_out_seconds: 0.6         # short fade at the very end (0 disables it)
+  fast_mux: true                # copy the finished video track instead of re-encoding it
+  video_bitrate: 6000k
+  crf: 20
+  preset: veryfast
+
+audio:
+  narration: true
+  # ---------------------------------------------------------------------
+  # MUSIC IS PERMANENTLY DISABLED. This key exists only so the renderer can
+  # assert that it is false. Setting it to true is rejected by config
+  # validation - the pipeline will refuse to run.
+  # ---------------------------------------------------------------------
+  music: false
+  loudness_lufs: -16.0          # YouTube-friendly narration loudness
+  sample_rate: 48000
+  aac_bitrate: 192k
+
+tts:
+  engine: auto                  # auto | piper | espeak | silent
+  voice: en_US-hfc_female-medium   # warm, clear American English female voice
+  fallback_voices:
+    - en_US-amy-medium
+    - en_US-lessac-medium
+  speed: 1.0                    # 1.0 = natural pace (lower = slower)
+  sentence_pause_seconds: 0.28
+  paragraph_pause_seconds: 0.55
+  scene_pause_seconds: 0.45
+  max_chunk_chars: 320          # long scripts are chunked so TTS never breaks
+
+subtitles:
+  enabled: true
+  burn_in: false                # default: ship a .srt file, do not burn in
+  max_line_chars: 42
+  max_lines: 2
+
+script:
+  engine: auto                  # auto | llm | template  (template = always works)
+  words_per_minute: 150         # narration speed used to size the script
+  llm:
+    enabled: false              # opt-in; template engine is the reliable default
+    model_repo: Qwen/Qwen2.5-1.5B-Instruct-GGUF
+    model_file: qwen2.5-1.5b-instruct-q4_k_m.gguf
+    context_size: 4096
+    threads: 0                  # 0 = auto-detect
+    max_seconds_per_call: 240
+    temperature: 0.8
+
+sources:
+  pexels: true
+  pixabay: true
+  local: false                  # serve clips from assets/local_clips (media you own)
+  per_query_results: 20
+  min_width: 1280
+  min_height: 720
+  prefer_width: 1920
+  min_source_seconds: 5.0
+  max_download_mb: 90
+  download_timeout_seconds: 120
+  retries: 3
+
+ranking:
+  weights:
+    relevance: 30
+    resolution: 20
+    orientation: 15
+    duration: 10
+    novelty: 15
+    quality: 10
+  min_score: 28                 # clips below this are never used
+  clip_reuse_cooldown_days: 45  # recently used clips are rejected
+  max_uses_per_clip: 3
+
+topics:
+  similarity_threshold: 0.62    # reject a new topic that is this similar to an old one
+  history_limit: 500
+
+autopilot:
+  enabled: false
+  videos_per_week: 3
+
+youtube:
+  upload_enabled: false
+  privacy_status: private       # private | unlisted | public
+  category_id: "26"             # Howto & Style
+  made_for_kids: false
+
+output:
+  directory: output
+  keep_workdir: false           # delete downloaded footage after a successful render
+
+quality:
+  min_file_mb: 1.0
+  duration_tolerance_seconds: 12.0
+  max_repair_attempts: 1

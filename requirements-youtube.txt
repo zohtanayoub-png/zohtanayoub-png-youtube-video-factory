@@ -1,0 +1,5 @@
+# Only needed when youtube.upload_enabled is true.
+google-api-python-client>=2.120
+google-auth>=2.28
+google-auth-oauthlib>=1.2
+google-auth-httplib2>=0.2

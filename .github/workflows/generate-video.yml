@@ -1,0 +1,280 @@
+# =============================================================================
+#  GENERATE ONE VIDEO
+#  Runs the whole pipeline in the cloud. Your computer does not need to be on.
+#  Start it from:  Actions -> Generate Video -> Run workflow
+# =============================================================================
+name: Generate Video
+
+on:
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: "Video topic (leave empty to pick one automatically)"
+        required: false
+        type: string
+        default: ""
+      duration_minutes:
+        description: "Target length in minutes"
+        required: false
+        type: string
+        default: "20"
+      voice:
+        description: "Narration voice"
+        required: false
+        type: choice
+        default: "en_US-hfc_female-medium"
+        options:
+          - en_US-hfc_female-medium
+          - en_US-amy-medium
+          - en_US-lessac-medium
+          - en_US-kristin-medium
+          - en_US-ryan-medium
+          - en_US-hfc_male-medium
+      subtitles:
+        description: "Generate an .srt subtitle file"
+        required: false
+        type: boolean
+        default: true
+      burn_in_subtitles:
+        description: "Burn the subtitles into the picture (usually leave off)"
+        required: false
+        type: boolean
+        default: false
+      upload_to_youtube:
+        description: "Upload to YouTube when it is finished"
+        required: false
+        type: boolean
+        default: false
+      privacy_status:
+        description: "YouTube privacy (only used when uploading)"
+        required: false
+        type: choice
+        default: "private"
+        options: [private, unlisted, public]
+
+  # Lets autopilot.yml reuse this exact job instead of duplicating it.
+  workflow_call:
+    inputs:
+      topic:
+        required: false
+        type: string
+        default: ""
+      duration_minutes:
+        required: false
+        type: string
+        default: "20"
+      voice:
+        required: false
+        type: string
+        default: "en_US-hfc_female-medium"
+      subtitles:
+        required: false
+        type: boolean
+        default: true
+      burn_in_subtitles:
+        required: false
+        type: boolean
+        default: false
+      upload_to_youtube:
+        required: false
+        type: boolean
+        default: false
+      privacy_status:
+        required: false
+        type: string
+        default: "private"
+    secrets:
+      PEXELS_API_KEY:
+        required: false
+      PIXABAY_API_KEY:
+        required: false
+      YOUTUBE_CLIENT_ID:
+        required: false
+      YOUTUBE_CLIENT_SECRET:
+        required: false
+      YOUTUBE_REFRESH_TOKEN:
+        required: false
+
+# Least privilege: the job only needs to read the code and commit the small
+# JSON history files back to the repository.
+permissions:
+  contents: write
+
+# Never let two renders write the history at the same time.
+concurrency:
+  group: video-generation
+  cancel-in-progress: false
+
+jobs:
+  render:
+    name: Render long-form video
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install FFmpeg
+        run: |
+          set -euo pipefail
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends ffmpeg
+          fi
+          ffmpeg -version | head -1
+          ffprobe -version | head -1
+
+      - name: Install eSpeak NG (narration fallback)
+        run: sudo apt-get install -y --no-install-recommends espeak-ng
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+
+      - name: Restore the cached voice and model files
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: vidfactory-cache-${{ inputs.voice }}-v1
+          restore-keys: |
+            vidfactory-cache-
+
+      - name: Show free disk space
+        run: df -h / | tail -1
+
+      - name: Check the environment
+        env:
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+        run: python -m vidfactory doctor || true
+
+      - name: Generate the video
+        id: generate
+        # Workflow inputs are passed through the environment rather than
+        # interpolated into the shell, so a topic can never inject a command.
+        env:
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          INPUT_TOPIC: ${{ inputs.topic }}
+          INPUT_DURATION: ${{ inputs.duration_minutes }}
+          INPUT_VOICE: ${{ inputs.voice }}
+          INPUT_SUBTITLES: ${{ inputs.subtitles }}
+          INPUT_BURN_IN: ${{ inputs.burn_in_subtitles }}
+          INPUT_UPLOAD: ${{ inputs.upload_to_youtube }}
+          INPUT_PRIVACY: ${{ inputs.privacy_status }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          if [ "${INPUT_UPLOAD}" = "true" ]; then
+            pip install -r requirements-youtube.txt
+          fi
+          python -m vidfactory generate \
+            --topic "${INPUT_TOPIC}" \
+            --duration "${INPUT_DURATION}" \
+            --voice "${INPUT_VOICE}" \
+            --subtitles "${INPUT_SUBTITLES}" \
+            --burn-in "${INPUT_BURN_IN}" \
+            --upload "${INPUT_UPLOAD}" \
+            --privacy "${INPUT_PRIVACY}" \
+            --run-id "run-${RUN_NUMBER}" \
+            --github-output
+
+      - name: Summarize the result
+        if: always()
+        env:
+          VIDEO_TITLE: ${{ steps.generate.outputs.title }}
+          VIDEO_SECONDS: ${{ steps.generate.outputs.duration_seconds }}
+          VIDEO_YOUTUBE_ID: ${{ steps.generate.outputs.youtube_id }}
+        run: |
+          {
+            echo "## Video generation"
+            echo ""
+            if [ -n "${VIDEO_TITLE:-}" ]; then
+              echo "**Title:** ${VIDEO_TITLE}"
+              echo ""
+              echo "**Length:** ${VIDEO_SECONDS} seconds"
+              echo ""
+              if [ -n "${VIDEO_YOUTUBE_ID:-}" ]; then
+                echo "**YouTube:** https://www.youtube.com/watch?v=${VIDEO_YOUTUBE_ID}"
+              else
+                echo "Not uploaded. Download the artifact below."
+              fi
+            else
+              echo "Generation did not complete. Check the log above."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the finished video and files
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: video-run-${{ github.run_number }}
+          path: |
+            output/**/final_video.mp4
+            output/**/subtitles.srt
+            output/**/script.txt
+            output/**/metadata.json
+            output/**/video_sources.json
+            output/**/scenes.json
+            output/**/quality_report.json
+          retention-days: 14
+          if-no-files-found: error
+          compression-level: 0
+
+      - name: Upload the text files only (kept longer)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: metadata-run-${{ github.run_number }}
+          path: |
+            output/**/script.txt
+            output/**/metadata.json
+            output/**/video_sources.json
+          retention-days: 60
+          if-no-files-found: warn
+
+      - name: Save the history back to the repository
+        if: success()
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/state
+          if git diff --cached --quiet; then
+            echo "No history changes to commit."
+            exit 0
+          fi
+          git commit -m "chore(history): record run ${RUN_NUMBER}"
+          # Another run may have pushed while this one was rendering.
+          for attempt in 1 2 3 4 5; do
+            if git pull --rebase --autostash origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}"; then
+              echo "History saved."
+              exit 0
+            fi
+            echo "Push attempt ${attempt} failed; retrying..."
+            sleep $((attempt * 4))
+          done
+          echo "::warning::Could not save the history this run. The video itself is fine."
+
+      - name: Remove temporary footage
+        if: always()
+        run: |
+          rm -rf work
+          df -h / | tail -1

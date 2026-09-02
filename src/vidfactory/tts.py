@@ -1,0 +1,579 @@
+"""Local, free, open-source narration.
+
+Engines, in preference order:
+
+``piper``
+    `Piper <https://github.com/OHF-Voice/piper1-gpl>`_ - a small ONNX neural
+    TTS that runs fast on CPU and produces natural American English. Voice
+    models are downloaded once from the public Hugging Face voice repository
+    and cached (the GitHub Actions workflow caches that directory).
+
+``espeak``
+    eSpeak NG. Robotic but completely dependency-free and installable from
+    every distro repository. Used when Piper cannot be prepared, so a runner
+    without model access still produces a complete, audible video.
+
+``silent``
+    Correctly-timed silence. Only used by tests and as a last resort so the
+    pipeline can still produce a valid, correctly-timed MP4.
+
+No paid API is used, and no music is ever generated or mixed - the output
+track contains narration only.
+"""
+
+from __future__ import annotations
+
+import os
+import re
+import shutil
+import subprocess
+import sys
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Iterable, Sequence
+
+from .ffmpeg_utils import concat_audio, make_silence, probe_media, run_ffmpeg
+from .http import download_file
+from .logging_utils import get_logger
+
+log = get_logger("TTS")
+
+CACHE_DIR = Path(os.environ.get("VIDFACTORY_CACHE", ".cache")) / "voices"
+#: Override with VIDFACTORY_PIPER_VOICE_BASE to use a mirror.
+VOICE_BASE = os.environ.get(
+    "VIDFACTORY_PIPER_VOICE_BASE",
+    "https://huggingface.co/rhasspy/piper-voices/resolve/main",
+).rstrip("/")
+
+#: Voices that ship as documented choices. Any other valid Piper voice name
+#: also works - the repository path is derived from the name itself.
+VOICE_PATHS: dict[str, str] = {
+    "en_US-hfc_female-medium": "en/en_US/hfc_female/medium",
+    "en_US-amy-medium": "en/en_US/amy/medium",
+    "en_US-lessac-medium": "en/en_US/lessac/medium",
+    "en_US-lessac-high": "en/en_US/lessac/high",
+    "en_US-libritts_r-medium": "en/en_US/libritts_r/medium",
+    "en_US-ryan-medium": "en/en_US/ryan/medium",
+    "en_US-hfc_male-medium": "en/en_US/hfc_male/medium",
+    "en_US-kristin-medium": "en/en_US/kristin/medium",
+    "en_US-kathleen-low": "en/en_US/kathleen/low",
+}
+
+_VOICE_NAME = re.compile(r"^(?P<family>[a-z]+)_(?P<region>[A-Za-z]+)-(?P<name>[^-]+)-(?P<quality>.+)$")
+
+
+def voice_repository_path(voice: str) -> str | None:
+    """Work out where a voice lives in the piper-voices repository.
+
+    Known voices come from the table above; anything else is derived from the
+    ``<lang>_<REGION>-<name>-<quality>`` naming convention, which is how Piper
+    itself resolves voices. That means a new voice can be selected in
+    ``config.yaml`` without any code change.
+    """
+
+    if voice in VOICE_PATHS:
+        return VOICE_PATHS[voice]
+    match = _VOICE_NAME.match(str(voice or ""))
+    if not match:
+        return None
+    family = match.group("family")
+    code = f"{family}_{match.group('region')}"
+    return f"{family}/{code}/{match.group('name')}/{match.group('quality')}"
+
+
+class TTSUnavailable(RuntimeError):
+    """Raised when a specific TTS engine cannot be used."""
+
+
+# ---------------------------------------------------------------------------
+# Text normalization - what gets spoken is also what gets subtitled
+# ---------------------------------------------------------------------------
+
+_UNITS = {
+    "cm": "centimeters",
+    "mm": "millimeters",
+    "kg": "kilograms",
+    "lb": "pounds",
+    "ft": "feet",
+    "in": "inches",
+}
+
+_ABBREVIATIONS = {
+    r"\be\.g\.\s*": "for example, ",
+    r"\bi\.e\.\s*": "that is, ",
+    r"\betc\.": "and so on",
+    r"\bvs\.?\b": "versus",
+    r"\bapprox\.": "approximately",
+    r"\bTV\b": "T V",
+    r"\bLED\b": "L E D",
+    r"\bDIY\b": "D I Y",
+    r"\bUS\b": "U S",
+}
+
+
+def normalize_for_speech(text: str) -> str:
+    """Make text safe and natural to speak, and keep subtitles matching it."""
+
+    text = re.sub(r"\s+", " ", str(text or "")).strip()
+    for pattern, replacement in _ABBREVIATIONS.items():
+        text = re.sub(pattern, replacement, text)
+    for unit, spoken in _UNITS.items():
+        text = re.sub(rf"(\d)\s*{re.escape(unit)}\.?(?![a-zA-Z])", rf"\1 {spoken}", text)
+    text = text.replace("&", " and ")
+    text = re.sub(r"[\"“”„]", "", text)
+    text = re.sub(r"\s*[—–]\s*", ", ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    text = re.sub(r"\s+([,.;:!?])", r"\1", text)
+    return text
+
+
+def chunk_text(text: str, max_chars: int = 320) -> list[str]:
+    """Split narration into TTS-sized chunks without cutting sentences apart."""
+
+    from .scene_planner import split_sentences
+
+    chunks: list[str] = []
+    current = ""
+    for sentence in split_sentences(text):
+        if not current:
+            current = sentence
+        elif len(current) + 1 + len(sentence) <= max_chars:
+            current = f"{current} {sentence}"
+        else:
+            chunks.append(current)
+            current = sentence
+        # A single sentence longer than the limit is split on commas.
+        while len(current) > max_chars:
+            split_at = current.rfind(", ", 0, max_chars)
+            if split_at < 40:
+                split_at = current.rfind(" ", 0, max_chars)
+            if split_at < 40:
+                break
+            chunks.append(current[: split_at + 1].strip())
+            current = current[split_at + 1 :].strip()
+    if current:
+        chunks.append(current)
+    return [c for c in chunks if c.strip()]
+
+
+# ---------------------------------------------------------------------------
+# Engines
+# ---------------------------------------------------------------------------
+
+class TTSEngine:
+    """Base engine interface: synthesize one chunk of text into a WAV file."""
+
+    name = "base"
+
+    def __init__(self, voice: str = "", speed: float = 1.0, sample_rate: int = 48000) -> None:
+        self.voice = voice
+        self.speed = float(speed)
+        self.sample_rate = int(sample_rate)
+
+    def synthesize(self, text: str, destination: Path) -> Path:  # pragma: no cover - abstract
+        raise NotImplementedError
+
+
+class PiperEngine(TTSEngine):
+    """Neural TTS through the ``piper`` CLI (installed by ``piper-tts``)."""
+
+    name = "piper"
+
+    def __init__(
+        self,
+        voice: str = "en_US-hfc_female-medium",
+        speed: float = 1.0,
+        sample_rate: int = 48000,
+        fallback_voices: Sequence[str] = (),
+    ) -> None:
+        super().__init__(voice, speed, sample_rate)
+        self.command_prefix = self._locate_piper()
+        self.model_path: Path
+        self.model_path = self._ensure_voice([voice, *fallback_voices])
+        log.info("Voice ready: %s", self.model_path.stem)
+
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _locate_piper() -> list[str]:
+        """Find piper as a console script, or fall back to ``python -m piper``."""
+
+        binary = shutil.which("piper")
+        if binary:
+            return [binary]
+        try:
+            import piper  # noqa: F401
+        except Exception as exc:
+            raise TTSUnavailable(
+                "piper is not installed (pip install piper-tts)"
+            ) from exc
+        return [sys.executable, "-m", "piper"]
+
+    @staticmethod
+    def _download_with_piper(voice: str, directory: Path) -> Path | None:
+        """Use Piper's own downloader, which knows the current voice catalog."""
+
+        directory.mkdir(parents=True, exist_ok=True)
+        try:
+            result = subprocess.run(
+                [sys.executable, "-m", "piper.download_voices", voice,
+                 "--download-dir", str(directory)],
+                capture_output=True,
+                text=True,
+                timeout=600,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return None
+        if result.returncode != 0:
+            return None
+        model = directory / f"{voice}.onnx"
+        config = directory / f"{voice}.onnx.json"
+        return model if model.exists() and config.exists() else None
+
+    @staticmethod
+    def _download_directly(voice: str, directory: Path) -> Path | None:
+        """Fetch the ONNX model and its config over plain HTTPS with retries."""
+
+        path = voice_repository_path(voice)
+        if not path:
+            return None
+        model = directory / f"{voice}.onnx"
+        config = directory / f"{voice}.onnx.json"
+        try:
+            download_file(f"{VOICE_BASE}/{path}/{voice}.onnx", model, retries=3, timeout=600)
+            download_file(
+                f"{VOICE_BASE}/{path}/{voice}.onnx.json", config, retries=3, timeout=120
+            )
+        except Exception:
+            model.unlink(missing_ok=True)
+            config.unlink(missing_ok=True)
+            return None
+        return model
+
+    @classmethod
+    def _ensure_voice(cls, candidates: Sequence[str]) -> Path:
+        """Return a local ONNX voice, downloading and caching it if needed."""
+
+        override = os.environ.get("VIDFACTORY_PIPER_MODEL")
+        if override and Path(override).exists():
+            return Path(override)
+
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        tried: list[str] = []
+        for voice in candidates:
+            if not voice:
+                continue
+            tried.append(voice)
+            model = CACHE_DIR / f"{voice}.onnx"
+            config = CACHE_DIR / f"{voice}.onnx.json"
+            if model.exists() and config.exists() and model.stat().st_size > 1_000_000:
+                return model
+            for strategy in (cls._download_with_piper, cls._download_directly):
+                found = strategy(voice, CACHE_DIR)
+                if found is not None:
+                    return found
+                log.debug("%s failed for %s", strategy.__name__, voice)
+
+        raise TTSUnavailable(
+            "no Piper voice could be downloaded (tried "
+            + ", ".join(tried[:4])
+            + "); check the runner's network access"
+        )
+
+    # ------------------------------------------------------------------
+    def synthesize(self, text: str, destination: Path) -> Path:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        raw = destination.with_name(destination.stem + ".piper.wav")
+        # Piper's length_scale is inverse to speed: 1.25 is 25% slower.
+        length_scale = 1.0 / max(0.4, min(self.speed, 2.0))
+        command = [
+            *self.command_prefix,
+            "-m", str(self.model_path),
+            "-f", str(raw),
+            "--length-scale", f"{length_scale:.3f}",
+            "--sentence-silence", "0.15",
+        ]
+        try:
+            result = subprocess.run(
+                command,
+                input=text,
+                capture_output=True,
+                text=True,
+                timeout=300,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise TTSUnavailable(f"piper failed to run: {exc}") from exc
+        if result.returncode != 0 or not raw.exists():
+            raise TTSUnavailable(f"piper failed: {(result.stderr or '')[-300:]}")
+
+        # Piper writes 22.05 kHz mono; resample once to the project rate.
+        run_ffmpeg(
+            ["-i", str(raw), "-ar", str(self.sample_rate), "-ac", "1", "-c:a", "pcm_s16le", str(destination)],
+            description="tts resample",
+        )
+        raw.unlink(missing_ok=True)
+        return destination
+
+
+class EspeakEngine(TTSEngine):
+    """eSpeak NG fallback: always available, intelligible, not natural."""
+
+    name = "espeak"
+
+    def __init__(self, voice: str = "en-us", speed: float = 1.0, sample_rate: int = 48000) -> None:
+        super().__init__(voice, speed, sample_rate)
+        self.binary = shutil.which("espeak-ng") or shutil.which("espeak")
+        if not self.binary:
+            raise TTSUnavailable("espeak-ng is not installed")
+        # Map a Piper-style voice name onto an eSpeak voice.
+        self.espeak_voice = "en-us+f3" if "female" in voice or "amy" in voice or "hfc_f" in voice else "en-us"
+
+    def synthesize(self, text: str, destination: Path) -> Path:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        raw = destination.with_name(destination.stem + ".espeak.wav")
+        words_per_minute = int(max(80, min(220, 165 * self.speed)))
+        command = [
+            self.binary,
+            "-v", self.espeak_voice,
+            "-s", str(words_per_minute),
+            "-p", "45",
+            "-g", "4",
+            "-w", str(raw),
+            text,
+        ]
+        try:
+            result = subprocess.run(command, capture_output=True, text=True, timeout=300, check=False)
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise TTSUnavailable(f"espeak-ng failed to run: {exc}") from exc
+        if result.returncode != 0 or not raw.exists():
+            raise TTSUnavailable(f"espeak-ng failed: {(result.stderr or '')[-300:]}")
+
+        run_ffmpeg(
+            ["-i", str(raw), "-ar", str(self.sample_rate), "-ac", "1", "-c:a", "pcm_s16le", str(destination)],
+            description="tts resample",
+        )
+        raw.unlink(missing_ok=True)
+        return destination
+
+
+class SilentEngine(TTSEngine):
+    """Timed silence. Keeps the pipeline runnable when no TTS exists at all."""
+
+    name = "silent"
+
+    def synthesize(self, text: str, destination: Path) -> Path:
+        # ~2.5 spoken words per second is the same rate the planner assumes.
+        seconds = max(0.8, len(text.split()) / 2.5 / max(self.speed, 0.1))
+        return make_silence(destination, seconds, self.sample_rate)
+
+
+def build_engine(
+    engine: str = "auto",
+    voice: str = "en_US-hfc_female-medium",
+    speed: float = 1.0,
+    sample_rate: int = 48000,
+    fallback_voices: Sequence[str] = (),
+) -> TTSEngine:
+    """Return the best available engine, honoring an explicit request first."""
+
+    order: list[str]
+    if engine in ("piper", "espeak", "silent"):
+        order = [engine]
+    else:
+        order = ["piper", "espeak", "silent"]
+
+    errors: list[str] = []
+    for name in order:
+        try:
+            if name == "piper":
+                return PiperEngine(voice, speed, sample_rate, fallback_voices)
+            if name == "espeak":
+                return EspeakEngine(voice, speed, sample_rate)
+            return SilentEngine(voice, speed, sample_rate)
+        except TTSUnavailable as exc:
+            errors.append(f"{name}: {exc}")
+            log.warning("TTS engine %s unavailable: %s", name, exc)
+
+    raise TTSUnavailable("no TTS engine could be initialised - " + "; ".join(errors))
+
+
+# ---------------------------------------------------------------------------
+# Narration assembly
+# ---------------------------------------------------------------------------
+
+@dataclass
+class NarrationChunk:
+    """One spoken chunk with its exact place on the finished audio timeline."""
+
+    text: str
+    start: float
+    end: float
+    scene_id: str = ""
+    path: str = ""
+
+    @property
+    def duration(self) -> float:
+        return max(0.0, self.end - self.start)
+
+
+@dataclass
+class Narration:
+    """The finished narration track plus the timings subtitles are built from."""
+
+    audio_path: Path
+    duration: float
+    chunks: list[NarrationChunk] = field(default_factory=list)
+    #: ``{scene_id: (start, end)}`` for matching visuals to narration.
+    scene_timings: dict[str, tuple[float, float]] = field(default_factory=dict)
+    engine: str = ""
+    voice: str = ""
+
+    def scene_duration(self, scene_id: str) -> float:
+        start, end = self.scene_timings.get(scene_id, (0.0, 0.0))
+        return max(0.0, end - start)
+
+
+class NarrationBuilder:
+    """Renders scenes to a single, loudness-normalized narration track."""
+
+    def __init__(
+        self,
+        engine: TTSEngine,
+        workdir: str | Path,
+        sentence_pause: float = 0.28,
+        scene_pause: float = 0.45,
+        max_chunk_chars: int = 320,
+        loudness_lufs: float = -16.0,
+        sample_rate: int = 48000,
+    ) -> None:
+        self.engine = engine
+        self.workdir = Path(workdir)
+        self.workdir.mkdir(parents=True, exist_ok=True)
+        self.sentence_pause = float(sentence_pause)
+        self.scene_pause = float(scene_pause)
+        self.max_chunk_chars = int(max_chunk_chars)
+        self.loudness_lufs = float(loudness_lufs)
+        self.sample_rate = int(sample_rate)
+
+    # ------------------------------------------------------------------
+    def build(self, scenes: Sequence[Any], destination: str | Path) -> Narration:
+        """Synthesize every scene and assemble one continuous narration file."""
+
+        parts: list[Path] = []
+        chunks: list[NarrationChunk] = []
+        scene_timings: dict[str, tuple[float, float]] = {}
+        timeline = 0.0
+        chunk_index = 0
+        silence_cache: dict[str, Path] = {}
+
+        def silence(seconds: float) -> Path:
+            key = f"{seconds:.3f}"
+            if key not in silence_cache:
+                path = self.workdir / f"pause_{key.replace('.', '_')}.wav"
+                make_silence(path, seconds, self.sample_rate)
+                silence_cache[key] = path
+            return silence_cache[key]
+
+        for scene_number, scene in enumerate(scenes):
+            scene_id = getattr(scene, "scene_id", f"scene-{scene_number:03d}")
+            narration_text = normalize_for_speech(getattr(scene, "narration", "") or "")
+            if not narration_text:
+                continue
+            scene_start = timeline
+
+            for chunk_text_value in chunk_text(narration_text, self.max_chunk_chars):
+                chunk_index += 1
+                wav = self.workdir / f"chunk_{chunk_index:05d}.wav"
+                try:
+                    self.engine.synthesize(chunk_text_value, wav)
+                except Exception as exc:
+                    # One failed chunk must not lose the whole narration: insert
+                    # correctly-timed silence and carry on.
+                    log.warning("TTS failed for a chunk (%s); inserting a pause", exc)
+                    make_silence(wav, max(1.0, len(chunk_text_value.split()) / 2.5), self.sample_rate)
+
+                info = probe_media(wav)
+                duration = info.duration if info.duration > 0 else 1.0
+                chunks.append(
+                    NarrationChunk(
+                        text=chunk_text_value,
+                        start=timeline,
+                        end=timeline + duration,
+                        scene_id=scene_id,
+                        path=str(wav),
+                    )
+                )
+                parts.append(wav)
+                timeline += duration
+
+                if self.sentence_pause > 0:
+                    pause = silence(self.sentence_pause)
+                    parts.append(pause)
+                    timeline += self.sentence_pause
+
+            scene_timings[scene_id] = (scene_start, timeline)
+
+            if self.scene_pause > 0 and scene_number < len(scenes) - 1:
+                pause = silence(self.scene_pause)
+                parts.append(pause)
+                timeline += self.scene_pause
+
+        if not parts:
+            raise RuntimeError("No narration was produced - the script was empty")
+
+        merged = self.workdir / "narration_raw.wav"
+        concat_audio(parts, merged, self.sample_rate)
+
+        target = Path(destination)
+        normalized = self._normalize(merged, target)
+        actual = probe_media(normalized).duration or timeline
+
+        # Loudness normalization can shift the length by a few milliseconds;
+        # rescale the timings so subtitles stay in sync with the real audio.
+        if actual > 0 and timeline > 0 and abs(actual - timeline) > 0.05:
+            factor = actual / timeline
+            for chunk in chunks:
+                chunk.start *= factor
+                chunk.end *= factor
+            scene_timings = {
+                key: (start * factor, end * factor)
+                for key, (start, end) in scene_timings.items()
+            }
+
+        log.info("Narration duration: %s (%s voice)", _fmt(actual), self.engine.name)
+        return Narration(
+            audio_path=normalized,
+            duration=actual,
+            chunks=chunks,
+            scene_timings=scene_timings,
+            engine=self.engine.name,
+            voice=self.engine.voice,
+        )
+
+    # ------------------------------------------------------------------
+    def _normalize(self, source: Path, destination: Path) -> Path:
+        """Apply EBU R128 loudness normalization. Falls back to a plain copy."""
+
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            run_ffmpeg(
+                [
+                    "-i", str(source),
+                    "-af", f"loudnorm=I={self.loudness_lufs}:TP=-1.5:LRA=11",
+                    "-ar", str(self.sample_rate),
+                    "-ac", "1",
+                    "-c:a", "pcm_s16le",
+                    str(destination),
+                ],
+                description="loudness normalization",
+            )
+        except Exception as exc:
+            log.warning("Loudness normalization failed (%s); using the raw track", exc)
+            shutil.copy2(source, destination)
+        return destination
+
+
+def _fmt(seconds: float) -> str:
+    minutes, secs = divmod(int(round(seconds)), 60)
+    return f"{minutes:d}:{secs:02d}"

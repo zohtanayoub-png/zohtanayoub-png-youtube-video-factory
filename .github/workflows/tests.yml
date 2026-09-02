@@ -1,0 +1,74 @@
+# =============================================================================
+#  TESTS
+#  Unit tests plus a real short render, so a change can never quietly break
+#  the pipeline. Deliberately has no access to any secret.
+# =============================================================================
+name: Tests
+
+on:
+  push:
+    branches: ["**"]
+    paths-ignore:
+      - "data/state/**"
+      - "**/*.md"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Unit tests and a real render
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install FFmpeg and eSpeak NG
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ffmpeg espeak-ng
+          ffmpeg -version | head -1
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+          pip install -e .
+
+
+      - name: Report which narration engine is available
+        run: |
+          python - <<'PY' || true
+          import sys
+          sys.path.insert(0, "src")
+          from vidfactory.tts import build_engine
+          engine = build_engine("auto", voice="en_US-hfc_female-medium",
+                                fallback_voices=["en_US-amy-medium", "en_US-lessac-medium"])
+          print(f"Narration engine: {engine.name}")
+          if engine.name != "piper":
+              print("::warning::Piper neural voice unavailable; narration would use "
+                    f"the {engine.name} fallback on this runner.")
+          PY
+
+      - name: Unit tests
+        run: python -m pytest -q -m "not integration"
+
+      - name: Real integration render
+        run: python -m pytest -q -m integration
+
+      - name: Environment check
+        run: python -m vidfactory doctor || true
