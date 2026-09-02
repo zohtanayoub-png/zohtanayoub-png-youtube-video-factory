@@ -141,27 +141,56 @@ def find_llama_binary() -> Path | None:
     return None
 
 
+def _rank_asset(name: str) -> int:
+    """Score a release asset for "prebuilt CPU build for x86-64 Linux".
+
+    llama.cpp renames its release assets from time to time, so this scores
+    candidates instead of pattern-matching one exact filename. Anything
+    scoring zero is unusable here.
+    """
+
+    name = name.lower()
+    if not name.endswith(".zip"):
+        return 0
+    if any(bad in name for bad in ("arm64", "aarch64", "macos", "win", "android", "musl")):
+        return 0
+    if "ubuntu" not in name and "linux" not in name:
+        return 0
+
+    score = 10
+    if "x64" in name or "x86_64" in name or "amd64" in name:
+        score += 5
+    # A plain CPU build is ideal; accelerator builds still run on CPU but
+    # carry driver dependencies a runner may not have.
+    if any(gpu in name for gpu in ("cuda", "hip", "sycl", "musa")):
+        score -= 8
+    elif "vulkan" in name:
+        score -= 4
+    return max(0, score)
+
+
 def _find_release_asset() -> str | None:
     """URL of a prebuilt CPU llama.cpp build for x86-64 Linux, or None."""
-
-    def usable(name: str) -> bool:
-        name = name.lower()
-        return (
-            name.endswith(".zip")
-            and "ubuntu" in name
-            and ("x64" in name or "x86_64" in name)
-            and not any(gpu in name for gpu in ("cuda", "vulkan", "hip", "sycl", "arm"))
-        )
 
     # Strategy 1: the API, authenticated when a token is available.
     try:
         request = urllib.request.Request(LLAMA_RELEASE_API, headers=_api_headers())
         with urllib.request.urlopen(request, timeout=60) as response:
             release = json.loads(response.read().decode("utf-8"))
-        for asset in release.get("assets", []):
-            if usable(str(asset.get("name", ""))):
-                return str(asset.get("browser_download_url"))
-        log.debug("No usable asset in the latest release listing")
+        names = [str(a.get("name", "")) for a in release.get("assets", [])]
+        ranked = sorted(
+            ((_rank_asset(n), n, a) for n, a in zip(names, release.get("assets", []))),
+            key=lambda row: row[0],
+            reverse=True,
+        )
+        if ranked and ranked[0][0] > 0:
+            log.info("Using llama.cpp asset %s", ranked[0][1])
+            return str(ranked[0][2].get("browser_download_url"))
+        log.warning(
+            "No usable Linux x86-64 asset in llama.cpp release %s. Available: %s",
+            release.get("tag_name", "?"),
+            ", ".join(names[:12]) or "none",
+        )
     except Exception as exc:
         log.info("llama.cpp release API unavailable (%s); trying the direct URL", exc)
 
@@ -169,10 +198,12 @@ def _find_release_asset() -> str | None:
     # no authentication, no rate limit.
     tag = _latest_release_tag()
     if not tag:
+        log.debug("Could not determine the latest llama.cpp tag")
         return None
     for pattern in (
         f"llama-{tag}-bin-ubuntu-x64.zip",
         f"llama-{tag}-bin-ubuntu-vulkan-x64.zip",
+        f"llama-{tag}-bin-linux-x64.zip",
     ):
         url = f"https://github.com/ggml-org/llama.cpp/releases/download/{tag}/{pattern}"
         try:
@@ -181,9 +212,11 @@ def _find_release_asset() -> str | None:
             )
             with urllib.request.urlopen(probe, timeout=30) as response:
                 if response.status < 400:
+                    log.info("Using llama.cpp asset %s", pattern)
                     return url
         except Exception:
             continue
+    log.debug("None of the constructed asset URLs resolved for tag %s", tag)
     return None
 
 
