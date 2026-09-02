@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vidfactory"
+version = "1.0.0"
+description = "Automated long-form home decor YouTube video factory (free and open source pipeline)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "PyYAML>=6.0",
+    "requests>=2.31",
+]
+
+[project.optional-dependencies]
+tts = ["piper-tts>=1.7.0"]
+youtube = [
+    "google-api-python-client>=2.120",
+    "google-auth>=2.28",
+    "google-auth-oauthlib>=1.2",
+    "google-auth-httplib2>=0.2",
+]
+dev = ["pytest>=8.0", "pytest-timeout>=2.3"]
+
+[project.scripts]
+vidfactory = "vidfactory.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q --timeout=900"
+markers = [
+    "integration: renders real video with FFmpeg (slower)",
+]
