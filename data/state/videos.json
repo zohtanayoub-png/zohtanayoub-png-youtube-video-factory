@@ -1,5 +1,19 @@
 {
   "table": "videos",
   "version": 1,
-  "rows": []
+  "rows": [
+    {
+      "id": 1,
+      "topic_slug": "10-small-living-room-ideas-that-make-any-space-look-bigger",
+      "title": "3 Small Living Room Ideas That Make Any Space Look Bigger",
+      "filename": "final_video.mp4",
+      "duration": 114.1,
+      "word_count": 353,
+      "scene_count": 14,
+      "clip_count": 16,
+      "created_at": "2026-09-02T16:13:13+00:00",
+      "youtube_id": null,
+      "status": "rendered"
+    }
+  ]
 }

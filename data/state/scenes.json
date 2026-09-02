@@ -1,5 +1,132 @@
 {
   "table": "scenes",
   "version": 1,
-  "rows": []
+  "rows": [
+    {
+      "id": 1,
+      "video_id": 1,
+      "scene_id": "intro-000-00",
+      "narration": "You can spend a fortune on a room and still have it feel unfinished, and you can spend very little and have it feel considered.",
+      "duration": null,
+      "query": "modern living room interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 2,
+      "video_id": 1,
+      "scene_id": "intro-000-01",
+      "narration": "In this video we are going through 3 of them, one at a time, with the reasoning behind each one and exactly how to apply it in a real home.",
+      "duration": null,
+      "query": "modern living room interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 3,
+      "video_id": 1,
+      "scene_id": "item-001-00",
+      "narration": "Number 1. Keep the palette continuous between rooms. There is a real principle underneath this. Homes feel bigger and calmer when one room flows into the next.",
+      "duration": null,
+      "query": "open plan cohesive color scheme",
+      "category": "living rooms"
+    },
+    {
+      "id": 4,
+      "video_id": 1,
+      "scene_id": "item-001-01",
+      "narration": "A different scheme behind every door makes a house feel like a corridor of unrelated boxes. The way to actually do this is simple.",
+      "duration": null,
+      "query": "connected rooms interior palette",
+      "category": "living rooms"
+    },
+    {
+      "id": 5,
+      "video_id": 1,
+      "scene_id": "item-001-02",
+      "narration": "Use one base color throughout and change only the accents room to room. Sightlines between spaces are where this matters most.",
+      "duration": null,
+      "query": "connected rooms interior palette",
+      "category": "living rooms"
+    },
+    {
+      "id": 6,
+      "video_id": 1,
+      "scene_id": "item-001-03",
+      "narration": "Do this one thing and the rest of the room starts to make more sense.",
+      "duration": null,
+      "query": "connected rooms interior palette",
+      "category": "living rooms"
+    },
+    {
+      "id": 7,
+      "video_id": 1,
+      "scene_id": "item-002-00",
+      "narration": "That brings us to number 2. Match the coffee table height to the sofa seat. The thinking behind this is simple.",
+      "duration": null,
+      "query": "coffee table proportion sofa",
+      "category": "living rooms"
+    },
+    {
+      "id": 8,
+      "video_id": 1,
+      "scene_id": "item-002-01",
+      "narration": "A table much lower than the seat forces an uncomfortable reach, and one much higher blocks the view across the room. Here is how to apply it.",
+      "duration": null,
+      "query": "round coffee table living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 9,
+      "video_id": 1,
+      "scene_id": "item-002-02",
+      "narration": "Aim within an inch or two of the sofa seat height, and choose a length roughly two-thirds of the sofa. Round tables work better in tight or high-traffic rooms.",
+      "duration": null,
+      "query": "round coffee table living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 10,
+      "video_id": 1,
+      "scene_id": "item-003-00",
+      "narration": "Idea number 3. Hang your curtains close to the ceiling, not to the window frame. This works for a specific reason.",
+      "duration": null,
+      "query": "floor to ceiling curtains living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 11,
+      "video_id": 1,
+      "scene_id": "item-003-01",
+      "narration": "The eye reads the top of the curtain rod as the top of the wall, so mounting the rod high stretches the whole room upward and makes a standard eight-foot ceiling feel far taller than it is.",
+      "duration": null,
+      "query": "tall curtains modern interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 12,
+      "video_id": 1,
+      "scene_id": "item-003-02",
+      "narration": "Here is how to apply it. Mount the rod four to six inches below the ceiling line and let the panels break just barely on the floor.",
+      "duration": null,
+      "query": "tall curtains modern interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 13,
+      "video_id": 1,
+      "scene_id": "item-003-03",
+      "narration": "Buy the longest ready-made length you can find, usually ninety-six or one hundred and eight inches, and widen the rod so the panels stack off the glass.",
+      "duration": null,
+      "query": "tall curtains modern interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 14,
+      "video_id": 1,
+      "scene_id": "outro-000-00",
+      "narration": "That is all 3 of them. If you found something here worth trying, there are more videos like this on the channel.",
+      "duration": null,
+      "query": "modern living room interior",
+      "category": "living rooms"
+    }
+  ]
 }

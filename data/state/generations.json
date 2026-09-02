@@ -1,5 +1,15 @@
 {
   "table": "generations",
   "version": 1,
-  "rows": []
+  "rows": [
+    {
+      "id": 1,
+      "run_id": "run-1",
+      "topic": "10 Small Living Room Ideas That Make Any Space Look Bigger",
+      "started_at": "2026-09-02T16:11:31+00:00",
+      "finished_at": "2026-09-02T16:13:13+00:00",
+      "status": "success",
+      "details": "{\"title\": \"3 Small Living Room Ideas That Make Any Space Look Bigger\", \"topic\": {\"title\": \"10 Small Living Room Ideas That Make Any Space Look Bigger\", \"category\": \"living rooms\", \"angle\": \"ideas\", \"item_count\": 10, \"slug\": \"10-small-living-room-ideas-that-make-any-space-look-bigger\", \"source\": \"manual\", \"keywords\": [\"small\", \"living\", \"room\", \"space\", \"look\", \"bigger\"]}, \"video\": \"output/run-1/final_video.mp4\", \"duration_seconds\": 114.1, \"subtitles\": \"output/run-1/subtitles.srt\", \"metadata\": \"output/run-1/metadata.json\", \"sources\": \"output/run-1/video_sources.json\", \"quality_passed\": true, \"youtube_id\": \"\"}"
+    }
+  ]
 }
