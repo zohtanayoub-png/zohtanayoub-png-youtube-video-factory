@@ -53,16 +53,33 @@ def test_the_sixty_thirty_ten_rule_is_rejected_for_look_bigger():
 
 
 def test_it_stays_out_of_a_generated_script():
+    """The guarantee that matters: it never reaches the video.
+
+    Deliberately does not assert against script.rejected_ideas, which is
+    truncated to the first 25 rejections and ordered by a shuffle seeded from
+    hash(slug) - and Python randomises string hashing per process, so whether
+    any particular idea lands in that window is luck rather than behaviour.
+    The rejection itself is asserted deterministically above via
+    score_alignment.
+    """
+
     topic = TopicEngine().from_user_input(
         "Small Living Room Tricks That Make Your Space Look Bigger"
     )
     script = generate_script(topic, duration_minutes=20.0)
+
     headings = " ".join(s.heading.lower() for s in script.items())
-    assert "sixty thirty ten" in " ".join(
-        r["title"].lower() for r in script.rejected_ideas
-    ), "the rule should be recorded as rejected"
     assert "sixty thirty ten" not in headings
     assert "60 30 10" not in headings
+
+    # And nowhere in the narration the viewer actually hears.
+    body = script.text.lower()
+    assert "sixty thirty ten" not in body
+    assert "dominant tone" not in body
+
+    # Ideas were genuinely filtered, not merely absent by chance.
+    assert script.rejected_ideas
+    assert script.title_idea_alignment >= 0.9
 
 
 def test_every_accepted_idea_names_a_causal_mechanism():
