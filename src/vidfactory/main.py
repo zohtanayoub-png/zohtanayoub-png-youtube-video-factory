@@ -98,6 +98,10 @@ def command_generate(args: argparse.Namespace) -> int:
         with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
             handle.write(f"video_path={result.video_path}\n")
             handle.write(f"output_dir={result.output_dir}\n")
+            handle.write(
+                f"generation_id="
+                f"{result.manifest.generation_id if result.manifest else ''}\n"
+            )
             handle.write(f"title={result.script.title}\n")
             handle.write(f"duration_seconds={result.duration:.1f}\n")
             handle.write(f"youtube_id={result.youtube_id}\n")

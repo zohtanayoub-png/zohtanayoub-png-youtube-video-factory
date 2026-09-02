@@ -36,6 +36,7 @@ DEFAULT_WEIGHTS: dict[str, float] = {
     "novelty": 15.0,
     "quality": 10.0,
     "aspirational": 20.0,
+    "premium": 25.0,
 }
 
 # ---------------------------------------------------------------------------
@@ -89,6 +90,175 @@ OFF_TOPIC_SIGNALS: tuple[str, ...] = (
 )
 
 
+# ---------------------------------------------------------------------------
+# Premium visual heuristics
+#
+# The second production video was much more varied but still included footage
+# where the interior was not really the subject: groups of people talking, dark
+# rooms, bare unfurnished spaces, office-like interiors. Pexels gives us a
+# caption (in the page URL slug) and tags, which is enough to catch most of
+# these cheaply and without any paid vision API.
+# ---------------------------------------------------------------------------
+
+#: People as the dominant subject. A person passing through a beautiful room is
+#: fine; a portrait, an interview or a dinner party is not interior footage.
+PEOPLE_SIGNALS: tuple[str, ...] = (
+    "woman", "women", "man", "men", "girl", "boy", "people", "person",
+    "couple", "family", "friends", "group", "crowd", "guests",
+    "portrait", "model", "posing", "smiling", "talking", "conversation",
+    "interview", "meeting", "party", "gathering", "celebration",
+    "sitting on", "lying on", "relaxing on", "reading a book", "drinking",
+    "hands", "face", "child", "children", "kid", "baby", "pet owner",
+    "yoga", "exercise", "working from home", "freelancer", "student",
+)
+
+#: Words that mean the room is the subject, which offsets an incidental person.
+INTERIOR_SUBJECT_SIGNALS: tuple[str, ...] = (
+    # rooms and dwellings
+    "living room", "bedroom", "kitchen", "bathroom", "dining room",
+    "hallway", "entryway", "nursery", "studio", "loft", "villa",
+    "interior", "interiors", "interior design", "apartment", "flat",
+    "home", "house", "room", "space",
+    # the discipline
+    "decor", "decoration", "decorating", "furniture", "furnishing",
+    "architecture", "architectural", "styling", "styled", "design",
+    # the objects a decor video actually shows
+    "sofa", "couch", "armchair", "chair", "stool", "bench", "ottoman",
+    "bed", "headboard", "nightstand", "bedside", "mattress", "bedding",
+    "curtain", "curtains", "drape", "drapes", "blind", "shutter",
+    "rug", "carpet", "shelf", "shelves", "shelving", "bookshelf",
+    "cabinet", "cupboard", "wardrobe", "dresser", "sideboard", "console",
+    "lamp", "lighting", "chandelier", "pendant", "sconce",
+    "window", "wall", "walls", "floor", "flooring", "ceiling",
+    "mirror", "plant", "plants", "greenery", "vase", "table", "desk",
+    "countertop", "counter", "backsplash", "tile", "cushion", "pillow",
+    "throw", "blanket", "artwork", "painting", "frame", "picture",
+    "fireplace", "staircase", "doorway", "door",
+)
+
+#: An unfurnished or under-furnished space has no decorating to look at.
+EMPTY_ROOM_SIGNALS: tuple[str, ...] = (
+    "empty room", "empty apartment", "empty house", "empty space",
+    "unfurnished", "bare room", "vacant", "no furniture", "moving in",
+    "new build", "shell", "white walls empty", "empty interior",
+)
+
+#: Low-light footage looks murky at 1080p and reads as cheap.
+DARK_SIGNALS: tuple[str, ...] = (
+    "dark", "darkness", "night", "nighttime", "dim", "dimly", "gloomy",
+    "shadow", "silhouette", "low light", "moody dark", "black background",
+    "unlit", "evening dark",
+)
+
+#: ...unless the darkness is deliberate warm evening ambience, which is
+#: exactly the cozy look this channel wants.
+DARK_RESCUE_SIGNALS: tuple[str, ...] = (
+    "candle", "cozy", "warm light", "lamp", "fireplace", "glow",
+    "warm glow", "ambient", "hygge", "evening light", "golden hour",
+)
+
+#: Commercial or institutional spaces.
+NON_HOME_SIGNALS: tuple[str, ...] = (
+    "office", "coworking", "workspace desk", "conference", "boardroom",
+    "hotel lobby", "reception", "showroom floor", "shop", "store",
+    "restaurant", "cafe", "bar", "gym", "clinic", "classroom", "warehouse",
+)
+
+
+#: People words that all but guarantee the clip is about the people.
+STRONG_PEOPLE_SIGNALS: tuple[str, ...] = (
+    "group", "people", "friends", "family", "couple", "crowd", "guests",
+    "party", "gathering", "celebration", "interview", "meeting",
+    "talking", "conversation", "portrait", "posing", "model", "smiling",
+)
+
+
+def people_dominance_penalty(clip: StockClip) -> tuple[float, list[str]]:
+    """0.0 - 1.0. How much the footage is about people rather than the room."""
+
+    text = clip.content_text
+    people = _phrase_hits(text, PEOPLE_SIGNALS)
+    if not people:
+        return 0.0, []
+
+    strong = _phrase_hits(text, STRONG_PEOPLE_SIGNALS)
+    # A single strong signal ("family", "friends", "interview") is already
+    # enough: the clip is about the people in it.
+    weight = (0.68 if strong else 0.45) + 0.15 * (len(people) - 1)
+
+    # Naming the room only slightly offsets this. "Friends talking in a living
+    # room" is still a clip about friends talking, and it is not what a decor
+    # channel should cut to.
+    interior = _phrase_hits(text, INTERIOR_SUBJECT_SIGNALS)
+    if interior:
+        weight -= min(0.15, 0.05 * len(interior))
+    return max(0.0, min(1.0, round(weight, 3))), (strong or people)[:3]
+
+
+def empty_room_penalty(clip: StockClip) -> tuple[float, list[str]]:
+    hits = _phrase_hits(clip.content_text, EMPTY_ROOM_SIGNALS)
+    return (0.8 if hits else 0.0), hits[:2]
+
+
+def dark_scene_penalty(clip: StockClip) -> tuple[float, list[str]]:
+    hits = _phrase_hits(clip.content_text, DARK_SIGNALS)
+    if not hits:
+        return 0.0, []
+    if _phrase_hits(clip.content_text, DARK_RESCUE_SIGNALS):
+        return 0.15, [f"{hits[0]} (warm)"]
+    return 0.7, hits[:2]
+
+
+def interior_relevance_score(clip: StockClip, query: str = "") -> tuple[float, list[str]]:
+    """0.0 - 1.0. How clearly the clip is showing an interior worth looking at."""
+
+    if not clip.content_text.strip():
+        return 0.5, ["no caption"]
+
+    subject = _phrase_hits(clip.content_text, INTERIOR_SUBJECT_SIGNALS)
+    non_home = _phrase_hits(clip.content_text, NON_HOME_SIGNALS)
+
+    score = 0.25 + min(0.6, 0.15 * len(subject))
+    reasons = [f"+{w}" for w in subject[:3]]
+    if non_home:
+        score -= 0.45
+        reasons.extend(f"-{w}" for w in non_home[:2])
+    # The words of the query itself appearing in the caption is the strongest
+    # evidence that this clip illustrates the sentence being narrated.
+    if query:
+        wanted = _words(query)
+        overlap = wanted & _words(clip.content_text)
+        if overlap:
+            score += min(0.25, 0.08 * len(overlap))
+            reasons.append(f"+matches query ({len(overlap)})")
+    return max(0.0, min(1.0, round(score, 3))), reasons
+
+
+def premium_visual_report(clip: StockClip, query: str = "") -> dict[str, Any]:
+    """All four premium signals for one clip, for the editorial report."""
+
+    people, people_why = people_dominance_penalty(clip)
+    empty, empty_why = empty_room_penalty(clip)
+    dark, dark_why = dark_scene_penalty(clip)
+    relevance, relevance_why = interior_relevance_score(clip, query)
+    return {
+        "people_dominance_penalty": people,
+        "empty_room_penalty": empty,
+        "dark_scene_penalty": dark,
+        "interior_relevance_score": relevance,
+        "is_people_dominant": people >= 0.5,
+        "is_empty_room": empty >= 0.5,
+        "is_dark": dark >= 0.5,
+        "is_premium": (
+            people < 0.5 and empty < 0.5 and dark < 0.5 and relevance >= 0.5
+        ),
+        "reasons": [*(f"people:{w}" for w in people_why),
+                    *(f"empty:{w}" for w in empty_why),
+                    *(f"dark:{w}" for w in dark_why),
+                    *relevance_why[:3]],
+    }
+
+
 def score_aspirational(clip: StockClip) -> tuple[float, list[str]]:
     """How well footage matches a premium interiors channel (0.0 - 1.0).
 
@@ -125,6 +295,24 @@ def is_blocked(clip: StockClip) -> bool:
     return any(word in text for word in BLOCKING_SIGNALS)
 
 _STOP = {"the", "and", "for", "with", "interior", "home", "design", "video", "footage"}
+
+
+def _phrase_hits(text: str, phrases: Sequence[str]) -> list[str]:
+    """Match whole words/phrases, never bare substrings.
+
+    Substring matching silently destroys decor vocabulary: "sunlit" contains
+    "unlit", "nightstand" contains "night", and "dimension" contains "dim".
+    Every one of those would have wrongly flagged a perfectly good clip as a
+    dark scene.
+    """
+
+    haystack = f" {re.sub(r'[^a-z0-9]+', ' ', text.lower())} "
+    hits: list[str] = []
+    for phrase in phrases:
+        needle = f" {re.sub(r'[^a-z0-9]+', ' ', phrase.lower()).strip()} "
+        if needle.strip() and needle in haystack:
+            hits.append(phrase)
+    return hits
 
 
 def _words(text: str) -> set[str]:
@@ -245,6 +433,10 @@ class RankingContext:
     #: Reject footage carrying blocking signals (plastic covers, demolition,
     #: someone vacuuming). Disabled only by tests and by the local provider.
     enforce_aspirational: bool = True
+    #: Reject people-dominant, empty, dark and non-interior footage.
+    enforce_premium: bool = True
+    #: Minimum interior_relevance_score a clip must reach to be usable.
+    min_interior_relevance: float = 0.35
     #: ``{"provider:id": (use_count, days_since_last_use | None)}``
     history: Mapping[str, tuple[int, float | None]] = None  # type: ignore[assignment]
     #: Clips already chosen for this video; repeats are penalized hard.
@@ -274,6 +466,18 @@ class ClipRanker:
         use_count, days_since = context.history.get(clip.key, (0, None))
 
         aspirational, aspirational_reasons = score_aspirational(clip)
+        premium = premium_visual_report(clip, context.query)
+        # One combined premium score: interior relevance, less the three
+        # penalties. This is what separates "a beautiful styled living room"
+        # from "four people talking in a dim room".
+        premium_score = max(
+            0.0,
+            premium["interior_relevance_score"]
+            - 0.6 * premium["people_dominance_penalty"]
+            - 0.7 * premium["empty_room_penalty"]
+            - 0.5 * premium["dark_scene_penalty"],
+        )
+        clip.premium = premium
         raw = {
             "relevance": score_relevance(clip, context.query, context.keywords),
             "resolution": score_resolution(clip, context.prefer_width, context.min_width),
@@ -282,8 +486,9 @@ class ClipRanker:
             "novelty": score_novelty(clip, use_count, days_since, context.cooldown_days),
             "quality": score_quality(clip),
             "aspirational": aspirational,
+            "premium": premium_score,
         }
-        clip.aspirational_reasons = aspirational_reasons
+        clip.aspirational_reasons = aspirational_reasons + premium["reasons"][:3]
         breakdown = {name: raw[name] * self.weights.get(name, 0.0) for name in raw}
         total = sum(breakdown.values())
 
@@ -324,6 +529,22 @@ class ClipRanker:
         # rescued by scoring well on resolution or novelty.
         if context.enforce_aspirational and is_blocked(clip):
             return False
+        if context.enforce_premium:
+            # Footage where people, emptiness or darkness is the subject is
+            # rejected outright rather than merely down-ranked: on a premium
+            # decor channel it is never the right shot, however well it scores
+            # on resolution or novelty.
+            report = premium_visual_report(clip, context.query)
+            if report["is_people_dominant"]:
+                return False
+            if report["is_empty_room"]:
+                return False
+            if report["is_dark"]:
+                return False
+            if report["interior_relevance_score"] < context.min_interior_relevance:
+                return False
+            if _phrase_hits(clip.content_text, NON_HOME_SIGNALS):
+                return False
         return bool(clip.download_url)
 
     def rank(self, clips: Sequence[StockClip], context: RankingContext) -> list[StockClip]:

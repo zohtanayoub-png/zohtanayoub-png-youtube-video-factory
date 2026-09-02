@@ -151,4 +151,8 @@ def clips_needed_for(
 
     seconds = max(10.0, float(duration_minutes) * 60.0)
     base = seconds / max(1.0, average_shot_seconds)
-    return max(12, int(math.ceil(base * max(1.0, safety))) + 6)
+    # The floor matters more than it looks: a "30 second" request still
+    # produces a hook, an idea and a close, which is comfortably more than
+    # 30 seconds of narration and therefore more shots than the arithmetic
+    # suggests. Running one clip short forces a reuse and fails editorial QC.
+    return max(28, int(math.ceil(base * max(1.0, safety))) + 8)

@@ -438,6 +438,17 @@ class Narration:
     engine: str = ""
     voice: str = ""
 
+    @property
+    def spoken_text(self) -> str:
+        """Exactly the narration that was handed to the TTS engine.
+
+        The provenance check compares script.txt against this rather than
+        against another in-memory copy of the script, so a mismatch between
+        what was said and what was shipped cannot slip through.
+        """
+
+        return " ".join(chunk.text for chunk in self.chunks)
+
     def scene_duration(self, scene_id: str) -> float:
         start, end = self.scene_timings.get(scene_id, (0.0, 0.0))
         return max(0.0, end - start)

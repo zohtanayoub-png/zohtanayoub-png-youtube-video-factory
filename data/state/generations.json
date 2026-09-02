@@ -37,6 +37,15 @@
       "finished_at": "2026-09-02T19:26:55+00:00",
       "status": "success",
       "details": "{\"title\": \"5 Small Living Room Tricks That Make Your Space Look Bigger\", \"topic\": {\"title\": \"5 Small Living Room Tricks That Make Your Space Look Bigger\", \"category\": \"living rooms\", \"angle\": \"tricks\", \"item_count\": 5, \"slug\": \"5-small-living-room-tricks-that-make-your-space-look-bigger\", \"source\": \"manual\", \"keywords\": [\"small\", \"living\", \"room\", \"tricks\", \"space\", \"look\", \"bigger\"]}, \"video\": \"output/run-4/final_video.mp4\", \"duration_seconds\": 172.83, \"subtitles\": \"output/run-4/subtitles.srt\", \"metadata\": \"output/run-4/metadata.json\", \"sources\": \"output/run-4/video_sources.json\", \"quality_passed\": true, \"editorial_passed\": true, \"unique_source_ratio\": 1.0, \"youtube_id\": \"\"}"
+    },
+    {
+      "id": 5,
+      "run_id": "run-5-20260902-203859-2effaf85",
+      "topic": "Small Living Room Tricks That Make Your Space Look Bigger",
+      "started_at": "2026-09-02T20:38:59+00:00",
+      "finished_at": "2026-09-02T20:40:46+00:00",
+      "status": "success",
+      "details": "{\"title\": \"Small Living Room Tricks That Make Your Space Look Bigger\", \"topic\": {\"title\": \"Small Living Room Tricks That Make Your Space Look Bigger\", \"category\": \"living rooms\", \"angle\": \"tricks\", \"item_count\": 25, \"slug\": \"small-living-room-tricks-that-make-your-space-look-bigger\", \"source\": \"manual\", \"keywords\": [\"small\", \"living\", \"room\", \"tricks\", \"space\", \"look\", \"bigger\"]}, \"video\": \"output/run-5-20260902-203859-2effaf85/final_video.mp4\", \"duration_seconds\": 103.9, \"subtitles\": \"output/run-5-20260902-203859-2effaf85/subtitles.srt\", \"metadata\": \"output/run-5-20260902-203859-2effaf85/metadata.json\", \"sources\": \"output/run-5-20260902-203859-2effaf85/video_sources.json\", \"generation_id\": \"run-5-20260902-203859-2effaf85\", \"quality_passed\": true, \"editorial_passed\": true, \"artifact_provenance_passed\": true, \"unique_source_ratio\": 1.0, \"youtube_id\": \"\"}"
     }
   ]
 }

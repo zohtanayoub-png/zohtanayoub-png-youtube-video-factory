@@ -46,6 +46,8 @@ class StockClip:
     score_breakdown: dict[str, float] = field(default_factory=dict)
     #: Why the aspirational score landed where it did, for the QC report.
     aspirational_reasons: list[str] = field(default_factory=list)
+    #: Premium visual signals (people / empty / dark / interior relevance).
+    premium: dict[str, Any] = field(default_factory=dict)
     local_path: str = ""
     content_hash: str = ""
 
@@ -58,12 +60,23 @@ class StockClip:
         return (self.width / self.height) if self.height else 0.0
 
     @property
-    def signal_text(self) -> str:
-        """Everything the provider tells us about what the footage shows."""
+    def content_text(self) -> str:
+        """What the provider says this clip shows - evidence, not intent.
+
+        Deliberately excludes the query we searched with: judging a clip by
+        our own search string makes every result look relevant, because the
+        words we were hoping for are in the text we are scoring.
+        """
 
         return " ".join(
-            [self.description, " ".join(self.tags), self.query]
-        ).lower()
+            part for part in (self.description, " ".join(self.tags)) if part
+        ).strip().lower()
+
+    @property
+    def signal_text(self) -> str:
+        """Everything known about the clip, including the query that found it."""
+
+        return " ".join([self.description, " ".join(self.tags), self.query]).lower()
 
     @property
     def is_landscape(self) -> bool:
@@ -86,6 +99,7 @@ class StockClip:
             "score": round(float(self.score), 2),
             "score_breakdown": {k: round(v, 2) for k, v in self.score_breakdown.items()},
             "aspirational_reasons": list(self.aspirational_reasons),
+            "premium": dict(self.premium),
             "content_hash": self.content_hash,
         }
 
