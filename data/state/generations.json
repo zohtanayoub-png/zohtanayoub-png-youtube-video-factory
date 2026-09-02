@@ -46,6 +46,15 @@
       "finished_at": "2026-09-02T20:40:46+00:00",
       "status": "success",
       "details": "{\"title\": \"Small Living Room Tricks That Make Your Space Look Bigger\", \"topic\": {\"title\": \"Small Living Room Tricks That Make Your Space Look Bigger\", \"category\": \"living rooms\", \"angle\": \"tricks\", \"item_count\": 25, \"slug\": \"small-living-room-tricks-that-make-your-space-look-bigger\", \"source\": \"manual\", \"keywords\": [\"small\", \"living\", \"room\", \"tricks\", \"space\", \"look\", \"bigger\"]}, \"video\": \"output/run-5-20260902-203859-2effaf85/final_video.mp4\", \"duration_seconds\": 103.9, \"subtitles\": \"output/run-5-20260902-203859-2effaf85/subtitles.srt\", \"metadata\": \"output/run-5-20260902-203859-2effaf85/metadata.json\", \"sources\": \"output/run-5-20260902-203859-2effaf85/video_sources.json\", \"generation_id\": \"run-5-20260902-203859-2effaf85\", \"quality_passed\": true, \"editorial_passed\": true, \"artifact_provenance_passed\": true, \"unique_source_ratio\": 1.0, \"youtube_id\": \"\"}"
+    },
+    {
+      "id": 6,
+      "run_id": "run-6-20260902-221557-ecad0bcf",
+      "topic": "Small Living Room Tricks That Make Your Space Look Bigger",
+      "started_at": "2026-09-02T22:15:57+00:00",
+      "finished_at": "2026-09-02T22:18:23+00:00",
+      "status": "success",
+      "details": "{\"title\": \"Small Living Room Tricks That Make Your Space Look Bigger\", \"topic\": {\"title\": \"Small Living Room Tricks That Make Your Space Look Bigger\", \"category\": \"living rooms\", \"angle\": \"tricks\", \"item_count\": 25, \"slug\": \"small-living-room-tricks-that-make-your-space-look-bigger\", \"source\": \"manual\", \"keywords\": [\"small\", \"living\", \"room\", \"tricks\", \"space\", \"look\", \"bigger\"]}, \"video\": \"output/run-6-20260902-221557-ecad0bcf/final_video.mp4\", \"duration_seconds\": 105.2, \"subtitles\": \"output/run-6-20260902-221557-ecad0bcf/subtitles.srt\", \"metadata\": \"output/run-6-20260902-221557-ecad0bcf/metadata.json\", \"sources\": \"output/run-6-20260902-221557-ecad0bcf/video_sources.json\", \"generation_id\": \"run-6-20260902-221557-ecad0bcf\", \"quality_passed\": true, \"editorial_passed\": true, \"artifact_provenance_passed\": true, \"unique_source_ratio\": 1.0, \"youtube_id\": \"\"}"
     }
   ]
 }
