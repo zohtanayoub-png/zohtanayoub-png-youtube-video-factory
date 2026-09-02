@@ -14,10 +14,11 @@ on:
         type: string
         default: ""
       duration_minutes:
-        description: "Target length in minutes"
+        description: "Target length in minutes (2 is a quick test render)"
         required: false
-        type: string
+        type: choice
         default: "20"
+        options: ["2", "5", "10", "15", "20", "30"]
       voice:
         description: "Narration voice"
         required: false
@@ -59,6 +60,7 @@ on:
         required: false
         type: string
         default: ""
+      # Free-form here so autopilot can pass whatever config.yaml says.
       duration_minutes:
         required: false
         type: string
@@ -232,6 +234,7 @@ jobs:
             output/**/video_sources.json
             output/**/scenes.json
             output/**/quality_report.json
+            output/**/editorial_quality_report.json
           retention-days: 14
           if-no-files-found: error
           compression-level: 0
@@ -245,6 +248,7 @@ jobs:
             output/**/script.txt
             output/**/metadata.json
             output/**/video_sources.json
+            output/**/editorial_quality_report.json
           retention-days: 60
           if-no-files-found: warn
 

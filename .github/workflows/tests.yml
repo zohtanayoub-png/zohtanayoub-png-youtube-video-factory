@@ -72,3 +72,57 @@ jobs:
 
       - name: Environment check
         run: python -m vidfactory doctor || true
+
+  llm-benchmark:
+    name: Local model feasibility (non-blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    # Never allowed to fail the build: this measures whether the optional
+    # local script model is practical here, it does not gate anything.
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+
+      - name: Runner capacity
+        run: |
+          echo "cores=$(nproc)"
+          free -g | head -2
+          df -h / | tail -1
+
+      - name: Cache the model and llama.cpp binary
+        uses: actions/cache@v4
+        with:
+          path: .cache/llm
+          key: llm-qwen25-1_5b-q4km-v1
+
+      - name: Benchmark the local model
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          python -m vidfactory llm-check --section-budget 120 2>&1 | tee bench.txt
+          echo "result=$?"
+
+      - name: Summarize
+        if: always()
+        run: |
+          {
+            echo "## Local model benchmark"
+            echo ""
+            echo '```'
+            tail -40 bench.txt 2>/dev/null || echo "no output"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
