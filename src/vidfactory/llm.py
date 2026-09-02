@@ -188,8 +188,17 @@ def _find_release_asset() -> str | None:
         log.info("llama.cpp release API unavailable (%s); trying direct URLs", exc)
         releases = []
 
-    if isinstance(releases, dict):        # a single release came back
-        releases = [releases]
+    if isinstance(releases, dict):
+        # The API returns an object rather than an array for errors such as
+        # rate limiting, which previously looked like "a release with no
+        # assets" and hid the real reason.
+        if "message" in releases:
+            log.warning("llama.cpp release API returned: %s", releases.get("message"))
+            releases = []
+        else:
+            releases = [releases]
+    if not releases:
+        log.warning("llama.cpp release listing was empty")
 
     seen_names: list[str] = []
     for release in releases or []:
