@@ -20,6 +20,8 @@ video:
   transition_seconds: 0.4       # only used when transition == crossfade
   motion: subtle                # "none" or "subtle" (slow ken-burns style zoom)
   tail_seconds: 1.2             # small silent tail so the video never freezes abruptly
+  fade_out_seconds: 0.6         # short fade at the very end (0 disables it)
+  fast_mux: true                # copy the finished video track instead of re-encoding it
   video_bitrate: 6000k
   crf: 20
   preset: veryfast

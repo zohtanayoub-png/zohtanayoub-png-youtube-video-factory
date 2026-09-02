@@ -40,6 +40,8 @@ DEFAULTS: dict[str, Any] = {
         "transition_seconds": 0.4,
         "motion": "subtle",
         "tail_seconds": 1.2,
+        "fade_out_seconds": 0.6,
+        "fast_mux": True,
         "video_bitrate": "6000k",
         "crf": 20,
         "preset": "veryfast",

@@ -92,10 +92,29 @@ def test_pexels_parses_a_real_shaped_response():
     assert first.license_name.startswith("Pexels")
 
 
-def test_pexels_prefers_the_best_file_under_4k():
+def test_pexels_picks_the_cheapest_rendition_that_is_still_1080p():
+    """4K costs bandwidth and decode time for no benefit in a 1080p render."""
+
     clips = PexelsProvider.parse(PEXELS_RESPONSE)
-    assert clips[0].width == 3840
-    assert clips[0].download_url.endswith("2160.mp4")
+    assert clips[0].width == 1920
+    assert clips[0].download_url.endswith("1080.mp4")
+
+
+def test_pexels_falls_back_to_the_largest_when_nothing_reaches_1080p():
+    payload = {
+        "videos": [
+            {
+                "id": 5,
+                "duration": 10,
+                "video_files": [
+                    {"file_type": "video/mp4", "width": 640, "height": 360, "link": "a.mp4"},
+                    {"file_type": "video/mp4", "width": 1280, "height": 720, "link": "b.mp4"},
+                ],
+            }
+        ]
+    }
+    clips = PexelsProvider.parse(payload)
+    assert clips[0].width == 1280
 
 
 def test_pexels_skips_entries_without_usable_files():

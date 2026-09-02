@@ -76,12 +76,18 @@ class PexelsProvider(StockProvider):
             )
         return [clip for clip in clips if clip.provider_id and clip.download_url]
 
-    @staticmethod
-    def _best_file(files: list[dict[str, Any]]) -> dict[str, Any] | None:
-        """Pick the highest-quality MP4 that is not larger than 4K.
+    #: We render at 1080p, so anything wider is wasted bandwidth and wasted
+    #: decode time on a two-core runner.
+    TARGET_WIDTH = 1920
 
-        Pexels returns several renditions. We want the largest one at or below
-        3840 wide: bigger than that wastes bandwidth and CPU on a free runner.
+    @classmethod
+    def _best_file(cls, files: list[dict[str, Any]]) -> dict[str, Any] | None:
+        """Pick the smallest MP4 rendition that is still at least 1080p wide.
+
+        Pexels returns several renditions of the same clip, often including 4K.
+        Downloading the 4K version of 150 clips would cost gigabytes of transfer
+        and a large amount of decode time for no visible benefit in a 1080p
+        render, so the smallest rendition at or above 1920 wide wins.
         """
 
         usable = [
@@ -91,5 +97,7 @@ class PexelsProvider(StockProvider):
         ]
         if not usable:
             return None
-        capped = [f for f in usable if int(f["width"]) <= 3840] or usable
-        return max(capped, key=lambda f: (int(f.get("width") or 0), int(f.get("height") or 0)))
+        big_enough = [f for f in usable if int(f["width"]) >= cls.TARGET_WIDTH]
+        if big_enough:
+            return min(big_enough, key=lambda f: int(f.get("width") or 0))
+        return max(usable, key=lambda f: int(f.get("width") or 0))

@@ -158,6 +158,7 @@ class VideoEditor:
         transition_seconds: float = 0.4,
         sample_rate: int = 48000,
         aac_bitrate: str = "192k",
+        fast_mux: bool = True,
     ) -> None:
         self.workdir = Path(workdir)
         self.workdir.mkdir(parents=True, exist_ok=True)
@@ -170,9 +171,10 @@ class VideoEditor:
         self.transition_seconds = float(transition_seconds)
         self.sample_rate = int(sample_rate)
         self.aac_bitrate = str(aac_bitrate)
+        self.fast_mux = bool(fast_mux)
 
     # ------------------------------------------------------------------
-    def _filter_for(self, shot: Shot) -> str:
+    def _filter_for(self, shot: Shot, fade_out: float = 0.0) -> str:
         """Scale + crop to exactly WxH, preserving aspect ratio, plus motion.
 
         ``increase`` scaling followed by a center crop is what prevents
@@ -186,11 +188,19 @@ class VideoEditor:
         """
 
         width, height = self.width, self.height
+        tail: list[str] = []
+        if fade_out > 0.01:
+            # Baking the closing fade into the final shot means the finished
+            # video can be assembled without re-encoding the whole timeline.
+            start = max(0.0, shot.duration - fade_out)
+            tail.append(f"fade=t=out:st={start:.3f}:d={fade_out:.3f}")
+
         if shot.motion == "none":
             return ",".join(
                 [
                     f"scale={width}:{height}:force_original_aspect_ratio=increase:flags=bicubic",
                     f"crop={width}:{height}",
+                    *tail,
                     f"fps={self.fps}",
                     "format=yuv420p",
                     "setsar=1",
@@ -233,11 +243,11 @@ class VideoEditor:
                 f":y='({over_h}-{height})/2'"
             )
 
-        chain.extend([f"fps={self.fps}", "format=yuv420p", "setsar=1"])
+        chain.extend([*tail, f"fps={self.fps}", "format=yuv420p", "setsar=1"])
         return ",".join(chain)
 
     # ------------------------------------------------------------------
-    def render_shot(self, shot: Shot, index: int) -> Path:
+    def render_shot(self, shot: Shot, index: int, fade_out: float = 0.0) -> Path:
         """Normalize one shot into an intermediate MP4 with identical params."""
 
         target = self.workdir / f"shot_{index:05d}.mp4"
@@ -246,7 +256,7 @@ class VideoEditor:
             "-t", f"{shot.duration:.3f}",
             "-i", str(shot.source),
             "-an",
-            "-vf", self._filter_for(shot),
+            "-vf", self._filter_for(shot, fade_out=fade_out),
             "-c:v", "libx264",
             "-preset", self.preset,
             "-crf", str(self.crf),
@@ -327,13 +337,15 @@ class VideoEditor:
         return destination
 
     # ------------------------------------------------------------------
-    def build_video_track(self, shots: Sequence[Shot]) -> Path:
+    def build_video_track(self, shots: Sequence[Shot], fade_out: float = 0.0) -> Path:
         """Render every shot and join them into one silent video track."""
 
         rendered: list[Path] = []
+        last = len(shots)
         for index, shot in enumerate(shots, start=1):
             try:
-                rendered.append(self.render_shot(shot, index))
+                shot_fade = fade_out if index == last else 0.0
+                rendered.append(self.render_shot(shot, index, fade_out=shot_fade))
             except FFmpegError as exc:
                 # A single bad source must not lose the render.
                 log.warning("Shot %d failed (%s); it will be skipped", index, exc)
@@ -382,6 +394,35 @@ class VideoEditor:
 
         if video_info.duration <= 0:
             raise FFmpegError("the assembled video track has no duration")
+
+        needs_filters = bool(subtitles is not None and Path(subtitles).exists())
+        long_enough = video_info.duration >= total - 0.05
+
+        if self.fast_mux and long_enough and not needs_filters:
+            # The video track already has the right size, frame rate, codec and
+            # closing fade, so it can simply be trimmed and copied. On a 20
+            # minute video this saves a full re-encode.
+            log.info("Rendering %s (stream copy)...", target.name)
+            run_ffmpeg(
+                [
+                    "-i", str(video_track),
+                    "-i", str(narration),
+                    "-map", "0:v:0",
+                    "-map", "1:a:0",
+                    "-c:v", "copy",
+                    "-c:a", "aac",
+                    "-b:a", self.aac_bitrate,
+                    "-ar", str(self.sample_rate),
+                    "-ac", "2",
+                    "-af", "apad=pad_dur=%.3f" % max(0.0, tail_seconds),
+                    "-t", f"{total:.3f}",
+                    "-movflags", "+faststart",
+                    str(target),
+                ],
+                description="final render (copy)",
+                timeout=3600,
+            )
+            return target
 
         args = ["-i", str(video_track), "-i", str(narration)]
         video_filters: list[str] = []

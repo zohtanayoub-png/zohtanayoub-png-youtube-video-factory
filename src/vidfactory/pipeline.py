@@ -342,12 +342,18 @@ class VideoPipeline:
             for scene in scenes
             if narration.scene_duration(scene.scene_id) > 0.05
         ]
-        # Distribute inter-scene pauses so the visuals cover the entire track.
+        # Spread the inter-scene pauses across the scenes, and extend the last
+        # scene by the closing tail, so the visuals cover the whole audio
+        # track. That lets the final mux stream-copy instead of re-encoding.
+        tail_seconds = float(self.config.get("video.tail_seconds", 1.2))
         covered = sum(duration for _, duration in scene_durations)
         shortfall = max(0.0, narration.duration - covered)
         if shortfall > 0.01 and scene_durations:
             share = shortfall / len(scene_durations)
             scene_durations = [(sid, dur + share) for sid, dur in scene_durations]
+        if scene_durations and tail_seconds > 0:
+            last_id, last_duration = scene_durations[-1]
+            scene_durations[-1] = (last_id, last_duration + tail_seconds + 0.2)
 
         shots = plan_shots(
             scene_durations,
@@ -368,8 +374,11 @@ class VideoPipeline:
             transition_seconds=float(self.config.get("video.transition_seconds", 0.4)),
             sample_rate=int(self.config.get("audio.sample_rate", 48000)),
             aac_bitrate=str(self.config.get("audio.aac_bitrate", "192k")),
+            fast_mux=bool(self.config.get("video.fast_mux", True)),
         )
-        video_track = editor.build_video_track(shots)
+        video_track = editor.build_video_track(
+            shots, fade_out=float(self.config.get("video.fade_out_seconds", 0.6))
+        )
 
         # Subtitles come from the narration timeline, so they are exact.
         subtitles_path: Path | None = None
@@ -388,7 +397,7 @@ class VideoPipeline:
             video_track,
             narration.audio_path,
             final_path,
-            tail_seconds=float(self.config.get("video.tail_seconds", 1.2)),
+            tail_seconds=tail_seconds,
             subtitles=subtitles_path if (burn_in and subtitles_path) else None,
             video_bitrate=str(self.config.get("video.video_bitrate", "")) or None,
         )
