@@ -40,6 +40,9 @@ src/vidfactory/
   script_generator.py template engine (default) + adaptive length fitting
   llm.py             optional local llama.cpp engine, always optional
   scene_planner.py   narration -> scenes -> per-scene visual queries
+  queries.py         specific -> variant -> broad -> generic query ladder
+  title_alignment.py what a title promises, and which ideas actually deliver it
+  editorial_qc.py    repetition, relevance and diversity gates (not ffprobe)
   stock/             provider adapters: base, pexels, pixabay, local, registry
   ranking.py         six-dimension clip scoring + diversification
   downloader.py      retries, ffprobe validation, content hashing
@@ -54,6 +57,22 @@ src/vidfactory/
   main.py            CLI
   testassets.py      synthetic FFmpeg footage for the offline integration test
 ```
+
+## Editorial invariants (added after the first production video repeated footage)
+
+* **A provider video ID appears at most once per video.** Not once per scene,
+  not "a different timestamp is fine" - once. `plan_shots` enforces it and
+  `editorial_qc` fails the run if it is violated. The v1 planner cycled
+  `order[cursor % len(order)]`, which replayed the whole clip sequence in its
+  original order once the cursor wrapped; that is what made the final third of
+  the first video look repetitive.
+* **Footage is sized from `estimate_shot_count`, never from
+  `duration / max_shot`.** Every scene rounds its own shot count up
+  independently, so the naive formula under-counts and starves the edit.
+* **Specific queries are exhausted before the generic category fallback**, and
+  the generic share is measured in the editorial report.
+* **Every idea must support the title's promise.** `title_alignment` rejects
+  ideas that do not, before the script is written.
 
 ## Non-obvious decisions
 
@@ -85,8 +104,9 @@ src/vidfactory/
 ## Testing
 
 ```bash
-python -m pytest -q -m "not integration"   # ~200 fast tests
-python -m pytest -q -m integration         # a genuine ~40 s 1080p render
+python -m pytest -q -m "not integration"   # ~250 fast tests
+python -m pytest -q -m integration         # a genuine ~60 s 1080p render
+python -m vidfactory llm-check             # is the optional local model viable here
 ```
 
 The integration test uses FFmpeg-generated synthetic footage and the offline TTS

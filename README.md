@@ -23,6 +23,7 @@ For every run you get:
 | `metadata.json` | YouTube title, description, chapters, tags, summary |
 | `video_sources.json` | every stock clip used, with attribution |
 | `quality_report.json` | the ffprobe validation results |
+| `editorial_quality_report.json` | footage repetition, relevance and diversity metrics |
 
 The default target length is **20 minutes** and it is configurable.
 
@@ -165,6 +166,22 @@ No MP4 is ever committed to git; only the small JSON history files are.
 ---
 
 ## Quality control
+
+Two independent gates. The technical one proves the file is a valid MP4; the
+editorial one proves the video is actually watchable.
+
+### Editorial
+
+`editorial_quality_report.json` records, and the run **fails** on the first two:
+
+* **no source video is used twice** - a Pexels video ID may appear once per
+  video, and taking a second segment from the same source at a different
+  timestamp counts as reuse
+* **unique source ratio** of at least 0.95
+* generic-query share, average clip score, creator / query / subject
+  diversity, title-to-idea alignment, shot count and per-section coverage
+
+### Technical
 
 After rendering, `ffprobe` checks the output and the workflow **fails loudly**
 if any of these are wrong:
