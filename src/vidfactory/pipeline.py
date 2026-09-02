@@ -29,12 +29,19 @@ from .editorial_qc import EditorialReport, build_report
 from .ffmpeg_utils import ffmpeg_available, probe_media
 from .logging_utils import get_logger
 from .metadata import build_metadata, safe_filename
+from .provenance import (
+    Manifest,
+    build_manifest,
+    new_generation_id,
+    prepare_directory,
+)
 from .quality_control import QualityReport, validate_output
 from .ranking import ClipRanker, DiversitySettings, RankingContext, diversify, diversity_report
 from .scene_planner import Scene, plan_scenes
 from .script_generator import Script, generate_script
 from .stock import StockClip, build_providers
 from .subtitles import generate_subtitles
+from .title_alignment import detect_promise, score_alignment
 from .topic_engine import Topic, TopicEngine
 from .tts import NarrationBuilder, build_engine
 
@@ -56,6 +63,7 @@ class GenerationResult:
     sources_path: Path
     report: QualityReport
     editorial: EditorialReport | None
+    manifest: Manifest | None
     topic: Topic
     script: Script
     duration: float
@@ -71,8 +79,10 @@ class GenerationResult:
             "subtitles": str(self.subtitles_path) if self.subtitles_path else "",
             "metadata": str(self.metadata_path),
             "sources": str(self.sources_path),
+            "generation_id": self.manifest.generation_id if self.manifest else "",
             "quality_passed": self.report.passed,
             "editorial_passed": self.editorial.passed if self.editorial else None,
+            "artifact_provenance_passed": self.manifest.passed if self.manifest else None,
             "unique_source_ratio": (
                 self.editorial.metrics.get("unique_source_ratio") if self.editorial else None
             ),
@@ -93,12 +103,24 @@ class VideoPipeline:
     ) -> None:
         self.config = config
         self.state_dir = Path(state_dir)
-        self.run_id = run_id or datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        # A run label may repeat (a re-run reuses the workflow run number), so
+        # the generation id adds a timestamp and a random suffix. Every path
+        # this run touches is derived from it, which is what makes artifacts
+        # from two generations physically unable to share a directory.
+        self.run_id = run_id or "run"
+        self.generation_id = new_generation_id(self.run_id)
         self.database = database or Database("data/factory.db")
         self.output_root = Path(config.get("output.directory", "output"))
-        self.workdir = Path(workdir) if workdir else Path("work") / self.run_id
+        self.workdir = (
+            Path(workdir) / self.generation_id if workdir
+            else Path("work") / self.generation_id
+        )
         self.workdir.mkdir(parents=True, exist_ok=True)
         self.output_root.mkdir(parents=True, exist_ok=True)
+        self.output_dir = prepare_directory(
+            self.output_root / self.generation_id, self.generation_id
+        )
+        log.info("Generation %s -> %s", self.generation_id, self.output_dir)
 
     # ------------------------------------------------------------------
     def run(
@@ -114,7 +136,7 @@ class VideoPipeline:
             raise PipelineError("background music is not supported by this project")
 
         started = time.time()
-        generation_id = self.database.start_generation(self.run_id, topic_text)
+        generation_id = self.database.start_generation(self.generation_id, topic_text)
 
         try:
             topic = self._choose_topic(topic_text)
@@ -427,6 +449,10 @@ class VideoPipeline:
             cooldown_days=float(self.config.get("ranking.clip_reuse_cooldown_days", 45)),
             history=history,
             enforce_aspirational=bool(self.config.get("ranking.enforce_aspirational", True)),
+            enforce_premium=bool(self.config.get("ranking.enforce_premium", True)),
+            min_interior_relevance=float(
+                self.config.get("ranking.min_interior_relevance", 0.35)
+            ),
         )
 
         # All ranking happens on metadata alone; nothing has been downloaded
@@ -541,8 +567,7 @@ class VideoPipeline:
         affinity: dict[str, list[str]] | None = None,
         search_stats: dict[str, Any] | None = None,
     ) -> GenerationResult:
-        output_dir = self.output_root / self.run_id
-        output_dir.mkdir(parents=True, exist_ok=True)
+        output_dir = self.output_dir
 
         scene_durations = scene_durations or self._scene_durations(scenes, narration)
         tail_seconds = float(self.config.get("video.tail_seconds", 1.2))
@@ -643,16 +668,36 @@ class VideoPipeline:
         metadata_path = metadata.save(output_dir / "metadata.json")
 
         # ---- editorial quality control ---------------------------------
-        editorial = build_report(
-            shot_plan=shot_plan,
-            clips=clips,
-            scenes=scenes,
-            script=script,
-            search_stats=search_stats,
-            diversity=diversity_report([c.clip for c in clips]),
-            thresholds=dict(self.config.get("editorial", {}) or {}),
+        # Written before provenance so its file is one of the artifacts the
+        # provenance check inspects; the verdict is folded back in below.
+        # How many chosen ideas fail the title promise. Should be zero: the
+        # script generator filters them out, so a non-zero count means a
+        # filter regression rather than a content problem.
+        promise = detect_promise(topic.title, topic.angle)
+        alignment_failures = sum(
+            1
+            for section in script.items()
+            if section.tip and not score_alignment(section.tip, promise).aligned
         )
-        editorial.save(output_dir / "editorial_quality_report.json")
+
+        def _editorial(provenance_passed: bool | None) -> EditorialReport:
+            report = build_report(
+                shot_plan=shot_plan,
+                clips=clips,
+                scenes=scenes,
+                script=script,
+                search_stats=search_stats,
+                diversity=diversity_report([c.clip for c in clips]),
+                thresholds=dict(self.config.get("editorial", {}) or {}),
+                provenance_passed=provenance_passed,
+                promise_alignment_failures=alignment_failures,
+            )
+            report.save(output_dir / "editorial_quality_report.json")
+            return report
+
+        # Written once so the file exists for the provenance check to inspect,
+        # then rewritten below carrying that check's verdict.
+        editorial = _editorial(None)
 
         # ---- technical quality control ---------------------------------
         report = validate_output(
@@ -702,6 +747,36 @@ class VideoPipeline:
             details = "; ".join(f"{c.name}: {c.detail}" for c in report.failures)
             raise PipelineError(f"Output failed validation - {details}")
 
+        # ---- artifact provenance ---------------------------------------
+        # Everything is on disk now, so re-read it and prove the files belong
+        # to each other before any of them can be packaged or uploaded.
+        manifest = build_manifest(
+            output_dir,
+            generation_id=self.generation_id,
+            topic=topic.title,
+            title=script.title,
+            spoken_text=narration.spoken_text,
+            duration=info.duration,
+            source_count=len(clips),
+            scene_count=len(scenes),
+            shot_count=len(shots),
+            scene_narrations=[scene.narration for scene in scenes],
+            selected_clip_keys=[
+                getattr(getattr(c, "clip", None), "key", "") for c in clips
+            ],
+        )
+        manifest.save(output_dir)
+        editorial = _editorial(manifest.passed)
+
+        if not manifest.passed:
+            details = "; ".join(
+                f"{c.name}: {c.detail}" for c in manifest.checks if not c.passed
+            )
+            raise PipelineError(
+                f"Artifact provenance check failed for generation "
+                f"{self.generation_id} - {details}"
+            )
+
         if not editorial.passed and bool(self.config.get("editorial.fail_on_error", True)):
             details = "; ".join(f"{c.name}: {c.detail}" for c in editorial.failures)
             raise PipelineError(f"Output failed editorial validation - {details}")
@@ -714,6 +789,7 @@ class VideoPipeline:
             sources_path=sources_path,
             report=report,
             editorial=editorial,
+            manifest=manifest,
             topic=topic,
             script=script,
             duration=info.duration,

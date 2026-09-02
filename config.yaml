@@ -93,6 +93,8 @@ ranking:
     quality: 10
     aspirational: 20            # premium-channel look; see editorial_qc
   enforce_aspirational: true    # reject plastic covers, building sites, cleaning
+  enforce_premium: true         # reject people-dominant, dark, empty, office footage
+  min_interior_relevance: 0.35  # a clip must clearly be showing an interior
   max_creator_share: 0.18       # no creator may supply more of the video than this
   max_query_share: 0.22
   min_score: 28                 # clips below this are never used
@@ -129,6 +131,8 @@ editorial:
   min_title_alignment: 0.8
   min_creator_diversity: 0.5
   min_average_clip_score: 40.0
+  min_premium_visual_ratio: 0.80   # share of clips that are premium interiors
+  max_promise_alignment_failures: 0
 
 quality:
   min_file_mb: 1.0

@@ -153,6 +153,11 @@ jobs:
           restore-keys: |
             vidfactory-cache-
 
+      - name: Start from a clean output tree
+        # A job re-run reuses the workflow run number, so guarantee that
+        # nothing from an earlier attempt can be picked up.
+        run: rm -rf output work
+
       - name: Show free disk space
         run: df -h / | tail -1
 
@@ -202,6 +207,7 @@ jobs:
           VIDEO_TITLE: ${{ steps.generate.outputs.title }}
           VIDEO_SECONDS: ${{ steps.generate.outputs.duration_seconds }}
           VIDEO_YOUTUBE_ID: ${{ steps.generate.outputs.youtube_id }}
+          GENERATION_ID: ${{ steps.generate.outputs.generation_id }}
         run: |
           {
             echo "## Video generation"
@@ -211,7 +217,9 @@ jobs:
               echo ""
               echo "**Length:** ${VIDEO_SECONDS} seconds"
               echo ""
-              if [ -n "${VIDEO_YOUTUBE_ID:-}" ]; then
+              echo "**Generation:** \`${GENERATION_ID}\`"
+            echo ""
+            if [ -n "${VIDEO_YOUTUBE_ID:-}" ]; then
                 echo "**YouTube:** https://www.youtube.com/watch?v=${VIDEO_YOUTUBE_ID}"
               else
                 echo "Not uploaded. Download the artifact below."
@@ -221,20 +229,16 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # The artifact is scoped to this generation's own directory. The
+      # previous "output/**" wildcard would sweep up every generation present
+      # on disk, so a stale run's script.txt could be packaged next to a
+      # different run's video.
       - name: Upload the finished video and files
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: video-run-${{ github.run_number }}
-          path: |
-            output/**/final_video.mp4
-            output/**/subtitles.srt
-            output/**/script.txt
-            output/**/metadata.json
-            output/**/video_sources.json
-            output/**/scenes.json
-            output/**/quality_report.json
-            output/**/editorial_quality_report.json
+          name: video-${{ steps.generate.outputs.generation_id }}
+          path: ${{ steps.generate.outputs.output_dir }}
           retention-days: 14
           if-no-files-found: error
           compression-level: 0
@@ -243,12 +247,13 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: metadata-run-${{ github.run_number }}
+          name: metadata-${{ steps.generate.outputs.generation_id }}
           path: |
-            output/**/script.txt
-            output/**/metadata.json
-            output/**/video_sources.json
-            output/**/editorial_quality_report.json
+            ${{ steps.generate.outputs.output_dir }}/script.txt
+            ${{ steps.generate.outputs.output_dir }}/metadata.json
+            ${{ steps.generate.outputs.output_dir }}/video_sources.json
+            ${{ steps.generate.outputs.output_dir }}/editorial_quality_report.json
+            ${{ steps.generate.outputs.output_dir }}/artifact_manifest.json
           retention-days: 60
           if-no-files-found: warn
 

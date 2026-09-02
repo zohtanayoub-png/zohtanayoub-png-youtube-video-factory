@@ -93,6 +93,16 @@ class EditorialReport:
             self.metrics.get("creator_diversity", 0),
             self.metrics.get("title_idea_alignment", 0) * 100,
         )
+        log.info(
+            "Premium: %.0f%% premium footage (%d people-dominant, %d dark, "
+            "%d empty), provenance %s, %d promise failures",
+            self.metrics.get("premium_visual_ratio", 0) * 100,
+            self.metrics.get("people_dominant_clip_count", 0),
+            self.metrics.get("dark_clip_count", 0),
+            self.metrics.get("empty_room_clip_count", 0),
+            self.metrics.get("artifact_provenance_passed"),
+            self.metrics.get("promise_alignment_failures", 0),
+        )
 
 
 def _section_coverage(
@@ -139,6 +149,8 @@ def build_report(
     search_stats: Mapping[str, Any] | None = None,
     diversity: Mapping[str, Any] | None = None,
     thresholds: Mapping[str, Any] | None = None,
+    provenance_passed: bool | None = None,
+    promise_alignment_failures: int = 0,
 ) -> EditorialReport:
     """Measure the editorial quality of a finished edit."""
 
@@ -149,6 +161,8 @@ def build_report(
         "min_title_alignment": 0.8,
         "min_creator_diversity": 0.5,
         "min_average_clip_score": 40.0,
+        "min_premium_visual_ratio": 0.80,
+        "max_promise_alignment_failures": 0,
         **dict(thresholds or {}),
     }
 
@@ -171,6 +185,24 @@ def build_report(
     coverage = _section_coverage(shots, scenes)
     weak_sections = [c for c in coverage if not c["well_supported"]]
 
+    # ---- premium visual signals ------------------------------------------
+    # Each downloaded clip carries the premium report the ranker computed, so
+    # the finished edit can be measured rather than assumed.
+    premium_reports = [
+        dict(getattr(getattr(c, "clip", None), "premium", {}) or {}) for c in clips
+    ]
+    rated = [r for r in premium_reports if r]
+    people_dominant = sum(1 for r in rated if r.get("is_people_dominant"))
+    dark_clips = sum(1 for r in rated if r.get("is_dark"))
+    empty_clips = sum(1 for r in rated if r.get("is_empty_room"))
+    premium_clips = sum(1 for r in rated if r.get("is_premium"))
+    premium_ratio = round(premium_clips / len(rated), 3) if rated else 0.0
+    mean_relevance = (
+        round(sum(float(r.get("interior_relevance_score", 0)) for r in rated) / len(rated), 3)
+        if rated
+        else 0.0
+    )
+
     metrics: dict[str, Any] = {
         "source_video_reuse_count": reuse_count,
         "unique_source_videos": unique_sources,
@@ -185,6 +217,14 @@ def build_report(
         "title_promise": getattr(script, "promise_key", "general"),
         "rejected_idea_count": len(getattr(script, "rejected_ideas", []) or []),
         "clips_downloaded": len(clips),
+        # ---- premium visual quality -------------------------------------
+        "artifact_provenance_passed": provenance_passed,
+        "people_dominant_clip_count": people_dominant,
+        "dark_clip_count": dark_clips,
+        "empty_room_clip_count": empty_clips,
+        "premium_visual_ratio": premium_ratio,
+        "mean_interior_relevance": mean_relevance,
+        "promise_alignment_failures": int(promise_alignment_failures),
         "search": stats,
         **diversity,
     }
@@ -229,6 +269,27 @@ def build_report(
             average_score >= float(limits["min_average_clip_score"]),
             f"average selected clip scored {average_score} "
             f"(minimum {limits['min_average_clip_score']})",
+            severity="warning",
+        ),
+        EditorialCheck(
+            "artifact_provenance",
+            provenance_passed is not False,
+            "every artifact belongs to this generation"
+            if provenance_passed
+            else "artifacts could not be proven to share one generation",
+        ),
+        EditorialCheck(
+            "promise_alignment",
+            int(promise_alignment_failures) <= int(limits["max_promise_alignment_failures"]),
+            f"{promise_alignment_failures} idea(s) do not support the title promise",
+        ),
+        EditorialCheck(
+            "premium_visual_ratio",
+            premium_ratio >= float(limits["min_premium_visual_ratio"]),
+            f"{premium_ratio:.0%} of clips are premium interior footage "
+            f"(minimum {float(limits['min_premium_visual_ratio']):.0%}); "
+            f"{people_dominant} people-dominant, {dark_clips} dark, "
+            f"{empty_clips} empty",
             severity="warning",
         ),
         EditorialCheck(
