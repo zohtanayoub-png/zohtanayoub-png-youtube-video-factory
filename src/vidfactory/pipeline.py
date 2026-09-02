@@ -464,6 +464,26 @@ class VideoPipeline:
             log.warning("Relaxing the reuse cooldown to widen the pool")
             context.cooldown_days = 0.0
             ranked = ranker.rank(list(candidates.values()), context)
+
+        # The premium gate is strict by design, and on a narrow topic it can
+        # reject more than the timeline needs. Repeating footage is a worse
+        # outcome than an occasional less-than-perfect clip, so relax the gate
+        # rather than shipping a video that loops - and say so in the log and
+        # in the editorial report.
+        if len(ranked) < shots_needed and context.enforce_premium:
+            context.enforce_premium = False
+            relaxed = ranker.rank(list(candidates.values()), context)
+            log.warning(
+                "PREMIUM GATE RELAXED: only %d clips cleared it for %d shots; "
+                "reranking without it yields %d. Expect a lower "
+                "premium_visual_ratio in the editorial report.",
+                len(ranked),
+                shots_needed,
+                len(relaxed),
+            )
+            stats["premium_gate_relaxed"] = True
+            ranked = relaxed
+
         if not ranked:
             raise PipelineError("No stock clip met the minimum quality requirements")
 
