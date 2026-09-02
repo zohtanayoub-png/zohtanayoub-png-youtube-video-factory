@@ -12,6 +12,7 @@ cut to the words instead of the words being stretched to fit the shots.
 from __future__ import annotations
 
 import json
+import math
 import shutil
 import time
 import uuid
@@ -23,12 +24,13 @@ from typing import Any, Mapping, Sequence
 from .config import Config
 from .database import Database
 from .downloader import ClipDownloader
-from .editor import VideoEditor, plan_shots
+from .editor import ShotPlan, VideoEditor, estimate_shot_count, plan_shots
+from .editorial_qc import EditorialReport, build_report
 from .ffmpeg_utils import ffmpeg_available, probe_media
 from .logging_utils import get_logger
 from .metadata import build_metadata, safe_filename
 from .quality_control import QualityReport, validate_output
-from .ranking import ClipRanker, RankingContext, diversify
+from .ranking import ClipRanker, DiversitySettings, RankingContext, diversify, diversity_report
 from .scene_planner import Scene, plan_scenes
 from .script_generator import Script, generate_script
 from .stock import StockClip, build_providers
@@ -53,6 +55,7 @@ class GenerationResult:
     metadata_path: Path
     sources_path: Path
     report: QualityReport
+    editorial: EditorialReport | None
     topic: Topic
     script: Script
     duration: float
@@ -69,6 +72,10 @@ class GenerationResult:
             "metadata": str(self.metadata_path),
             "sources": str(self.sources_path),
             "quality_passed": self.report.passed,
+            "editorial_passed": self.editorial.passed if self.editorial else None,
+            "unique_source_ratio": (
+                self.editorial.metrics.get("unique_source_ratio") if self.editorial else None
+            ),
             "youtube_id": self.youtube_id,
         }
 
@@ -111,11 +118,32 @@ class VideoPipeline:
 
         try:
             topic = self._choose_topic(topic_text)
-            script = self._write_script(topic)
+            # Build the voice first: how fast it actually speaks decides how
+            # many words a 20 minute video needs.
+            tts_engine = self._build_tts()
+            script = self._write_script(topic, tts_engine.speech_rate_wpm)
             scenes = self._plan_scenes(script)
-            narration = self._narrate(scenes)
-            clips = self._gather_footage(scenes, narration, topic)
-            result = self._render(topic, script, scenes, narration, clips)
+            narration = self._narrate(scenes, tts_engine)
+
+            # Work out the real shot count before searching, so the amount of
+            # footage gathered matches what the edit will actually consume.
+            scene_durations = self._scene_durations(scenes, narration)
+            shots_needed = estimate_shot_count(
+                scene_durations,
+                min_shot=float(self.config.get("video.min_clip_seconds", 3)),
+                max_shot=float(self.config.get("video.max_clip_seconds", 6)),
+            )
+            log.info("Timeline needs %d shots from %d unique source videos", shots_needed, shots_needed)
+
+            clips, affinity, search_stats = self._gather_footage(
+                scenes, narration, topic, shots_needed
+            )
+            result = self._render(
+                topic, script, scenes, narration, clips,
+                scene_durations=scene_durations,
+                affinity=affinity,
+                search_stats=search_stats,
+            )
             self._persist(topic, script, scenes, result)
 
             if upload is None:
@@ -162,26 +190,38 @@ class VideoPipeline:
         )
         return topic
 
-    def _write_script(self, topic: Topic) -> Script:
+    def _write_script(self, topic: Topic, speech_rate_wpm: float | None = None) -> Script:
+        configured = float(self.config.get("script.words_per_minute", 150))
+        rate = float(speech_rate_wpm or configured)
+        if speech_rate_wpm and abs(rate - configured) > 5:
+            log.info(
+                "Sizing the script for the actual voice rate (%.0f words per "
+                "minute) rather than the configured %.0f",
+                rate,
+                configured,
+            )
         return generate_script(
             topic,
             duration_minutes=float(self.config.get("video.duration_minutes", 20)),
             engine=str(self.config.get("script.engine", "auto")),
-            words_per_minute=float(self.config.get("script.words_per_minute", 150)),
+            words_per_minute=rate,
             llm_settings=dict(self.config.get("script.llm", {}) or {}),
         )
 
     def _plan_scenes(self, script: Script) -> list[Scene]:
         return plan_scenes(script)
 
-    def _narrate(self, scenes: Sequence[Scene]):
-        engine = build_engine(
+    def _build_tts(self):
+        return build_engine(
             engine=str(self.config.get("tts.engine", "auto")),
             voice=str(self.config.get("tts.voice", "en_US-hfc_female-medium")),
             speed=float(self.config.get("tts.speed", 1.0)),
             sample_rate=int(self.config.get("audio.sample_rate", 48000)),
             fallback_voices=list(self.config.get("tts.fallback_voices", []) or []),
         )
+
+    def _narrate(self, scenes: Sequence[Scene], engine=None):
+        engine = engine or self._build_tts()
         builder = NarrationBuilder(
             engine=engine,
             workdir=self.workdir / "audio",
@@ -213,9 +253,20 @@ class VideoPipeline:
         return history
 
     def _gather_footage(
-        self, scenes: Sequence[Scene], narration: Any, topic: Topic
-    ) -> list[Any]:
-        """Search, rank and download enough clips to cover the whole timeline."""
+        self, scenes: Sequence[Scene], narration: Any, topic: Topic, shots_needed: int
+    ) -> tuple[list[Any], dict[str, list[str]], dict[str, Any]]:
+        """Search metadata first, rank, then download only what was selected.
+
+        Returns the downloaded clips, a scene-to-clip affinity map (so each
+        idea's shots come from that idea's own searches), and search
+        statistics for the editorial report.
+
+        The search walks each scene's query ladder specific-first and only
+        falls through to the generic category query when the specific ones
+        genuinely came back empty. When the pool is still short of the number
+        of shots the timeline needs, it broadens: more queries per scene, then
+        deeper result pages, rather than accepting footage reuse.
+        """
 
         sources = dict(self.config.get("sources", {}) or {})
         providers = build_providers(sources)
@@ -225,10 +276,127 @@ class VideoPipeline:
                 "or enable sources.local and add your own clips to assets/local_clips."
             )
 
-        max_shot = float(self.config.get("video.max_clip_seconds", 8))
-        min_shot = float(self.config.get("video.min_clip_seconds", 4))
-        total_seconds = narration.duration + float(self.config.get("video.tail_seconds", 1.2))
-        needed = max(3, int(total_seconds / max(max_shot, 1.0)) + 2)
+        max_shot = float(self.config.get("video.max_clip_seconds", 6))
+        min_shot = float(self.config.get("video.min_clip_seconds", 3))
+        per_query = int(sources.get("per_query_results", 30))
+        max_pages = max(1, int(sources.get("max_pages", 3)))
+
+        # One unique source video per shot, plus headroom for clips that fail
+        # validation on download. Under-counting here is what forced the
+        # earlier videos to repeat footage.
+        headroom = float(sources.get("candidate_headroom", 1.35))
+        needed = max(3, int(math.ceil(shots_needed * headroom)))
+
+        candidates: dict[str, StockClip] = {}
+        affinity: dict[str, list[str]] = {}
+        stats = {
+            "queries_run": 0,
+            "specific_queries_run": 0,
+            "generic_queries_run": 0,
+            "pages_fetched": 0,
+            "empty_queries": 0,
+        }
+
+        def run(provider: Any, query_text: str, page: int) -> list[StockClip]:
+            stats["queries_run"] += 1
+            stats["pages_fetched"] += 1
+            try:
+                return provider.search(query_text, per_page=per_query, page=page)
+            except Exception as exc:
+                log.warning("%s search failed for %r: %s", provider.name, query_text, exc)
+                return []
+
+        def harvest(scene: Scene, pages: int, include_generic: bool) -> int:
+            """Search one scene's ladder. Returns how many new clips it added."""
+
+            added = 0
+            found_specific = False
+            bucket = affinity.setdefault(scene.scene_id, [])
+            for query in scene.visual_queries:
+                if query.is_generic and (found_specific or not include_generic):
+                    continue
+                for provider in providers:
+                    provider_pages = pages if provider.supports_pagination else 1
+                    for page in range(1, provider_pages + 1):
+                        results = run(provider, query.text, page)
+                        if query.is_generic:
+                            stats["generic_queries_run"] += 1
+                        else:
+                            stats["specific_queries_run"] += 1
+                        if not results:
+                            stats["empty_queries"] += 1
+                            break        # no point paging an empty query
+                        for clip in results:
+                            if clip.key not in candidates:
+                                candidates[clip.key] = clip
+                                added += 1
+                            if clip.key not in bucket:
+                                bucket.append(clip.key)
+                        if not query.is_generic:
+                            found_specific = True
+                    if found_specific and len(bucket) >= 6:
+                        break
+                if found_specific and len(bucket) >= 8:
+                    break
+            return added
+
+        scene_order = self._scene_search_order(scenes)
+
+        # A provider that has stopped returning anything new is exhausted, and
+        # hammering it just burns rate limit. Track consecutive dry scenes.
+        def sweep(pages: int, include_generic: bool, stop_after_dry: int = 6) -> None:
+            dry = 0
+            for scene in scene_order:
+                if len(candidates) >= needed * 2:
+                    return
+                before = len(candidates)
+                harvest(scene, pages=pages, include_generic=include_generic)
+                if len(candidates) == before:
+                    dry += 1
+                    if dry >= stop_after_dry:
+                        log.info(
+                            "Searches stopped returning new footage after %d scenes; "
+                            "the available pool is %d clips",
+                            dry,
+                            len(candidates),
+                        )
+                        return
+                else:
+                    dry = 0
+
+        # Pass 1: specific queries only, one page each. Cheap and precise.
+        sweep(pages=1, include_generic=False)
+
+        # Pass 2: still short, so go deeper before ever loosening the rules.
+        if len(candidates) < needed * 1.5:
+            log.info(
+                "Only %d candidates after the first pass; searching deeper",
+                len(candidates),
+            )
+            sweep(pages=max_pages, include_generic=False)
+
+        # Pass 3: last resort, allow the generic category fallback.
+        if len(candidates) < needed:
+            log.warning(
+                "Specific queries yielded %d candidates for %d shots; "
+                "falling back to generic category queries",
+                len(candidates),
+                shots_needed,
+            )
+            sweep(pages=max_pages, include_generic=True, stop_after_dry=4)
+
+        log.info(
+            "%d candidates from %d searches (%d specific, %d generic, %d empty)",
+            len(candidates),
+            stats["queries_run"],
+            stats["specific_queries_run"],
+            stats["generic_queries_run"],
+            stats["empty_queries"],
+        )
+        if not candidates:
+            raise PipelineError(
+                "No stock clips were found for any scene. Check the provider API keys."
+            )
 
         history = self._clip_history()
         ranker = ClipRanker(
@@ -236,36 +404,6 @@ class VideoPipeline:
             min_score=float(self.config.get("ranking.min_score", 28)),
             max_uses_per_clip=int(self.config.get("ranking.max_uses_per_clip", 3)),
         )
-
-        # Search scene by scene so the footage follows the narration, and stop
-        # once there is comfortably more material than the timeline needs.
-        candidates: dict[str, StockClip] = {}
-        query_count = 0
-        per_query = int(sources.get("per_query_results", 20))
-        scene_order = self._scene_search_order(scenes)
-
-        for scene in scene_order:
-            if len(candidates) >= needed * 3:
-                break
-            for provider in providers:
-                for query in scene.queries[:2]:
-                    query_count += 1
-                    try:
-                        found = provider.search(query, per_page=per_query)
-                    except Exception as exc:
-                        log.warning("%s search failed for %r: %s", provider.name, query, exc)
-                        continue
-                    for clip in found:
-                        candidates.setdefault(clip.key, clip)
-                    if found:
-                        break        # a query that worked is enough for this scene
-
-        log.info("%d candidates found across %d queries", len(candidates), query_count)
-        if not candidates:
-            raise PipelineError(
-                "No stock clips were found for any scene. Check the provider API keys."
-            )
-
         context = RankingContext(
             query=topic.title,
             keywords=topic.keywords,
@@ -277,20 +415,32 @@ class VideoPipeline:
             min_source_seconds=float(sources.get("min_source_seconds", 5.0)),
             cooldown_days=float(self.config.get("ranking.clip_reuse_cooldown_days", 45)),
             history=history,
+            enforce_aspirational=bool(self.config.get("ranking.enforce_aspirational", True)),
         )
+
+        # All ranking happens on metadata alone; nothing has been downloaded
+        # yet, so rejected footage costs no bandwidth.
         ranked = ranker.rank(list(candidates.values()), context)
         log.info("%d clips passed ranking (of %d candidates)", len(ranked), len(candidates))
 
-        if not ranked:
-            # Relax the cooldown rather than failing the whole render.
-            log.warning("No clip cleared the ranking threshold; retrying without the cooldown")
+        if len(ranked) < shots_needed:
+            log.warning("Relaxing the reuse cooldown to widen the pool")
             context.cooldown_days = 0.0
             ranked = ranker.rank(list(candidates.values()), context)
         if not ranked:
             raise PipelineError("No stock clip met the minimum quality requirements")
 
-        selected = diversify(ranked, needed)
-        log.info("%d clips selected for download", len(selected))
+        selected = diversify(
+            ranked,
+            needed,
+            DiversitySettings(
+                max_creator_share=float(self.config.get("ranking.max_creator_share", 0.18)),
+                max_query_share=float(self.config.get("ranking.max_query_share", 0.22)),
+            ),
+        )
+        stats["ranked"] = len(ranked)
+        stats["selected"] = len(selected)
+        log.info("%d clips selected for download (need %d shots)", len(selected), shots_needed)
 
         downloader = ClipDownloader(
             workdir=self.workdir / "clips",
@@ -300,22 +450,39 @@ class VideoPipeline:
             max_mb=float(sources.get("max_download_mb", 90)),
             timeout=float(sources.get("download_timeout_seconds", 120)),
             retries=int(sources.get("retries", 3)),
-            # Only byte-identical duplicates within this run are rejected here;
-            # reuse across videos is governed by the ranking cooldown instead.
             known_hashes=(),
         )
         results = downloader.fetch_many(selected, needed=needed)
 
-        if len(results) < 3 and len(ranked) > len(selected):
-            log.warning("Only %d clips downloaded; trying the next ranked batch", len(results))
-            extra = [c for c in ranked if c.key not in {r.clip.key for r in results}]
-            results.extend(downloader.fetch_many(extra[:needed], needed=needed - len(results)))
+        # Top up from the ranked remainder if downloads failed validation,
+        # because being short of clips is what causes footage repetition.
+        if len(results) < shots_needed and len(ranked) > len(selected):
+            have = {r.clip.key for r in results}
+            extra = [c for c in ranked if c.key not in have]
+            log.info(
+                "Downloaded %d of %d shots' worth; topping up from the ranked pool",
+                len(results),
+                shots_needed,
+            )
+            results.extend(
+                downloader.fetch_many(extra, needed=shots_needed - len(results))
+            )
 
         if not results:
             raise PipelineError("Every clip download failed - cannot build a video")
 
+        if len(results) < shots_needed:
+            log.warning(
+                "FOOTAGE SHORTAGE: %d unique clips for %d shots. Some footage "
+                "will have to be reused; consider raising sources.per_query_results "
+                "or sources.max_pages.",
+                len(results),
+                shots_needed,
+            )
+
+        stats["downloaded"] = len(results)
         log.info("%d clips downloaded and validated", len(results))
-        return results
+        return results, affinity, stats
 
     @staticmethod
     def _scene_search_order(scenes: Sequence[Scene]) -> list[Scene]:
@@ -326,6 +493,32 @@ class VideoPipeline:
         return leads + rest
 
     # ------------------------------------------------------------------
+    def _scene_durations(
+        self, scenes: Sequence[Scene], narration: Any
+    ) -> list[tuple[str, float]]:
+        """Real per-scene screen time, covering the whole audio track.
+
+        Inter-scene pauses are spread across the scenes and the closing tail is
+        added to the last one, so the visuals cover the entire narration and
+        the final mux can stream-copy instead of re-encoding.
+        """
+
+        durations = [
+            (scene.scene_id, narration.scene_duration(scene.scene_id))
+            for scene in scenes
+            if narration.scene_duration(scene.scene_id) > 0.05
+        ]
+        covered = sum(duration for _, duration in durations)
+        shortfall = max(0.0, narration.duration - covered)
+        if shortfall > 0.01 and durations:
+            share = shortfall / len(durations)
+            durations = [(sid, dur + share) for sid, dur in durations]
+        tail_seconds = float(self.config.get("video.tail_seconds", 1.2))
+        if durations and tail_seconds > 0:
+            last_id, last_duration = durations[-1]
+            durations[-1] = (last_id, last_duration + tail_seconds + 0.2)
+        return durations
+
     def _render(
         self,
         topic: Topic,
@@ -333,35 +526,25 @@ class VideoPipeline:
         scenes: Sequence[Scene],
         narration: Any,
         clips: Sequence[Any],
+        scene_durations: list[tuple[str, float]] | None = None,
+        affinity: dict[str, list[str]] | None = None,
+        search_stats: dict[str, Any] | None = None,
     ) -> GenerationResult:
         output_dir = self.output_root / self.run_id
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        scene_durations = [
-            (scene.scene_id, narration.scene_duration(scene.scene_id))
-            for scene in scenes
-            if narration.scene_duration(scene.scene_id) > 0.05
-        ]
-        # Spread the inter-scene pauses across the scenes, and extend the last
-        # scene by the closing tail, so the visuals cover the whole audio
-        # track. That lets the final mux stream-copy instead of re-encoding.
+        scene_durations = scene_durations or self._scene_durations(scenes, narration)
         tail_seconds = float(self.config.get("video.tail_seconds", 1.2))
-        covered = sum(duration for _, duration in scene_durations)
-        shortfall = max(0.0, narration.duration - covered)
-        if shortfall > 0.01 and scene_durations:
-            share = shortfall / len(scene_durations)
-            scene_durations = [(sid, dur + share) for sid, dur in scene_durations]
-        if scene_durations and tail_seconds > 0:
-            last_id, last_duration = scene_durations[-1]
-            scene_durations[-1] = (last_id, last_duration + tail_seconds + 0.2)
 
-        shots = plan_shots(
+        shot_plan = plan_shots(
             scene_durations,
             clips,
-            min_shot=float(self.config.get("video.min_clip_seconds", 4)),
-            max_shot=float(self.config.get("video.max_clip_seconds", 8)),
+            min_shot=float(self.config.get("video.min_clip_seconds", 3)),
+            max_shot=float(self.config.get("video.max_clip_seconds", 6)),
             motion=str(self.config.get("video.motion", "subtle")),
+            scene_affinity=affinity,
         )
+        shots = shot_plan.shots
 
         editor = VideoEditor(
             workdir=self.workdir / "render",
@@ -448,7 +631,19 @@ class VideoPipeline:
         )
         metadata_path = metadata.save(output_dir / "metadata.json")
 
-        # ---- quality control -------------------------------------------
+        # ---- editorial quality control ---------------------------------
+        editorial = build_report(
+            shot_plan=shot_plan,
+            clips=clips,
+            scenes=scenes,
+            script=script,
+            search_stats=search_stats,
+            diversity=diversity_report([c.clip for c in clips]),
+            thresholds=dict(self.config.get("editorial", {}) or {}),
+        )
+        editorial.save(output_dir / "editorial_quality_report.json")
+
+        # ---- technical quality control ---------------------------------
         report = validate_output(
             final_path,
             expected_duration=narration.duration + float(self.config.get("video.tail_seconds", 1.2)),
@@ -496,6 +691,10 @@ class VideoPipeline:
             details = "; ".join(f"{c.name}: {c.detail}" for c in report.failures)
             raise PipelineError(f"Output failed validation - {details}")
 
+        if not editorial.passed and bool(self.config.get("editorial.fail_on_error", True)):
+            details = "; ".join(f"{c.name}: {c.detail}" for c in editorial.failures)
+            raise PipelineError(f"Output failed editorial validation - {details}")
+
         return GenerationResult(
             video_path=final_path,
             subtitles_path=subtitles_path,
@@ -503,6 +702,7 @@ class VideoPipeline:
             metadata_path=metadata_path,
             sources_path=sources_path,
             report=report,
+            editorial=editorial,
             topic=topic,
             script=script,
             duration=info.duration,

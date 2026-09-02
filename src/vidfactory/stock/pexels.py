@@ -10,6 +10,8 @@ from __future__ import annotations
 import os
 from typing import Any
 
+import re
+
 from ..http import request_json
 from ..logging_utils import get_logger
 from .base import ProviderError, StockClip, StockProvider
@@ -38,6 +40,7 @@ class PexelsProvider(StockProvider):
             params={
                 "query": query,
                 "per_page": max(1, min(int(per_page), 80)),
+                "page": max(1, int(filters.get("page", 1))),
                 "orientation": filters.get("orientation", "landscape"),
                 "size": filters.get("size", "medium"),
             },
@@ -72,9 +75,25 @@ class PexelsProvider(StockProvider):
                     preview_image=str(video.get("image", "")),
                     file_size=int(best.get("file_size") or 0),
                     query=query,
+                    description=cls.describe(str(video.get("url", ""))),
                 )
             )
         return [clip for clip in clips if clip.provider_id and clip.download_url]
+
+    @staticmethod
+    def describe(page_url: str) -> str:
+        """Recover the caption Pexels encodes in its page URL.
+
+        ``/video/woman-cleaning-the-living-room-1234567/`` describes the
+        footage. It is the only textual signal the videos API gives us, and it
+        is the difference between ranking a styled interior above someone
+        vacuuming.
+        """
+
+        match = re.search(r"/video/([a-z0-9-]*?)-?(\d+)?/?$", str(page_url or "").lower())
+        if not match or not match.group(1):
+            return ""
+        return match.group(1).replace("-", " ").strip()
 
     #: We render at 1080p, so anything wider is wasted bandwidth and wasted
     #: decode time on a two-core runner.

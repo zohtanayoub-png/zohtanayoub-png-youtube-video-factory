@@ -193,15 +193,15 @@ def test_scenes_are_not_all_the_same_query(script):
 
 
 def test_queries_follow_the_narration_not_the_title():
-    queries = derive_queries(
+    queries = [q.text for q in derive_queries(
         "Floor to ceiling curtains can make a low room appear considerably taller.",
         "living rooms",
-    )
+    )]
     assert any("curtain" in q for q in queries)
 
-    queries = derive_queries(
+    queries = [q.text for q in derive_queries(
         "A rug that is too small can visually shrink your seating area.", "living rooms"
-    )
+    )]
     assert any("rug" in q for q in queries)
 
 

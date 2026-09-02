@@ -26,7 +26,14 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Sequence
 
-from .knowledge import Tip, tips_for
+from .knowledge import ALL_CATEGORIES, Tip, tips_for
+from .title_alignment import (
+    AlignmentResult,
+    Promise,
+    alignment_ratio,
+    detect_promise,
+    filter_aligned,
+)
 from .logging_utils import get_logger
 from .topic_engine import Topic
 
@@ -51,6 +58,8 @@ class ScriptSection:
     text: str
     index: int = 0
     tip: Tip | None = None
+    #: Set when the local model disagrees that this idea serves the title.
+    flagged_off_promise: bool = False
 
     @property
     def word_count(self) -> int:
@@ -65,6 +74,13 @@ class Script:
     topic: Topic
     sections: list[ScriptSection] = field(default_factory=list)
     engine: str = "template"
+    #: What the title commits every idea to deliver.
+    promise_key: str = "general"
+    promise_label: str = ""
+    #: Ideas dropped because they did not support the title promise.
+    rejected_ideas: list[dict[str, Any]] = field(default_factory=list)
+    #: Share of the chosen ideas that support the promise (0.0 - 1.0).
+    title_idea_alignment: float = 1.0
 
     @property
     def text(self) -> str:
@@ -86,6 +102,9 @@ class Script:
             "title": self.title,
             "engine": self.engine,
             "word_count": self.word_count,
+            "promise": {"key": self.promise_key, "label": self.promise_label},
+            "title_idea_alignment": self.title_idea_alignment,
+            "rejected_ideas": list(self.rejected_ideas),
             "topic": self.topic.to_dict(),
             "sections": [
                 {
@@ -284,8 +303,172 @@ GENERIC_ELABORATIONS = [
     "Photograph the room before and after. The difference is usually clearer on a screen than in person.",
     "None of this requires a professional. It requires deciding, and then being willing to move things twice.",
     "The cost here is time rather than money, which is why it is so often skipped.",
+    "Do it once properly rather than twice cheaply, and you will not have to think about it again.",
+    "If you live with other people, agree on this one before you start moving things.",
+    "Measure first. Almost every regret in decorating traces back to a measurement nobody took.",
+    "Stand back and look from the doorway rather than from the middle of the room.",
+    "It is worth doing on a quiet afternoon rather than squeezing it into a busy one.",
+    "Notice how the room feels in the evening as well as in daylight, because the two can differ sharply.",
+    "There is no rush on this. Rooms improve faster when decisions are made slowly.",
+    "Keep whatever you remove for a month before letting it go, in case the room tells you otherwise.",
 ]
 
+
+
+# ---------------------------------------------------------------------------
+# Promise-aware hooks
+#
+# The first fifteen seconds have to create curiosity, not introduce a channel.
+# Each hook names a problem the viewer recognises and implies that it is
+# fixable, then the script goes straight into the ideas.
+# ---------------------------------------------------------------------------
+
+PROMISE_HOOKS: dict[str, list[str]] = {
+    "bigger": [
+        "If your {room} feels smaller than it really is, the problem may not be the square footage. A handful of ordinary decorating choices can visually shrink a room, and reversing them can make the exact same space feel dramatically bigger.",
+        "Two rooms can have identical dimensions and feel completely different to stand in. The one that feels bigger is almost never the one with less furniture in it, and that surprises people.",
+        "There is a version of your {room} that feels noticeably larger, and reaching it does not involve knocking down a single wall. It involves undoing about six decisions that are quietly costing you space.",
+        "Most small rooms are not actually short of space. They are short of sightlines, light and vertical thinking, and all three are things you can fix this weekend.",
+    ],
+    "expensive": [
+        "Expensive-looking rooms are rarely expensive rooms. Walk into any home that feels high end and you will find the same small decisions repeated, and almost none of them are about how much anything cost.",
+        "There is a specific reason a room reads as cheap, and it is almost never the furniture. It is a short list of details that are cheap to fix and impossible to unsee once you know them.",
+        "You can spend twenty thousand on a room and have it look ordinary, or spend a fraction of that and have it look considered. The difference comes down to things most people never think about.",
+        "The gap between a builder-grade {room} and one that looks designed is smaller than you think, and most of it is measured in millimetres and finishes rather than money.",
+    ],
+    "cozy": [
+        "Cosiness is not a style you buy. It is a set of physical conditions, and once you know what they are you can produce them in almost any room, including a cold modern one.",
+        "Some rooms make you want to sit down and stay. It is not the furniture, and it is not the size, and it is almost entirely something you can change tonight.",
+        "If your {room} looks good in photographs but nobody actually relaxes in it, there is usually one culprit, and it is hanging from the middle of your ceiling.",
+    ],
+    "storage": [
+        "Most homes do not have a storage problem. They have a storage-in-the-wrong-place problem, and the difference is what makes one house feel calm and another feel permanently untidy.",
+        "If you have run out of space, there is a good chance you still have unused cubic metres in every room. They are just above your head, behind your doors and under your bed.",
+        "Buying more containers almost never fixes clutter. What fixes it is a small number of decisions about where things live, and they cost nothing at all.",
+    ],
+    "mistakes": [
+        "Almost every room that feels slightly wrong is making the same small number of mistakes. None of them are obvious, all of them are common, and every single one is reversible.",
+        "You can follow every rule you have read and still end up with a room that feels off. Usually it is because of something nobody warned you about, and it is probably on this list.",
+        "These are the mistakes that show up in real homes constantly, and the frustrating part is that they are cheap to fix once somebody points at them.",
+    ],
+    "budget": [
+        "The most effective changes you can make to a home are usually not the expensive ones. Some of the best cost nothing beyond an afternoon and a willingness to move things twice.",
+        "A small budget forces better decisions, because you cannot solve a design problem by buying your way out of it. That constraint tends to produce better rooms.",
+        "If your budget is tight, the good news is that the things that most affect how a {room} feels are mostly cheap. The expensive parts matter far less than people assume.",
+    ],
+    "timeless": [
+        "Some rooms still look right twenty years later, and others date within a season. The difference is decided by a handful of choices made early, and most of them are about restraint.",
+        "You can tell what year a room was decorated within about eighteen months. Unless it was done in a way that deliberately avoids that, which is what this comes down to.",
+    ],
+    "renter": [
+        "Renting does not mean living in a beige box for three years. Nearly everything that makes a home feel like yours is reversible, and a surprising amount of it needs no permission at all.",
+        "The reason most rented homes feel temporary is not the lease. It is that people stop at the point where they think they need permission, and that point is much further away than they think.",
+    ],
+    "brighter": [
+        "A dark room is rarely as dark as it feels. Most of the light already reaching it is being absorbed, blocked or wasted before it ever gets to where you are sitting.",
+        "If you have ever wondered why a room feels gloomy at four in the afternoon despite having a perfectly good window, the answer is usually a combination of about four things.",
+    ],
+}
+
+#: Used when a title makes no specific promise.
+GENERAL_HOOKS = [
+    "Some rooms just feel right the moment you walk into them, and it is almost never because of how much anything in them cost.",
+    "There is a reason a designed room feels different from a decorated one, and most of that difference comes down to a handful of decisions anyone can make.",
+    "Most homes are only a few small decisions away from looking dramatically better than they do right now, and none of those decisions require a renovation.",
+    "Walk into any well-designed home and you will find the same quiet decisions repeated over and over, whatever the budget was.",
+]
+
+#: How the idea itself is introduced. Deliberately varied in shape so the
+#: script does not settle into one rhythm.
+STATEMENT_FRAMES = [
+    "{title}.",
+    "{title}.",
+    "{title}.",
+    "Here is the one: {title_lower}.",
+    "{title}, and it matters more than it sounds like it should.",
+    "This one is simple: {title_lower}.",
+    "Start here: {title_lower}.",
+    "The rule is short: {title_lower}.",
+    "{title}, which is easier than it sounds.",
+]
+
+QUESTION_FRAMES = [
+    "Ever wondered why some rooms get this right and others do not? {title}.",
+    "So what actually makes the difference here? {title}.",
+    "What would you change first in a room like that? Almost always this: {title_lower}.",
+    "Why does this keep coming up in well-designed homes? {title}.",
+    "Want the version of this that designers actually use? {title}.",
+    "What is the cheapest fix on this whole list? Arguably this one: {title_lower}.",
+    "Ask yourself what your eye lands on first in that room. Then: {title}.",
+    "Which of these would you notice if it were missing? Probably this: {title_lower}.",
+]
+
+WARNING_FRAMES = [
+    "This is the one people get wrong most often. {title}.",
+    "If you only fix one thing on this list, consider making it this one. {title}.",
+    "Here is a mistake worth catching early. {title}.",
+    "Be careful with this one, because it is easy to get backwards. {title}.",
+    "This trips up more rooms than almost anything else. {title}.",
+    "Get this wrong and everything else you do will fight it. {title}.",
+    "Worth pausing on, because the fix is easy and the mistake is expensive. {title}.",
+]
+
+SCENARIO_FRAMES = [
+    "Picture the room before and after this single change. {title}.",
+    "Imagine walking into the same room twice, once with this done and once without. {title}.",
+    "Stand in the doorway and look at your own room while you listen to this one. {title}.",
+    "Think about the last home you walked into that felt genuinely finished. It almost certainly did this: {title_lower}.",
+    "Try this as a thought experiment before you try it as a project. {title}.",
+    "Two identical rooms, one decision apart. {title}.",
+    "Picture the same room photographed by an estate agent and by a magazine. The difference is often this: {title_lower}.",
+]
+
+#: Numbered call-outs, kept short and varied. Some items skip the number
+#: entirely and let the transition carry it, which reads far more naturally.
+NUMBER_FRAMES = [
+    "Number {n}.",
+    "Idea number {n}.",
+    "Number {n} on the list.",
+    "That takes us to number {n}.",
+    "Next, number {n}.",
+    "Number {n}, and this one is a favorite.",
+]
+
+#: Transitions. Long enough a pool that a twenty minute video never repeats.
+TRANSITIONS_V2 = [
+    "The next one follows directly from that.",
+    "This next idea solves a related problem.",
+    "Here is another one people underestimate.",
+    "The following idea is one of the easiest on this list.",
+    "This next point comes up in almost every home.",
+    "Once that is sorted, look at this next.",
+    "There is a related idea worth covering here.",
+    "This one is less obvious, but it matters just as much.",
+    "The next idea is where a lot of rooms go wrong.",
+    "Here is something that changes a room faster than most people expect.",
+    "Moving on, and this one is quick.",
+    "Now for something you can do in an afternoon.",
+    "This next one costs nothing at all.",
+    "Related to that, and just as useful.",
+    "Here is where it gets interesting.",
+    "That leads neatly into the next one.",
+    "The flip side of that is worth knowing too.",
+    "And then there is this, which people almost always skip.",
+    "This next one surprises people.",
+    "Keep that in mind while we look at this.",
+]
+
+#: Closers for an item. Used sparingly and never twice in a row.
+ITEM_CLOSERS = [
+    "It is a small change that changes the whole read of the room.",
+    "Once you have seen it, you cannot unsee it in other people's homes either.",
+    "That single adjustment does more than another round of shopping ever will.",
+    "It is one of those details you only notice when it is missing.",
+    "Worth doing even if you change nothing else on this list.",
+    "Do that much and the rest of the room starts to make more sense.",
+    "It sounds minor written down. It is not minor in the room.",
+    "This is the sort of thing people cannot name but always notice.",
+]
 
 INTRO_CONTEXT = {
     "living rooms": "The living room is usually the largest shared space in a home and the one that gets photographed, which is exactly why its problems are so visible.",
@@ -332,6 +515,24 @@ def count_words(count: int) -> dict[str, str]:
         "them": "it" if singular else "them",
         "it": "it",
     }
+
+
+#: Natural-language room word used inside hooks.
+_ROOM_WORDS: dict[str, str] = {
+    "living rooms": "living room",
+    "bedrooms": "bedroom",
+    "kitchens": "kitchen",
+    "bathrooms": "bathroom",
+    "small spaces": "space",
+    "apartment decorating": "apartment",
+    "renter-friendly decorating": "rental",
+    "home organization": "home",
+    "storage": "home",
+}
+
+
+def _room_word(category: str) -> str:
+    return _ROOM_WORDS.get(str(category or ""), "home")
 
 
 def _clean(text: str) -> str:
@@ -399,11 +600,44 @@ class TemplateScriptEngine:
     # ------------------------------------------------------------------
     def generate(self, topic: Topic, duration_minutes: float) -> Script:
         rng = random.Random(self.seed if self.seed is not None else hash(topic.slug) & 0xFFFFFFFF)
-        pool = tips_for(topic.category)
-        if not pool:
-            pool = tips_for(None)
+        promise = detect_promise(topic.title, topic.angle)
+
+        pool = tips_for(topic.category) or tips_for(None)
         rng.shuffle(pool)
 
+        wanted = self.plan_item_count(topic, duration_minutes, len(pool))
+        aligned, rejected = filter_aligned(pool, promise, minimum=min(3, wanted))
+
+        # If validating against the title promise leaves too little material,
+        # widen the search across every category before giving up on the
+        # promise - a broader pool is always better than a weaker promise.
+        if len(aligned) < wanted and promise.key != "general":
+            widened = [t for t in tips_for(None) if t not in pool]
+            rng.shuffle(widened)
+            extra, extra_rejected = filter_aligned(
+                widened, promise, minimum=0
+            )
+            if extra:
+                log.info(
+                    "Widened the idea pool across all categories to satisfy "
+                    "the '%s' promise (+%d aligned ideas)",
+                    promise.key,
+                    len(extra),
+                )
+            aligned = aligned + extra
+            rejected = rejected + extra_rejected
+
+        if rejected:
+            log.info(
+                "Rejected %d idea(s) that do not support '%s'; kept %d that do",
+                len(rejected),
+                promise.label,
+                len(aligned),
+            )
+            for result in rejected[:3]:
+                log.debug("  dropped %r - %s", result.tip["title"], result.explain())
+
+        pool = aligned or pool
         count = self.plan_item_count(topic, duration_minutes, len(pool))
         chosen = pool[:count]
 
@@ -417,18 +651,40 @@ class TemplateScriptEngine:
             self._intro(topic, title, count, duration_minutes, rng, compact=compact)
         ]
 
+        recent_patterns: list[str] = []
+        used_transitions: set[str] = set()
+        used_phrases: set[str] = set()
         for index, tip in enumerate(chosen, start=1):
-            sections.append(self._item(index, count, tip, rng))
+            sections.append(
+                self._item(
+                    index, count, tip, rng, recent_patterns, used_transitions, used_phrases
+                )
+            )
 
         sections.append(self._outro(count, rng, compact=compact))
 
-        script = Script(title=title, topic=topic, sections=sections, engine=self.name)
+        script = Script(
+            title=title,
+            topic=topic,
+            sections=sections,
+            engine=self.name,
+            promise_key=promise.key,
+            promise_label=promise.label,
+            rejected_ideas=[
+                {"title": r.tip["title"], "score": r.score, "reason": r.explain()}
+                for r in rejected[:25]
+            ],
+            title_idea_alignment=alignment_ratio(chosen, promise),
+        )
         self._fit_to_duration(script, duration_minutes, rng)
         log.info(
-            "%s words generated across %d sections (%s engine)",
+            "%s words across %d sections (%s engine); title promise '%s' "
+            "satisfied by %.0f%% of the ideas",
             f"{script.word_count:,}",
             len(sections),
             self.name,
+            promise.key,
+            script.title_idea_alignment * 100,
         )
         return script
 
@@ -442,7 +698,10 @@ class TemplateScriptEngine:
         rng: random.Random,
         compact: bool = False,
     ) -> ScriptSection:
-        parts = [rng.choice(HOOKS)]
+        promise = detect_promise(topic.title, topic.angle)
+        room = _room_word(topic.category)
+        hooks = PROMISE_HOOKS.get(promise.key) or GENERAL_HOOKS
+        parts = [rng.choice(hooks).format(room=room)]
         context = INTRO_CONTEXT.get(topic.category)
         if context and not compact:
             parts.append(context)
@@ -457,24 +716,125 @@ class TemplateScriptEngine:
             parts.append(rng.choice(PROMISE_TAILS))
         return ScriptSection(kind="intro", heading="Introduction", text=_clean(" ".join(parts)))
 
-    def _item(self, index: int, total: int, tip: Tip, rng: random.Random) -> ScriptSection:
+    #: How an idea can be structured. Choosing between these is what stops
+    #: every section following the identical sentence pattern.
+    ITEM_PATTERNS = (
+        ("statement", 26),   # idea -> why -> how
+        ("question", 16),    # rhetorical question -> idea -> why -> how
+        ("warning", 14),     # what goes wrong -> idea -> fix
+        ("scenario", 14),    # before/after framing -> idea -> how
+        ("how_first", 16),   # concrete instruction -> why it works
+        ("bare", 14),        # idea -> why -> how with no lead-ins at all
+    )
+
+    @staticmethod
+    def _pick_fresh(pool: Sequence[str], used: set[str], rng: random.Random) -> str:
+        """Choose from a pool without repeating until it is exhausted.
+
+        Long videos have many sections, and a phrase that shows up three times
+        in twenty minutes is exactly what makes a script sound generated.
+        """
+
+        fresh = [item for item in pool if item not in used]
+        if not fresh:
+            used.difference_update(pool)      # exhausted; start the cycle again
+            fresh = list(pool)
+        choice = rng.choice(fresh)
+        used.add(choice)
+        return choice
+
+    def _pick_pattern(self, rng: random.Random, recent: list[str]) -> str:
+        """Weighted choice that never repeats the last two patterns."""
+
+        options = [(name, w) for name, w in self.ITEM_PATTERNS if name not in recent[-2:]]
+        if not options:
+            options = list(self.ITEM_PATTERNS)
+        total = sum(w for _, w in options)
+        roll = rng.uniform(0, total)
+        upto = 0.0
+        for name, weight in options:
+            upto += weight
+            if roll <= upto:
+                return name
+        return options[-1][0]
+
+    def _item(
+        self,
+        index: int,
+        total: int,
+        tip: Tip,
+        rng: random.Random,
+        recent_patterns: list[str] | None = None,
+        used_transitions: set[str] | None = None,
+        used_phrases: set[str] | None = None,
+    ) -> ScriptSection:
+        """Write one numbered idea, varying the structure from item to item."""
+
+        recent_patterns = recent_patterns if recent_patterns is not None else []
+        used_transitions = used_transitions if used_transitions is not None else set()
+        used_phrases = used_phrases if used_phrases is not None else set()
+
+        pattern = self._pick_pattern(rng, recent_patterns)
+        recent_patterns.append(pattern)
+
+        title = str(tip["title"]).rstrip(".")
+        title_lower = title[0].lower() + title[1:]
+        why = str(tip["why"])
+        how = str(tip["how"])
+        mistake = str(tip.get("mistake") or "")
+
         parts: list[str] = []
 
-        if index > 1 and rng.random() < 0.45:
-            parts.append(rng.choice(TRANSITIONS))
+        # A transition, but never the same one twice in one video.
+        if index > 1 and rng.random() < 0.4:
+            fresh = [t for t in TRANSITIONS_V2 if t not in used_transitions]
+            if fresh:
+                transition = rng.choice(fresh)
+                used_transitions.add(transition)
+                parts.append(transition)
 
-        opener = rng.choice(ITEM_OPENERS).format(n=index)
-        parts.append(f"{opener} {tip['title']}.")
+        # The number is announced most of the time, but not always - always
+        # announcing it is a large part of what makes list videos feel robotic.
+        if rng.random() < 0.78:
+            parts.append(self._pick_fresh(NUMBER_FRAMES, used_phrases, rng).format(n=index))
 
-        parts.append(_join_lead(rng.choice(WHY_LEADS), tip["why"]))
-        parts.append(_join_lead(rng.choice(HOW_LEADS), tip["how"]))
+        if pattern == "question":
+            parts.append(self._pick_fresh(QUESTION_FRAMES, used_phrases, rng).format(title=title, title_lower=title_lower))
+            parts.append(why)
+            parts.append(how)
+        elif pattern == "warning":
+            if mistake:
+                parts.append(mistake)
+                parts.append(self._pick_fresh(WARNING_FRAMES, used_phrases, rng).format(title=title, title_lower=title_lower))
+                parts.append(how)
+                mistake = ""      # already used, do not repeat it below
+            else:
+                parts.append(self._pick_fresh(WARNING_FRAMES, used_phrases, rng).format(title=title, title_lower=title_lower))
+                parts.append(why)
+                parts.append(how)
+        elif pattern == "scenario":
+            parts.append(self._pick_fresh(SCENARIO_FRAMES, used_phrases, rng).format(title=title, title_lower=title_lower))
+            parts.append(why)
+            parts.append(how)
+        elif pattern == "how_first":
+            parts.append(f"{title}.")
+            parts.append(how)
+            parts.append(why)
+        elif pattern == "bare":
+            parts.append(f"{title}.")
+            parts.append(why)
+            parts.append(how)
+        else:  # statement
+            parts.append(self._pick_fresh(STATEMENT_FRAMES, used_phrases, rng).format(title=title, title_lower=title_lower))
+            parts.append(why)
+            parts.append(how)
 
-        if tip.get("mistake") and rng.random() < 0.75:
-            parts.append(_join_lead(rng.choice(MISTAKE_LEADS), tip["mistake"]))
-        elif rng.random() < 0.4:
-            parts.append(rng.choice(MICRO_SUMMARIES))
+        if mistake and rng.random() < 0.6:
+            parts.append(mistake)
+        elif rng.random() < 0.3:
+            parts.append(self._pick_fresh(ITEM_CLOSERS, used_phrases, rng))
 
-        heading = tip["title"]
+        heading = title
         if len(heading) > 64:
             heading = heading[:61].rstrip(" ,;:") + "..."
         return ScriptSection(
@@ -522,7 +882,7 @@ class TemplateScriptEngine:
         usage: dict[str, int] = {}
         per_item: dict[int, set[str]] = {id(item): set() for item in items}
         added = 0
-        max_reuse = 3
+        max_reuse = 2
 
         for _round in range(6):
             if script.word_count >= target_words * 0.98:

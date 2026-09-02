@@ -187,13 +187,21 @@ class LlamaRunner:
 
 
 PROMPT_TEMPLATE = (
-    "<|im_start|>system\n"
-    "You are a professional YouTube scriptwriter for a US home decor and interior "
-    "design channel. You write original, warm, practical narration in American "
-    "English. You never use emoji, headings, stage directions, bullet points or "
-    "engagement bait. You write flowing spoken prose only.<|im_end|>\n"
+    "<|im_start|>system\n{system}<|im_end|>\n"
     "<|im_start|>user\n{instruction}<|im_end|>\n"
     "<|im_start|>assistant\n"
+)
+
+WRITER_SYSTEM = (
+    "You are a professional YouTube scriptwriter for a US home decor and "
+    "interior design channel. You write original, warm, practical narration in "
+    "American English. You never use emoji, headings, stage directions, bullet "
+    "points or engagement bait. You write flowing spoken prose only."
+)
+
+ANALYST_SYSTEM = (
+    "You are a precise editorial assistant. You answer exactly in the format "
+    "requested, with no preamble, no explanation and no extra words."
 )
 
 
@@ -202,7 +210,7 @@ def _sanitize(text: str) -> str:
 
     text = re.sub(r"<\|.*?\|>", " ", text)
     text = re.sub(r"[*#`_>\[\]]+", " ", text)
-    text = re.sub(r"^\s*[-•\d]+[.)]\s*", "", text, flags=re.MULTILINE)
+    text = re.sub(r"^\s*[-\u2022\d]+[.)]\s*", "", text, flags=re.MULTILINE)
     text = re.sub(r"\(.*?\)", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
     text = re.sub(r"\s+([,.;:!?])", r"\1", text)
@@ -215,15 +223,139 @@ def _sanitize(text: str) -> str:
     return text
 
 
+class LLMAssistant:
+    """Small, focused jobs a local model does better than a template.
+
+    Every method is best-effort: on timeout, refusal or unusable output the
+    caller keeps whatever the deterministic engine produced. Nothing here is
+    allowed to fail a render.
+    """
+
+    def __init__(self, runner: "LlamaRunner", budget_seconds: float = 90.0) -> None:
+        self.runner = runner
+        self.budget_seconds = float(budget_seconds)
+        self.calls = 0
+        self.failures = 0
+
+    # ------------------------------------------------------------------
+    def _ask(
+        self,
+        instruction: str,
+        system: str,
+        max_tokens: int,
+        timeout: float | None = None,
+    ) -> str:
+        self.calls += 1
+        prompt = PROMPT_TEMPLATE.format(system=system, instruction=instruction)
+        try:
+            return self.runner.complete(
+                prompt,
+                max_tokens=max_tokens,
+                timeout=timeout or self.budget_seconds,
+            )
+        except LLMUnavailable as exc:
+            self.failures += 1
+            log.debug("Model call failed: %s", exc)
+            return ""
+
+    # ------------------------------------------------------------------
+    def rewrite_section(self, text: str, context: str, target_words: int) -> str:
+        """Rephrase one section so consecutive videos do not sound identical."""
+
+        instruction = (
+            f"Rewrite the following home decor narration in about {target_words} "
+            f"words. Keep every fact, measurement and recommendation exactly as "
+            f"given - do not invent new ones. Vary the sentence rhythm so it does "
+            f"not sound templated. {context}\n\nNarration:\n{text}"
+        )
+        out = _sanitize(self._ask(instruction, WRITER_SYSTEM, int(target_words * 2.0) + 80))
+        # Guard against the model truncating or padding badly.
+        if len(out.split()) < max(20, target_words * 0.45):
+            return ""
+        if len(out.split()) > target_words * 2.2:
+            return ""
+        return out
+
+    def strengthen_hook(self, title: str, current: str, promise: str) -> str:
+        """Rewrite the opening so the first fifteen seconds create curiosity."""
+
+        instruction = (
+            f"Write the opening 45 to 65 words of narration for a video titled "
+            f"'{title}'. The video promises to {promise}. Open with a specific, "
+            f"concrete observation that makes the viewer curious - name the "
+            f"problem they recognize. Do not greet the audience, do not mention "
+            f"the channel, do not ask for likes or subscriptions, and do not say "
+            f"'in this video'. Go straight into the idea.\n\n"
+            f"For reference, the current opening is:\n{current}"
+        )
+        out = _sanitize(self._ask(instruction, WRITER_SYSTEM, 180))
+        words = len(out.split())
+        if not 25 <= words <= 130:
+            return ""
+        lowered = out.lower()
+        if any(bad in lowered for bad in ("subscribe", "like and", "welcome back", "hey guys")):
+            return ""
+        return out
+
+    def check_alignment(self, title: str, idea: str, promise: str) -> bool | None:
+        """Ask whether an idea really delivers the title's promise.
+
+        Returns True, False, or None when the model gave no usable answer, in
+        which case the caller keeps the deterministic verdict.
+        """
+
+        instruction = (
+            f"A video is titled '{title}'. It promises to {promise}.\n"
+            f"Idea: {idea}\n\n"
+            f"Does this idea directly deliver that promise? "
+            f"Answer with exactly one word: YES or NO."
+        )
+        out = self._ask(instruction, ANALYST_SYSTEM, 6, timeout=min(self.budget_seconds, 45.0))
+        text = re.sub(r"[^a-z]", " ", out.lower())
+        if " yes " in f" {text} ":
+            return True
+        if " no " in f" {text} ":
+            return False
+        return None
+
+    def suggest_queries(self, narration: str, existing: Sequence[str], count: int = 4) -> list[str]:
+        """Propose extra stock-footage search phrases for one narration line."""
+
+        instruction = (
+            f"Narration line: {narration}\n\n"
+            f"Write {count} short stock-footage search phrases that would find "
+            f"video clips showing exactly what this line describes. Each phrase "
+            f"is three to six words, lowercase, one per line, no numbering, no "
+            f"punctuation. Be specific about the object and the room. "
+            f"Do not repeat these: {', '.join(existing[:4])}"
+        )
+        out = self._ask(instruction, ANALYST_SYSTEM, 90, timeout=min(self.budget_seconds, 60.0))
+        queries: list[str] = []
+        for line in out.splitlines():
+            cleaned = re.sub(r"[^a-z0-9 ]+", " ", line.lower())
+            cleaned = re.sub(r"\s+", " ", cleaned).strip()
+            if 2 <= len(cleaned.split()) <= 8 and cleaned not in queries:
+                queries.append(cleaned)
+        return queries[:count]
+
+
 class LLMScriptEngine:
-    """Generates each script section with a local model, per-section fallback."""
+    """Uses a local model to raise script quality, never to enable it.
+
+    The deterministic template engine still supplies the structure, the ideas,
+    the facts and the visual queries. The model rewrites prose, sharpens the
+    hook and second-guesses title alignment. Every one of those is optional and
+    individually recoverable, which is what keeps a slow runner from turning
+    into a failed render.
+    """
 
     name = "llm"
 
     def __init__(self, settings: dict[str, Any], words_per_minute: float = 150.0) -> None:
         self.settings = settings or {}
         self.words_per_minute = float(words_per_minute)
-        self.budget_seconds = float(self.settings.get("max_seconds_per_call", 240))
+        self.budget_seconds = float(self.settings.get("max_seconds_per_call", 120))
+        self.total_budget = float(self.settings.get("max_total_seconds", 900))
 
         binary = find_llama_binary()
         if binary is None:
@@ -242,71 +374,137 @@ class LLMScriptEngine:
             threads=int(self.settings.get("threads", 0)),
             temperature=float(self.settings.get("temperature", 0.8)),
         )
+        self.assistant = LLMAssistant(self.runner, self.budget_seconds)
         log.info("Local model ready: %s", model.name)
 
     # ------------------------------------------------------------------
-    def _write(self, instruction: str, words: int) -> str:
-        prompt = PROMPT_TEMPLATE.format(instruction=instruction)
-        raw = self.runner.complete(
-            prompt,
-            max_tokens=int(words * 2.0) + 80,
-            timeout=self.budget_seconds,
-        )
-        return _sanitize(raw)
-
     def generate(self, topic: Topic, duration_minutes: float, fallback: Any) -> Any:
-        """Rewrite a template-planned script section by section with the model.
-
-        The template engine supplies the structure, the item list and the
-        visual queries; the model supplies the prose. Any section the model
-        fails on keeps its template text, so the result is always complete.
-        """
+        """Improve a template-planned script section by section."""
 
         base = fallback.generate(topic, duration_minutes)
         started = time.time()
-        total_budget = max(self.budget_seconds, 60.0) * 6
         rewritten = 0
+        checked = 0
+        dropped = 0
 
-        for section in base.sections:
-            if time.time() - started > total_budget:
-                log.warning("LLM time budget exhausted; keeping template text for the rest")
-                break
-            target_words = max(45, section.word_count)
-            if section.kind == "item" and section.tip:
-                instruction = (
-                    f"Write about {target_words} words of narration for one numbered idea in a "
-                    f"video called '{base.title}'. The idea is number {section.index}: "
-                    f"{section.tip['title']}. Explain why it works and exactly how to do it. "
-                    f"Start with 'Number {section.index}.' Use these facts and do not invent "
-                    f"different ones: {section.tip['why']} {section.tip['how']}"
-                )
-            elif section.kind == "intro":
-                instruction = (
-                    f"Write about {target_words} words of opening narration for a video called "
-                    f"'{base.title}'. Open with a hook, say what the viewer will learn, and "
-                    f"mention that there are {len(base.items())} ideas. Do not greet the "
-                    f"audience by name and do not ask for likes."
-                )
-            else:
-                instruction = (
-                    f"Write about {target_words} words of closing narration for a video called "
-                    f"'{base.title}'. Summarise the underlying principle and end with one short, "
-                    f"low-key invitation to subscribe."
-                )
-            try:
-                text = self._write(instruction, target_words)
-            except LLMUnavailable as exc:
-                log.warning("Section %s fell back to the template (%s)", section.heading, exc)
-                continue
-            if len(text.split()) >= max(25, target_words * 0.4):
-                section.text = text
+        def remaining() -> float:
+            return self.total_budget - (time.time() - started)
+
+        # 1. The hook earns the most from a model, so it goes first while
+        #    there is definitely budget left.
+        if remaining() > 60 and base.sections:
+            intro = base.sections[0]
+            improved = self.assistant.strengthen_hook(
+                base.title, intro.text, base.promise_label or "help the viewer"
+            )
+            if improved:
+                # Keep whatever the template said after the opening hook.
+                tail = " ".join(intro.text.split(". ")[2:]).strip()
+                intro.text = f"{improved} {tail}".strip()
                 rewritten += 1
-            else:
-                log.debug("Model output too short for %s; keeping template text", section.heading)
+                log.info("Model strengthened the opening hook")
+
+        # 2. Second-guess title alignment on the ideas that scored lowest.
+        if bool(self.settings.get("check_alignment", True)) and base.promise_key != "general":
+            items = base.items()
+            for section in items:
+                if remaining() < 90 or checked >= int(self.settings.get("max_alignment_checks", 12)):
+                    break
+                tip = section.tip or {}
+                checked += 1
+                verdict = self.assistant.check_alignment(
+                    base.title, str(tip.get("title", "")), base.promise_label
+                )
+                if verdict is False:
+                    section.flagged_off_promise = True
+                    dropped += 1
+            if dropped:
+                log.info(
+                    "Model flagged %d of %d checked ideas as off-promise", dropped, checked
+                )
+
+        # 3. Rewrite item prose while budget allows, longest sections first so
+        #    the most template-sounding parts benefit most.
+        for section in sorted(base.items(), key=lambda s: -s.word_count):
+            if remaining() < self.budget_seconds + 20:
+                break
+            improved = self.assistant.rewrite_section(
+                section.text,
+                context=f"This is idea number {section.index} in '{base.title}'.",
+                target_words=section.word_count,
+            )
+            if improved:
+                section.text = improved
+                rewritten += 1
 
         if rewritten == 0:
-            raise LLMUnavailable("the model did not produce any usable sections")
+            raise LLMUnavailable("the model did not produce any usable output")
 
-        base.engine = f"llm+template ({rewritten}/{len(base.sections)} sections from the model)"
-        log.info("Model wrote %d of %d sections", rewritten, len(base.sections))
+        base.engine = f"llm+template ({rewritten} sections improved by the model)"
+        log.info(
+            "Model improved %d sections in %.0fs (%d calls, %d failed)",
+            rewritten,
+            time.time() - started,
+            self.assistant.calls,
+            self.assistant.failures,
+        )
         return base
+
+
+# ---------------------------------------------------------------------------
+# Feasibility benchmark
+# ---------------------------------------------------------------------------
+
+def benchmark(settings: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Measure whether this machine can realistically run the local model.
+
+    Used by CI to decide whether ``script.llm`` is worth enabling by default,
+    and by ``vidfactory doctor`` to explain why it is or is not being used.
+    """
+
+    settings = dict(settings or {})
+    result: dict[str, Any] = {"available": False}
+    started = time.time()
+
+    binary = find_llama_binary()
+    result["binary"] = str(binary) if binary else ""
+    if binary is None:
+        result["reason"] = "no llama.cpp binary could be obtained"
+        return result
+
+    model = find_model(
+        str(settings.get("model_repo", "Qwen/Qwen2.5-1.5B-Instruct-GGUF")),
+        str(settings.get("model_file", "qwen2.5-1.5b-instruct-q4_k_m.gguf")),
+    )
+    result["model"] = str(model) if model else ""
+    if model is None:
+        result["reason"] = "no GGUF model could be obtained"
+        return result
+    result["model_mb"] = round(model.stat().st_size / 1_000_000, 1)
+    result["provision_seconds"] = round(time.time() - started, 1)
+
+    runner = LlamaRunner(
+        binary,
+        model,
+        context_size=int(settings.get("context_size", 2048)),
+        threads=int(settings.get("threads", 0)),
+    )
+    assistant = LLMAssistant(runner, budget_seconds=float(settings.get("benchmark_timeout", 240)))
+
+    sample = (
+        "Hang your curtains close to the ceiling rather than to the window "
+        "frame. The eye reads the top of the rod as the top of the wall, so a "
+        "high rod stretches the whole room upward."
+    )
+    call_started = time.time()
+    rewritten = assistant.rewrite_section(sample, context="Test call.", target_words=45)
+    elapsed = time.time() - call_started
+
+    result["rewrite_seconds"] = round(elapsed, 1)
+    result["rewrite_words"] = len(rewritten.split())
+    result["words_per_second"] = round(len(rewritten.split()) / elapsed, 2) if elapsed else 0.0
+    result["sample_output"] = rewritten[:300]
+    result["available"] = bool(rewritten)
+    if not rewritten:
+        result["reason"] = "the model produced no usable output within the timeout"
+    return result

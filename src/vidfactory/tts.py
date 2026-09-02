@@ -164,6 +164,10 @@ class TTSEngine:
     """Base engine interface: synthesize one chunk of text into a WAV file."""
 
     name = "base"
+    #: Words per minute this engine actually speaks at. The script generator
+    #: uses it to size a script, so a 20 minute request produces 20 minutes of
+    #: narration rather than 20 minutes' worth of words read at another pace.
+    speech_rate_wpm = 150.0
 
     def __init__(self, voice: str = "", speed: float = 1.0, sample_rate: int = 48000) -> None:
         self.voice = voice
@@ -178,6 +182,7 @@ class PiperEngine(TTSEngine):
     """Neural TTS through the ``piper`` CLI (installed by ``piper-tts``)."""
 
     name = "piper"
+    speech_rate_wpm = 155.0
 
     def __init__(
         self,
@@ -320,6 +325,9 @@ class EspeakEngine(TTSEngine):
     """eSpeak NG fallback: always available, intelligible, not natural."""
 
     name = "espeak"
+    #: Measured, not assumed: eSpeak with our pacing settings runs far slower
+    #: than Piper, and assuming otherwise made every fallback video overrun.
+    speech_rate_wpm = 95.0
 
     def __init__(self, voice: str = "en-us", speed: float = 1.0, sample_rate: int = 48000) -> None:
         super().__init__(voice, speed, sample_rate)
@@ -361,6 +369,7 @@ class SilentEngine(TTSEngine):
     """Timed silence. Keeps the pipeline runnable when no TTS exists at all."""
 
     name = "silent"
+    speech_rate_wpm = 150.0
 
     def synthesize(self, text: str, destination: Path) -> Path:
         # ~2.5 spoken words per second is the same rate the planner assumes.

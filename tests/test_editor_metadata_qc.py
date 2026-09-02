@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from vidfactory.editor import Shot, VideoEditor, plan_shots
+from vidfactory.editor import Shot, ShotPlan, VideoEditor, estimate_shot_count, plan_shots
 from vidfactory.ffmpeg_utils import (
     FFmpegError,
     ffmpeg_available,
@@ -28,10 +28,17 @@ from vidfactory.quality_control import validate_output
 from vidfactory.scene_planner import plan_scenes
 
 
+class _FakeInner:
+    def __init__(self, key: str, author: str) -> None:
+        self.key = key
+        self.author = author
+
+
 class FakeClip:
-    def __init__(self, path: str, duration: float) -> None:
+    def __init__(self, path: str, duration: float, key: str = "", author: str = "") -> None:
         self.path = path
         self.duration = duration
+        self.clip = _FakeInner(key or path, author or "someone")
 
 
 # --------------------------------------------------------------------- ffmpeg
@@ -67,35 +74,39 @@ def test_run_ffmpeg_raises_on_a_bad_command():
 # ---------------------------------------------------------------- shot planner
 
 def test_a_long_scene_gets_multiple_shots(tmp_path):
-    clips = [FakeClip(str(_touch(tmp_path, f"c{i}.mp4")), 15.0) for i in range(4)]
-    shots = plan_shots([("s1", 30.0)], clips, min_shot=4, max_shot=8, motion="none")
-    assert len(shots) >= 4
-    assert all(shot.duration <= 8.5 for shot in shots)
-    assert sum(shot.duration for shot in shots) == pytest.approx(30.0, abs=0.1)
+    clips = [FakeClip(str(_touch(tmp_path, f"c{i}.mp4")), 15.0, key=f"pexels:{i}") for i in range(8)]
+    plan = plan_shots([("s1", 30.0)], clips, min_shot=3, max_shot=6, motion="none")
+    assert len(plan.shots) >= 5
+    assert all(shot.duration <= 6.5 for shot in plan.shots)
+    assert sum(shot.duration for shot in plan.shots) == pytest.approx(30.0, abs=0.1)
 
 
 def test_shots_cover_every_scene_exactly(tmp_path):
-    clips = [FakeClip(str(_touch(tmp_path, f"c{i}.mp4")), 12.0) for i in range(3)]
+    clips = [FakeClip(str(_touch(tmp_path, f"c{i}.mp4")), 12.0, key=f"pexels:{i}") for i in range(8)]
     scenes = [("s1", 6.0), ("s2", 11.0), ("s3", 3.0)]
-    shots = plan_shots(scenes, clips, min_shot=4, max_shot=8, motion="none")
+    plan = plan_shots(scenes, clips, min_shot=3, max_shot=6, motion="none")
     for scene_id, duration in scenes:
-        covered = sum(s.duration for s in shots if s.scene_id == scene_id)
+        covered = sum(s.duration for s in plan.shots if s.scene_id == scene_id)
         assert covered == pytest.approx(duration, abs=0.05)
 
 
 def test_no_single_clip_is_frozen_for_a_whole_long_scene(tmp_path):
-    clips = [FakeClip(str(_touch(tmp_path, f"c{i}.mp4")), 20.0) for i in range(5)]
-    shots = plan_shots([("s1", 40.0)], clips, min_shot=4, max_shot=8, motion="none")
-    assert len({shot.source for shot in shots}) > 1
+    clips = [FakeClip(str(_touch(tmp_path, f"c{i}.mp4")), 20.0, key=f"pexels:{i}") for i in range(10)]
+    plan = plan_shots([("s1", 40.0)], clips, min_shot=3, max_shot=6, motion="none")
+    assert len({shot.source for shot in plan.shots}) > 1
 
 
-def test_reused_clips_get_a_different_in_point(tmp_path):
-    clips = [FakeClip(str(_touch(tmp_path, "only.mp4")), 30.0)]
-    shots = plan_shots([("s1", 24.0)], clips, min_shot=4, max_shot=8, motion="subtle")
-    starts = [round(shot.start, 2) for shot in shots]
+def test_forced_reuse_is_reported_and_varied(tmp_path):
+    """With one clip and many shots, reuse is unavoidable - but never silent."""
+
+    clips = [FakeClip(str(_touch(tmp_path, "only.mp4")), 30.0, key="pexels:1")]
+    plan = plan_shots([("s1", 24.0)], clips, min_shot=3, max_shot=6, motion="subtle")
+    assert plan.reuse_count > 0
+    assert plan.unique_sources == 1
+    assert plan.shortfall == len(plan.shots) - 1
+    starts = [round(shot.start, 2) for shot in plan.shots]
     assert len(set(starts)) > 1
-    # Reuse should also vary the motion so the repeat is not obvious.
-    assert any(shot.motion != "none" for shot in shots)
+    assert any(shot.motion != "none" for shot in plan.shots)
 
 
 def test_planning_without_clips_raises():
@@ -104,9 +115,9 @@ def test_planning_without_clips_raises():
 
 
 def test_motion_none_disables_movement(tmp_path):
-    clips = [FakeClip(str(_touch(tmp_path, f"c{i}.mp4")), 20.0) for i in range(4)]
-    shots = plan_shots([("s1", 20.0)], clips, motion="none")
-    assert all(shot.motion == "none" for shot in shots)
+    clips = [FakeClip(str(_touch(tmp_path, f"c{i}.mp4")), 20.0, key=f"pexels:{i}") for i in range(8)]
+    plan = plan_shots([("s1", 20.0)], clips, motion="none")
+    assert all(shot.motion == "none" for shot in plan.shots)
 
 
 def test_filter_chain_scales_and_crops_without_stretching(tmp_path):
