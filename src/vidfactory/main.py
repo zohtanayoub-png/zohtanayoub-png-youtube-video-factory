@@ -183,6 +183,14 @@ def command_doctor(args: argparse.Namespace) -> int:
         print(f"[FAIL] no TTS engine available: {exc}")
         problems += 1
 
+    llm_settings = dict(config.get("script.llm", {}) or {})
+    if llm_settings.get("enabled"):
+        print(f"[ok]   script engine   : local model preferred "
+              f"({llm_settings.get('model_file', '?')}), template fallback")
+    else:
+        print("[ok]   script engine   : template (deterministic, always works)")
+        print("       local model     : disabled - run 'vidfactory llm-check' to test it here")
+
     providers = build_providers(dict(config.get("sources", {}) or {}))
     if providers:
         print(f"[ok]   stock providers : {', '.join(p.name for p in providers)}")

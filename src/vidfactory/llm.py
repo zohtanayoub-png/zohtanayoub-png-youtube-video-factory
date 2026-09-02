@@ -36,7 +36,10 @@ from .topic_engine import Topic
 log = get_logger("LLM")
 
 CACHE_DIR = Path(os.environ.get("VIDFACTORY_CACHE", ".cache")) / "llm"
-LLAMA_RELEASE_API = "https://api.github.com/repos/ggml-org/llama.cpp/releases/latest"
+#: llama.cpp tags a stale "latest" release (v0.3.0) that contains only a text
+#: file; the real prebuilt binaries live on rolling bNNNN tags. So the recent
+#: release list is scanned for the newest one that actually carries a build.
+LLAMA_RELEASES_API = "https://api.github.com/repos/ggml-org/llama.cpp/releases?per_page=30"
 HF_TEMPLATE = "https://huggingface.co/{repo}/resolve/main/{file}"
 
 
@@ -170,35 +173,53 @@ def _rank_asset(name: str) -> int:
 
 
 def _find_release_asset() -> str | None:
-    """URL of a prebuilt CPU llama.cpp build for x86-64 Linux, or None."""
+    """URL of a prebuilt CPU llama.cpp build for x86-64 Linux, or None.
 
-    # Strategy 1: the API, authenticated when a token is available.
+    Scans recent releases rather than ``/releases/latest``: llama.cpp's
+    "latest" is a stale ``v0.3.0`` tag whose only asset is a text file, while
+    the binaries are published continuously under ``bNNNN`` tags.
+    """
+
     try:
-        request = urllib.request.Request(LLAMA_RELEASE_API, headers=_api_headers())
+        request = urllib.request.Request(LLAMA_RELEASES_API, headers=_api_headers())
         with urllib.request.urlopen(request, timeout=60) as response:
-            release = json.loads(response.read().decode("utf-8"))
-        names = [str(a.get("name", "")) for a in release.get("assets", [])]
-        ranked = sorted(
-            ((_rank_asset(n), n, a) for n, a in zip(names, release.get("assets", []))),
-            key=lambda row: row[0],
-            reverse=True,
-        )
-        if ranked and ranked[0][0] > 0:
-            log.info("Using llama.cpp asset %s", ranked[0][1])
-            return str(ranked[0][2].get("browser_download_url"))
-        log.warning(
-            "No usable Linux x86-64 asset in llama.cpp release %s. Available: %s",
-            release.get("tag_name", "?"),
-            ", ".join(names[:12]) or "none",
-        )
+            releases = json.loads(response.read().decode("utf-8"))
     except Exception as exc:
-        log.info("llama.cpp release API unavailable (%s); trying the direct URL", exc)
+        log.info("llama.cpp release API unavailable (%s); trying direct URLs", exc)
+        releases = []
 
-    # Strategy 2: construct the download URL from the redirect tag. No API,
-    # no authentication, no rate limit.
+    if isinstance(releases, dict):        # a single release came back
+        releases = [releases]
+
+    seen_names: list[str] = []
+    for release in releases or []:
+        assets = release.get("assets") or []
+        best_score, best_url, best_name = 0, "", ""
+        for asset in assets:
+            name = str(asset.get("name", ""))
+            seen_names.append(name)
+            score = _rank_asset(name)
+            if score > best_score:
+                best_score, best_url, best_name = score, str(asset.get("browser_download_url")), name
+        if best_score > 0:
+            log.info(
+                "Using llama.cpp %s from release %s",
+                best_name,
+                release.get("tag_name", "?"),
+            )
+            return best_url
+
+    if seen_names:
+        log.warning(
+            "No usable Linux x86-64 asset across %d recent llama.cpp releases. "
+            "Saw: %s",
+            len(releases or []),
+            ", ".join(dict.fromkeys(seen_names))[:400],
+        )
+
+    # Last resort: construct the URL from whatever tag the redirect gives us.
     tag = _latest_release_tag()
     if not tag:
-        log.debug("Could not determine the latest llama.cpp tag")
         return None
     for pattern in (
         f"llama-{tag}-bin-ubuntu-x64.zip",
@@ -216,7 +237,6 @@ def _find_release_asset() -> str | None:
                     return url
         except Exception:
             continue
-    log.debug("None of the constructed asset URLs resolved for tag %s", tag)
     return None
 
 
