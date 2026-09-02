@@ -74,6 +74,13 @@ src/vidfactory/
   experiments and must never become required.
 * **`data/state/*.json` is the durable store; SQLite is the working copy.**
   Runners are ephemeral and a binary `.db` is hostile to git.
+* **`autopilot.videos_per_week` is enforced by the workflow**, which counts
+  `created_at` entries in `data/state/videos.json` from the last seven days and
+  skips the run when the quota is met. The cron may fire more often than the
+  quota allows; that is intentional.
+* **The final mux stream-copies by default.** The closing fade is baked into
+  the last shot and shot planning covers the audio tail, so the whole timeline
+  does not need re-encoding. Burned-in subtitles fall back to a re-encode.
 
 ## Testing
 

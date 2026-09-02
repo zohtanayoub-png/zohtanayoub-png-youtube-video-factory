@@ -117,6 +117,12 @@ by accident.
 
 Autopilot now runs on **Monday, Wednesday and Friday at 14:00 UTC**.
 
+`videos_per_week` is a real limit, not a note. Before each scheduled run,
+autopilot counts how many videos were made in the last seven days and skips the
+run if the limit has already been reached. So if you set `videos_per_week: 1`,
+only the Monday run produces a video and the other two skip themselves. Set it
+to `0` to remove the limit entirely.
+
 To change the days, edit `.github/workflows/autopilot.yml` and change this line:
 
 ```yaml

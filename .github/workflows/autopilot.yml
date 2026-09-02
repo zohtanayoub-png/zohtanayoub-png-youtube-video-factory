@@ -37,6 +37,8 @@ jobs:
     timeout-minutes: 5
     outputs:
       enabled: ${{ steps.decide.outputs.enabled }}
+      quota: ${{ steps.decide.outputs.quota }}
+      made_this_week: ${{ steps.decide.outputs.made_this_week }}
       duration: ${{ steps.decide.outputs.duration }}
       voice: ${{ steps.decide.outputs.voice }}
       upload: ${{ steps.decide.outputs.upload }}
@@ -48,7 +50,7 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Read config.yaml
+      - name: Decide from config.yaml and the recent history
         id: decide
         env:
           AUTOPILOT_VARIABLE: ${{ vars.AUTOPILOT }}
@@ -58,6 +60,9 @@ jobs:
           import os, sys, pathlib
           sys.path.insert(0, "src")
           import yaml
+
+          import json
+          from datetime import datetime, timedelta, timezone
 
           config = yaml.safe_load(pathlib.Path("config.yaml").read_text(encoding="utf-8")) or {}
           autopilot = config.get("autopilot") or {}
@@ -69,8 +74,35 @@ jobs:
           in_variable = str(os.environ.get("AUTOPILOT_VARIABLE", "")).strip().lower() == "true"
           forced = str(os.environ.get("FORCED", "")).strip().lower() == "true"
 
-          enabled = forced or (in_config and in_variable)
+          # autopilot.videos_per_week is a real quota, not a comment. The cron
+          # can fire more often than the quota allows; runs above the quota are
+          # skipped rather than producing more videos than were asked for.
+          quota = int(autopilot.get("videos_per_week", 3) or 0)
+          made_this_week = 0
+          history = pathlib.Path("data/state/videos.json")
+          if history.exists():
+              try:
+                  rows = (json.loads(history.read_text(encoding="utf-8")) or {}).get("rows", [])
+              except json.JSONDecodeError:
+                  rows = []
+              cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+              for row in rows:
+                  stamp = str(row.get("created_at") or "")
+                  try:
+                      created = datetime.fromisoformat(stamp)
+                  except ValueError:
+                      continue
+                  if created.tzinfo is None:
+                      created = created.replace(tzinfo=timezone.utc)
+                  if created >= cutoff:
+                      made_this_week += 1
+
+          within_quota = quota <= 0 or made_this_week < quota
+          enabled = forced or (in_config and in_variable and within_quota)
+
           print(f"enabled={'true' if enabled else 'false'}")
+          print(f"quota={quota}")
+          print(f"made_this_week={made_this_week}")
           print(f"duration={video.get('duration_minutes', 20)}")
           print(f"voice={tts.get('voice', 'en_US-hfc_female-medium')}")
           print(f"upload={'true' if youtube.get('upload_enabled', False) else 'false'}")
@@ -79,14 +111,26 @@ jobs:
 
       - name: Explain why nothing will run
         if: steps.decide.outputs.enabled != 'true'
+        env:
+          QUOTA: ${{ steps.decide.outputs.quota }}
+          MADE: ${{ steps.decide.outputs.made_this_week }}
         run: |
           {
-            echo "### Autopilot is off"
-            echo ""
-            echo "To turn it on:"
-            echo "1. set \`autopilot.enabled: true\` in \`config.yaml\`"
-            echo "2. add a repository variable \`AUTOPILOT\` with the value \`true\`"
-            echo "   (Settings -> Secrets and variables -> Actions -> Variables)"
+            if [ "${MADE}" -ge "${QUOTA}" ] && [ "${QUOTA}" -gt 0 ]; then
+              echo "### Weekly quota already met"
+              echo ""
+              echo "${MADE} video(s) were made in the last 7 days and"
+              echo "\`autopilot.videos_per_week\` is ${QUOTA}."
+              echo ""
+              echo "Raise \`videos_per_week\` in \`config.yaml\` to allow more."
+            else
+              echo "### Autopilot is off"
+              echo ""
+              echo "To turn it on:"
+              echo "1. set \`autopilot.enabled: true\` in \`config.yaml\`"
+              echo "2. add a repository variable \`AUTOPILOT\` with the value \`true\`"
+              echo "   (Settings -> Secrets and variables -> Actions -> Variables)"
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
   generate:

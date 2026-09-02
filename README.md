@@ -96,7 +96,8 @@ Inputs you can set:
 
 The **Autopilot** workflow can produce videos three times a week without you
 doing anything. It is off by default and needs two switches turned on - see
-SETUP.md.
+SETUP.md. `autopilot.videos_per_week` is enforced: a scheduled run that would
+exceed the weekly limit skips itself.
 
 ### On your own computer (optional)
 
