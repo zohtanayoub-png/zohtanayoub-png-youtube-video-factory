@@ -523,3 +523,39 @@ def test_repair_never_reuses_a_source_another_shot_holds(monkeypatch, tmp_path):
     )
     keys = [s.clip_key for s in shots]
     assert len(keys) == len(set(keys)), "a repair introduced a duplicate source"
+
+
+def test_every_mechanism_explanation_names_its_own_mechanism():
+    """Otherwise the sentence that states the mechanism cannot score as doing so.
+
+    Repair appends a mechanism's own explanation, which should take a
+    paragraph to 1.00 - mechanism, connective and outcome together. Where the
+    explanation uses vocabulary the mechanism does not claim, the scorer sees
+    only a connective and an outcome, the paragraph sticks at 0.85, and a
+    short video can never reach the average it is graded on.
+    """
+
+    from vidfactory.title_alignment import PROMISES, PROMISES_ES, mechanisms_for
+
+    unrecognised = [
+        (promise.key, promise.language, mechanism.name, text[:60])
+        for promise in list(PROMISES) + list(PROMISES_ES)
+        for mechanism in promise.mechanisms
+        for text in mechanism.explanations
+        if mechanism.name
+        not in [m.name for m in mechanisms_for(promise, text.lower())]
+    ]
+    assert not unrecognised, (
+        "these explanations state a mechanism the scorer cannot see: "
+        f"{unrecognised[:3]}"
+    )
+
+
+def test_a_repaired_paragraph_states_its_mechanism():
+    tip = TIPS["Choose a rug that is generously sized, not undersized"]
+    repaired = repair_text(
+        tip["why"], BIGGER, tip,
+        heading="Choose a rug that is generously sized, not undersized",
+    )
+    assert repaired is not None
+    assert score_paragraph(repaired, BIGGER).score == 1.0

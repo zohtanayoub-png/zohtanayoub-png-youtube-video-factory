@@ -311,7 +311,9 @@ def test_two_generations_never_share_a_directory(tmp_path, has_ffmpeg):
     from vidfactory.config import load_config
     from vidfactory.database import Database
     from vidfactory.pipeline import VideoPipeline
-    from vidfactory.testassets import build_test_library, clips_needed_for
+    from vidfactory.testassets import (
+        ScriptedVisualAnalyzer, build_test_library, clips_needed_for,
+    )
 
     repo_root = Path(__file__).resolve().parents[1]
     clips = tmp_path / "clips"
@@ -337,6 +339,10 @@ def test_two_generations_never_share_a_directory(tmp_path, has_ffmpeg):
             config, database=Database(tmp_path / f"{run_label}.db"),
             workdir=tmp_path / "work", run_id="run-7",
             state_dir=tmp_path / "state",
+            # Synthetic footage: the semantic score is decided, not measured,
+            # so this proves artifact isolation rather than re-measuring how
+            # well a gradient illustrates a sentence.
+            visual_analyzer=ScriptedVisualAnalyzer(low=0.60, high=0.75),
         )
         return pipeline.run(topic_text=topic)
 
@@ -380,7 +386,9 @@ def test_a_rendered_generation_verifies_its_own_artifacts(tmp_path, has_ffmpeg):
     from vidfactory.config import load_config
     from vidfactory.database import Database
     from vidfactory.pipeline import VideoPipeline
-    from vidfactory.testassets import build_test_library, clips_needed_for
+    from vidfactory.testassets import (
+        ScriptedVisualAnalyzer, build_test_library, clips_needed_for,
+    )
     from vidfactory.provenance import words
 
     repo_root = Path(__file__).resolve().parents[1]
@@ -400,6 +408,7 @@ def test_a_rendered_generation_verifies_its_own_artifacts(tmp_path, has_ffmpeg):
     pipeline = VideoPipeline(
         config, database=Database(tmp_path / "f.db"), workdir=tmp_path / "work",
         run_id="verify", state_dir=tmp_path / "state",
+        visual_analyzer=ScriptedVisualAnalyzer(low=0.60, high=0.75),
     )
     result = pipeline.run(
         topic_text="Small Living Room Tricks That Make Your Space Look Bigger"

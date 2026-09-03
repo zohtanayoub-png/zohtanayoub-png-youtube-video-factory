@@ -113,8 +113,12 @@ class VideoPipeline:
         workdir: str | Path | None = None,
         run_id: str | None = None,
         state_dir: str | Path = "data/state",
+        visual_analyzer: VisualAnalyzer | None = None,
     ) -> None:
         self.config = config
+        # Supplying an analyzer is how the offline test stays deterministic.
+        # Production passes nothing and gets the real one, model included.
+        self._injected_analyzer = visual_analyzer
         # One decision, read once, used everywhere: topic grammar, knowledge
         # pool, phrase pack, promise vocabulary, voice, pronunciation,
         # subtitle chunking and metadata all follow from it.
@@ -999,6 +1003,12 @@ class VideoPipeline:
         return analyzer
 
     def _build_visual_analyzer(self) -> VisualAnalyzer | None:
+        if self._injected_analyzer is not None:
+            log.info(
+                "Using a supplied visual analyzer (%s)",
+                type(self._injected_analyzer).__name__,
+            )
+            return self._injected_analyzer
         if not bool(self.config.get("visual.enabled", True)):
             log.info("Frame inspection is disabled; ranking on captions alone")
             return None

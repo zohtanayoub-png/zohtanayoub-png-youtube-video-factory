@@ -77,11 +77,16 @@ def test_request_json_gives_up_and_hides_the_url(monkeypatch):
 
 # ------------------------------------------------------------------ pipeline
 
-@pytest.fixture
-def local_pipeline(tmp_path, has_ffmpeg, repo_root):
-    if not has_ffmpeg:
-        pytest.skip("ffmpeg required")
-    from vidfactory.testassets import build_test_library
+def _local_pipeline(tmp_path, repo_root, semantic=(0.60, 0.75)):
+    """An offline pipeline over synthetic footage, with a decided semantic score.
+
+    ``semantic`` is the range the scripted analyzer returns. The default sits
+    above the production gate because the point of this fixture is to exercise
+    orchestration; the negative test passes a range below it to prove the gate
+    still bites.
+    """
+
+    from vidfactory.testassets import ScriptedVisualAnalyzer, build_test_library
 
     clips = tmp_path / "clips"
     build_test_library(clips, count=24, seconds=8.0, width=1280, height=720)
@@ -111,7 +116,23 @@ def local_pipeline(tmp_path, has_ffmpeg, repo_root):
         workdir=tmp_path / "work",
         run_id="unit",
         state_dir=tmp_path / "state",
+        # Without this the test measures the runner, not the pipeline: where
+        # the CLIP export downloads, MobileCLIP scores these FFmpeg gradients
+        # around 0.43 and final-shot relevance fails; where it does not, the
+        # statistics fallback runs and the same fixture passes.
+        visual_analyzer=ScriptedVisualAnalyzer(
+            low=semantic[0],
+            high=semantic[1],
+            frames_per_clip=int(config.get("visual.frames_per_clip", 3)),
+        ),
     )
+
+
+@pytest.fixture
+def local_pipeline(tmp_path, has_ffmpeg, repo_root):
+    if not has_ffmpeg:
+        pytest.skip("ffmpeg required")
+    return _local_pipeline(tmp_path, repo_root)
 
 
 def test_pipeline_fails_clearly_without_any_provider(tmp_path, repo_root):
@@ -166,6 +187,73 @@ def test_pipeline_runs_end_to_end_with_local_clips(local_pipeline):
     # History was written, so the next run will avoid the same topic and clips.
     assert local_pipeline.database.stats()["videos"] == 1
     assert (local_pipeline.state_dir / "videos.json").exists()
+
+    # The relevance the report describes is the one that was supplied, so the
+    # run is reproducible; the gate it was measured against is production's.
+    metrics = result.editorial.metrics
+    assert 0.60 <= metrics["final_shot_visual_semantic_match_average"] <= 0.75
+    assert metrics["final_shot_low_relevance_percentage"] == 0.0
+    assert metrics["contradiction_count"] == 0
+    assert metrics["source_video_reuse_count"] == 0
+    assert metrics["burn_in_subtitles"] is True
+    assert metrics["subtitles_ass_exported"] is True
+    assert metrics["artifact_provenance_passed"] is True
+
+
+@pytest.mark.integration
+def test_the_offline_render_is_reproducible(tmp_path, has_ffmpeg, repo_root):
+    """Two runs of the same fixture agree on the relevance they measured.
+
+    This is the property the test lost: its verdict used to depend on whether
+    an optional, network-provisioned CLIP export happened to be available on
+    the machine running it.
+    """
+
+    if not has_ffmpeg:
+        pytest.skip("ffmpeg required")
+    scores = []
+    for index in range(2):
+        pipeline = _local_pipeline(tmp_path / f"run{index}", repo_root)
+        editorial = pipeline.run(topic_text="5 Small Living Room Ideas").editorial
+        scores.append(editorial.metrics["final_shot_visual_semantic_match_average"])
+    assert scores[0] == scores[1]
+
+
+@pytest.mark.integration
+def test_footage_that_does_not_show_the_narration_still_fails_qc(
+    tmp_path, has_ffmpeg, repo_root
+):
+    """The gate is not bypassed - it is measured against a decided score.
+
+    Every clip is scripted below the production threshold, and the local
+    library has nothing better to offer, so the repair pass runs three rounds,
+    fails to find a replacement that scores higher, and the render is refused.
+    Proving that is the whole point of supplying the score rather than
+    removing the check.
+    """
+
+    if not has_ffmpeg:
+        pytest.skip("ffmpeg required")
+    pipeline = _local_pipeline(tmp_path, repo_root, semantic=(0.20, 0.30))
+
+    with pytest.raises(PipelineError) as failure:
+        pipeline.run(topic_text="5 Small Living Room Ideas")
+    assert "final_shot_relevance" in str(failure.value)
+    assert "minimum 0.5" in str(failure.value)
+
+    # The report is written before the run is refused, so the numbers behind
+    # that refusal can be read rather than inferred.
+    report = json.loads(
+        next(pipeline.output_dir.glob("editorial_quality_report.json")).read_text(
+            encoding="utf-8"
+        )
+    )
+    assert report["passed"] is False
+    assert report["final_shot_visual_semantic_match_average"] < 0.50
+    # The repair pass ran and found nothing better, rather than not running.
+    assert report["weak_shots_before_repair"] > 0
+    assert report["repair_rounds_used"] >= 1
+    assert report["weak_shots_after_repair"] > 0
 
 
 def test_a_failed_run_is_recorded(local_pipeline, monkeypatch):
