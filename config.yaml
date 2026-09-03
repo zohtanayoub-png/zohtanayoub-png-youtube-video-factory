@@ -97,6 +97,12 @@ sources:
   # costs API calls and frame decoding, so the budget is small; the log says
   # when it runs and when it gives up.
   relevance_search_budget: 2
+  # How many of the worst-matching scenes each round re-searches. Every scene
+  # at once turned a four minute render into a forty minute one on a runner:
+  # fifteen scenes times four queries times two providers is several hundred
+  # extra API calls before the frames are even decoded. The worst eight are
+  # where the gain is.
+  relevance_research_max_scenes: 8
   min_width: 1280
   min_height: 720
   prefer_width: 1920

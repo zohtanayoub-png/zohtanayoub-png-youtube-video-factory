@@ -537,6 +537,13 @@ class VideoPipeline:
         # become acceptable, and the log says when it happened.
         min_semantic = float(self._visual_settings().min_semantic)
         research_budget = int(sources.get("relevance_search_budget", 2))
+        # One frame-inspection budget for the whole stage, not one per round.
+        # Three rounds each granted the full budget is three times the wall
+        # clock, which on a runner is the difference between a four minute
+        # render and a forty minute one.
+        visual_budget = float(self.config.get("visual.time_budget_seconds", 420))
+        visual_spent = float(visual_stats.get("seconds", 0.0))
+        max_weak_scenes = int(sources.get("relevance_research_max_scenes", 8))
         deep_page = {scene.scene_id: max_pages for scene in scene_order}
         tried: dict[str, set[str]] = {}
         stats["relevance_research_rounds"] = 0
@@ -576,8 +583,17 @@ class VideoPipeline:
             ]
             if len(strong) >= needed:
                 break
-            weak = [s for s in scene_order if scene_best_match(s) < min_semantic]
+            weak = sorted(
+                (s for s in scene_order if scene_best_match(s) < min_semantic),
+                key=scene_best_match,
+            )[:max_weak_scenes]
             if not weak:
+                break
+            if visual_spent >= visual_budget:
+                log.info(
+                    "Relevance research stopping: the frame-inspection budget "
+                    "of %.0fs is spent", visual_budget,
+                )
                 break
             log.info(
                 "Relevance research round %d: %d clip(s) clear %.2f for %d shots; "
@@ -592,14 +608,16 @@ class VideoPipeline:
                 for query_text in extra_queries(scene):
                     tried.setdefault(scene.scene_id, set()).add(query_text)
                     for provider in providers:
-                        pages = (1, page) if provider.supports_pagination else (1,)
-                        for which in pages:
-                            for clip in run(provider, query_text, which):
-                                if clip.key not in candidates:
-                                    candidates[clip.key] = clip
-                                    added += 1
-                                if clip.key not in bucket:
-                                    bucket.append(clip.key)
+                        # One page per query: the unspent shot intents are new
+                        # queries, and a new query's first page is better
+                        # footage than an old query's fourth.
+                        which = page if provider.supports_pagination else 1
+                        for clip in run(provider, query_text, which):
+                            if clip.key not in candidates:
+                                candidates[clip.key] = clip
+                                added += 1
+                            if clip.key not in bucket:
+                                bucket.append(clip.key)
             stats["relevance_research_rounds"] = round_number
             stats["relevance_research_added"] += added
             if not added:
@@ -608,8 +626,11 @@ class VideoPipeline:
             log.info("Relevance research added %d new candidate(s)", added)
             ranked = ranker.rank(list(candidates.values()), context)
             ranked, visual_stats = self._inspect_footage(
-                ranked, scenes, affinity, needed
+                ranked, scenes, affinity, needed,
+                time_budget=max(0.0, visual_budget - visual_spent),
             )
+            visual_spent += float(visual_stats.get("seconds", 0.0))
+            visual_stats["seconds"] = round(visual_spent, 1)
             stats["visual"] = visual_stats
 
         if stats["relevance_research_rounds"]:
@@ -777,6 +798,7 @@ class VideoPipeline:
         scenes: Sequence[Scene],
         affinity: Mapping[str, Sequence[str]],
         needed: int,
+        time_budget: float | None = None,
     ) -> tuple[list[StockClip], dict[str, Any]]:
         """Decode frames for the shortlist and re-rank on what they contain.
 
@@ -800,7 +822,11 @@ class VideoPipeline:
 
         multiplier = float(self.config.get("visual.shortlist_multiplier", 1.6))
         cap = int(self.config.get("visual.max_clips_analyzed", 260))
-        budget = float(self.config.get("visual.time_budget_seconds", 420))
+        budget = (
+            float(time_budget)
+            if time_budget is not None
+            else float(self.config.get("visual.time_budget_seconds", 420))
+        )
         workers = max(1, int(self.config.get("visual.workers", 4)))
 
         size = min(len(ranked), cap, max(needed, int(math.ceil(needed * multiplier))))
