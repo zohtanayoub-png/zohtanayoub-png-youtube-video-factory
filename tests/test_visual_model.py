@@ -218,3 +218,111 @@ def test_a_model_that_throws_does_not_stop_the_analysis():
     analysis = analyzer.analyze([frame], query="a styled living room")
     assert analysis.analyzed
     assert analysis.semantic_source == "pixel-expectations"
+
+
+# ---------------------------------------------------------------------------
+# Concept and semantic scoring at realistic CLIP scales
+#
+# The first real render measured a semantic match of 0.01 across forty clips
+# and flagged five renovations and four plastic covers among ordinary Pexels
+# interiors. Both came from scoring with CLIP's temperature-100 softmax, which
+# is winner-take-all over similarities that differ by hundredths. These tests
+# pin the margin-based replacement at the scales CLIP actually produces.
+# ---------------------------------------------------------------------------
+
+import math
+
+from vidfactory.visual_analysis import (
+    DISTRACTOR_PROMPTS,
+    NEGATIVE_CONCEPTS,
+    POSITIVE_CONCEPTS,
+)
+
+
+def _unit(angle: float) -> list[float]:
+    return [math.cos(angle), math.sin(angle)]
+
+
+class _AngleBackend:
+    """A model where every prompt sits at a chosen angle from the image."""
+
+    name = "angles"
+    image_size = 224
+
+    def __init__(self, angles: dict[str, float]):
+        self.angles = angles
+
+    def encode_images(self, frames):
+        return [_unit(0.0)] * len(frames)
+
+    def encode_texts(self, texts):
+        return [_unit(self.angles.get(t, 1.2)) for t in texts]
+
+
+def _textured_frame():
+    """A frame with enough structure that the pixel statistics stay quiet.
+
+    A flat probe frame is, quite correctly, measured as an empty room, and
+    that would mask what these tests are about.
+    """
+
+    from vidfactory.visual_analysis import Frame
+
+    width = height = 48
+    data = bytearray()
+    for y in range(height):
+        for x in range(width):
+            seed = (x * 37 + y * 91) % 255
+            data += bytes((
+                60 + (seed * 3) % 180,
+                50 + (seed * 7) % 170,
+                40 + (seed * 11) % 160,
+            ))
+    return Frame(width, height, bytes(data), "probe")
+
+
+def _analysis(angles, query="a styled living room"):
+    from vidfactory.visual_analysis import VisualAnalyzer
+
+    analyzer = VisualAnalyzer(model=_AngleBackend(angles), frames_per_clip=1)
+    return analyzer.analyze([_textured_frame()], query=query)
+
+
+def test_a_clip_matching_its_own_prompt_scores_high():
+    prompt = "a photo of a styled living room"
+    angles = {prompt: 0.30}
+    angles.update({d: 0.55 for d in DISTRACTOR_PROMPTS})
+    assert _analysis(angles).semantic_match > 0.75
+
+
+def test_a_clip_matching_a_distractor_better_scores_low():
+    prompt = "a photo of a styled living room"
+    angles = {prompt: 0.60}
+    angles.update({d: 0.58 for d in DISTRACTOR_PROMPTS})
+    angles[DISTRACTOR_PROMPTS[0]] = 0.30
+    assert _analysis(angles).semantic_match < 0.35
+
+
+def test_an_ordinary_interior_does_not_collect_negative_flags():
+    """The failure this replaces: hundredths of a cosine becoming certainty."""
+
+    angles = {c: 0.50 for c in POSITIVE_CONCEPTS}
+    # Every negative concept is very slightly closer than the best positive,
+    # which under a temperature-100 softmax was enough to read as certain.
+    angles.update({text: 0.499 for text, _ in NEGATIVE_CONCEPTS})
+    angles.update({f"a photo of a styled living room": 0.50})
+    angles.update({d: 0.60 for d in DISTRACTOR_PROMPTS})
+    analysis = _analysis(angles)
+    assert not analysis.penalised_flags, analysis.flags
+
+
+def test_a_clearly_negative_frame_is_still_flagged():
+    angles = {c: 0.90 for c in POSITIVE_CONCEPTS}
+    angles.update({text: 0.85 for text, _ in NEGATIVE_CONCEPTS})
+    plastic = NEGATIVE_CONCEPTS[1][0]
+    assert NEGATIVE_CONCEPTS[1][1] == "plastic_covered_furniture"
+    angles[plastic] = 0.05          # far closer to the image than anything else
+    angles.update({"a photo of a styled living room": 0.9})
+    angles.update({d: 0.9 for d in DISTRACTOR_PROMPTS})
+    analysis = _analysis(angles)
+    assert analysis.flags.get("plastic_covered_furniture", 0) > 0.6

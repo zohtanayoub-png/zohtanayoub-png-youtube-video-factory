@@ -46,6 +46,15 @@ log = get_logger("VISUAL")
 #: distributions just as well as two million while costing 400x less Python.
 STAT_SIZE: tuple[int, int] = (96, 54)
 
+#: How far a negative concept must out-score every positive one before the
+#: flag is certain. CLIP text-image cosines for related prompts differ by
+#: hundredths, so these are small on purpose.
+CONCEPT_MARGIN_LOW = -0.015
+CONCEPT_MARGIN_HIGH = 0.055
+#: The same idea for the scene prompt's margin over the average alternative.
+SEMANTIC_MARGIN_LOW = -0.02
+SEMANTIC_MARGIN_HIGH = 0.06
+
 #: Confidence at which a visual flag rejects a candidate outright.
 REJECT_CONFIDENCE = 0.72
 #: Confidence at which a visual flag applies a large ranking penalty.
@@ -908,14 +917,6 @@ class VisualAnalysis:
         }
 
 
-def _softmax(values: Sequence[float], temperature: float = 100.0) -> list[float]:
-    scaled = [v * temperature for v in values]
-    peak = max(scaled) if scaled else 0.0
-    exps = [math.exp(v - peak) for v in scaled]
-    total = sum(exps) or 1.0
-    return [e / total for e in exps]
-
-
 def _cosine(a: Sequence[float], b: Sequence[float]) -> float:
     dot = sum(x * y for x, y in zip(a, b))
     na = math.sqrt(sum(x * x for x in a)) or 1.0
@@ -1178,7 +1179,20 @@ class VisualAnalyzer:
         return [self._text_cache[t] for t in texts]
 
     def _concept_flags(self, image_vectors: Sequence[Sequence[float]]) -> dict[str, float]:
-        """Zero-shot concept probabilities, collapsed onto the flag names."""
+        """Zero-shot concept scoring, as a margin over the positive concepts.
+
+        Not a softmax. CLIP's classification softmax runs at a temperature of
+        100, which makes it winner-take-all: a frame that is only marginally
+        more like "a room under renovation" than like a styled living room
+        comes out at a probability near 1.0, and the first real render duly
+        flagged five renovations and four plastic covers in forty perfectly
+        ordinary Pexels interiors.
+
+        What we actually want to know is comparative and unnormalised: does
+        this frame look *more* like the failure than like any of the six
+        descriptions of footage we want? That margin is small, bounded, and
+        does not amplify noise.
+        """
 
         prompts = list(POSITIVE_CONCEPTS) + [text for text, _ in NEGATIVE_CONCEPTS]
         try:
@@ -1190,15 +1204,17 @@ class VisualAnalyzer:
         offset = len(POSITIVE_CONCEPTS)
         per_flag: dict[str, list[float]] = {}
         for image in image_vectors:
-            probabilities = _softmax([_cosine(image, t) for t in text_vectors])
-            frame_totals: dict[str, float] = {}
+            similarities = [_cosine(image, t) for t in text_vectors]
+            best_positive = max(similarities[:offset])
+            frame: dict[str, float] = {}
             for index, (_, flag) in enumerate(NEGATIVE_CONCEPTS):
-                # Two concepts can evidence one flag ("an office" and "a
-                # furniture showroom" are both non_home_space), so their
-                # probabilities add within a frame before frames are compared.
-                frame_totals[flag] = frame_totals.get(flag, 0.0) + probabilities[offset + index]
-            for flag, value in frame_totals.items():
-                per_flag.setdefault(flag, []).append(min(1.0, value))
+                margin = similarities[offset + index] - best_positive
+                # Two concepts can evidence one flag; the strongest wins.
+                frame[flag] = max(
+                    frame.get(flag, 0.0), _ramp(margin, CONCEPT_MARGIN_LOW, CONCEPT_MARGIN_HIGH)
+                )
+            for flag, value in frame.items():
+                per_flag.setdefault(flag, []).append(value)
 
         merged: dict[str, float] = {}
         for flag, values in per_flag.items():
@@ -1209,6 +1225,20 @@ class VisualAnalyzer:
     def _clip_semantic(
         self, image_vectors: Sequence[Sequence[float]], query: str, narration: str
     ) -> float | None:
+        """How well the frames show *this* sentence rather than something else.
+
+        Scored by where the scene's own prompt lands among a fixed set of
+        plausible alternatives, not by a softmax probability. A specific
+        narration prompt ("painted trim matching the wall color") is longer
+        and rarer than a generic one ("a bedroom with a made bed"), and under
+        a temperature-100 softmax it loses to the generic prompt almost every
+        time - which is how the first real render measured an average match of
+        0.01 across forty clips that were mostly fine.
+
+        Two scale-free signals instead: the prompt's position in the range of
+        similarities, and its margin over the average alternative.
+        """
+
         wanted = (query or narration or "").strip()
         if not wanted:
             return None
@@ -1219,10 +1249,15 @@ class VisualAnalyzer:
         except Exception as exc:                          # pragma: no cover
             log.warning("visual model failed on the scene prompt: %s", exc)
             return None
-        scores = []
+
+        scores: list[float] = []
         for image in image_vectors:
-            probabilities = _softmax([_cosine(image, t) for t in text_vectors])
-            scores.append(probabilities[0])
-        # Rescale: beating nine alternatives outright is a strong match, and
-        # chance is 1/10, so map [0.1, 0.75] onto [0, 1].
-        return round(_ramp(_mean(scores), 0.10, 0.75), 3)
+            similarities = [_cosine(image, t) for t in text_vectors]
+            low, high = min(similarities), max(similarities)
+            spread = high - low
+            position = (similarities[0] - low) / spread if spread > 1e-6 else 0.5
+            margin = similarities[0] - _mean(similarities[1:])
+            scores.append(
+                0.65 * position + 0.35 * _ramp(margin, SEMANTIC_MARGIN_LOW, SEMANTIC_MARGIN_HIGH)
+            )
+        return round(_mean(scores), 3)

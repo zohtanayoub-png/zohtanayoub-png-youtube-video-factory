@@ -244,7 +244,9 @@ jobs:
         env:
           OUTPUT_DIR: ${{ steps.generate.outputs.output_dir }}
         run: |
-          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          # tee, not a plain redirect: the same table in the job log makes a
+          # render reviewable without downloading the artifact.
+          python - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
           import json, os, pathlib
 
           directory = pathlib.Path(os.environ.get("OUTPUT_DIR") or "")
