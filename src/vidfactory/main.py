@@ -313,7 +313,7 @@ def command_visual_check(args: argparse.Namespace) -> int:
 def command_entity_check(args: argparse.Namespace) -> int:
     """Measure the entity probes against real footage instead of guessing.
 
-    ``ENTITY_PRESENCE_PASS`` and the ramp bounds around it were set by analogy
+    ``ENTITY_DOMINANCE_FAIL`` and the ramp bounds around it were set by analogy
     with the concept flags, never measured, and run 26 duly failed 57 of 88
     shots with scores of exactly 0.0 - which is not a statement about how many
     Pexels interiors contain a lamp. A threshold on a measurement has to come
@@ -416,17 +416,26 @@ def command_entity_check(args: argparse.Namespace) -> int:
         print(f"{entity.name:16} containing it : {summary(present)}")
         print(f"{'':16} something else: {summary(absent)}")
 
+    from .entities import ENTITY_DOMINANCE_FAIL
+
     present_all = sorted(v for r in report.values() for v in r["present"])
     absent_all = sorted(v for r in report.values() for v in r["absent"])
     print("=" * 62)
     if present_all and absent_all:
-        overlap = sum(1 for a in absent_all if a >= present_all[len(present_all) // 2])
+        # The number the gate actually uses: how often each side is rejected.
+        # A probe worth having rejects the control far more often than the
+        # real thing, and the gap between those two rates is the whole story.
+        kept = sum(1 for v in present_all if v > 1.0 - ENTITY_DOMINANCE_FAIL)
+        culled = sum(1 for v in absent_all if v <= 1.0 - ENTITY_DOMINANCE_FAIL)
         print(f"present  n={len(present_all)} "
-              f"median={present_all[len(present_all) // 2]:.3f}")
+              f"median={present_all[len(present_all) // 2]:.3f} "
+              f"kept={kept} ({100.0 * kept / len(present_all):.0f}%)")
         print(f"absent   n={len(absent_all)} "
-              f"median={absent_all[len(absent_all) // 2]:.3f}")
-        print(f"{overlap} of {len(absent_all)} 'absent' clips score at or above "
-              f"the 'present' median")
+              f"median={absent_all[len(absent_all) // 2]:.3f} "
+              f"rejected={culled} ({100.0 * culled / len(absent_all):.0f}%)")
+        print(f"threshold {1.0 - ENTITY_DOMINANCE_FAIL:.2f}: keeps "
+              f"{100.0 * kept / len(present_all):.0f}% of real footage and "
+              f"rejects {100.0 * culled / len(absent_all):.0f}% of the control")
     if args.json_out:
         Path(args.json_out).write_text(json.dumps(report, indent=2), encoding="utf-8")
         print(f"raw scores written to {args.json_out}")

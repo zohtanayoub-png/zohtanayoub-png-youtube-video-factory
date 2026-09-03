@@ -1,11 +1,20 @@
-"""The object has to be in the picture.
+"""The frame has to be about the thing the sentence is about.
 
 Run 25 passed every relevance gate the pipeline had - a 0.569 average over the
 clips on screen and not one below the 0.50 floor - and put colourful ribbons
 under "paint the trim the same colour as the walls" and potted plants under
-"a rug too small to reach the sofa". These tests pin the two rules that catch
-that: presence is asked separately from similarity, and a section's causal
-sentence has to explain that section's own idea.
+"a rug too small to reach the sofa".
+
+Two calibration runs over real Pexels footage narrowed what this can honestly
+claim. Certifying that an object is *present* separates nothing: a living room
+photograph contains a wall, a floor, a window and a sofa at once, so the answer
+is nearly always yes and the measurement is noise. Being *displaced* - a frame
+that plants or ribbons clearly own - is a different question, and it is the one
+the run 25 failures actually were.
+
+These tests pin that rule, and the two editorial rules from the same run: a
+causal sentence has to explain its own section's idea, and may not rest on one
+of the section's optional examples.
 """
 
 from __future__ import annotations
@@ -15,7 +24,7 @@ import pytest
 from vidfactory.causal_alignment import CAUSAL_CONNECTIVES
 from vidfactory.entities import (
     ENTITIES,
-    ENTITY_PRESENCE_PASS,
+    ENTITY_DOMINANCE_FAIL,
     EntityGrounding,
     entities_in,
     repair_queries,
@@ -107,26 +116,39 @@ def _frames(entity, positive: float, competitor: float, count: int = 3):
     ]
 
 
-def test_a_clip_containing_the_object_is_grounded():
+def test_a_clip_where_the_object_holds_the_frame_is_grounded():
     rug = _entity("rug")
     result = score_from_similarities(rug, _frames(rug, 0.30, 0.24), _ramp)
     assert result.checked and result.passed
-    assert result.score >= ENTITY_PRESENCE_PASS
+    assert result.score > ENTITY_DOMINANCE_FAIL
     assert not result.failed
 
 
-def test_a_beautiful_room_with_no_rug_is_rejected():
-    """The point of the whole module: similarity is not presence.
+def test_a_room_that_merely_also_contains_other_things_is_not_rejected():
+    """A real living room holds a wall, a floor, a window and a sofa at once.
 
-    This frame is *more* like every competitor than like a rug, which is
-    exactly what a styled living room with no rug in it looks like - and it
-    still scores well against a sentence about rugs.
+    Two calibration runs said so with numbers: asking "is the object present"
+    of interior footage separates nothing, because the answer is nearly always
+    yes. Only a shot that something else clearly owns is a failure.
+    """
+
+    rug = _entity("rug")
+    assert score_from_similarities(rug, _frames(rug, 0.26, 0.25), _ramp).passed
+
+
+def test_a_frame_something_else_owns_is_rejected():
+    """The point of the module: sentence similarity cannot see this.
+
+    Every competitor beats every rug prompt by a clear margin, which is what a
+    frame of plants under rug narration looks like - and it still scores well
+    against the sentence, because the sentence and the room share a whole
+    vocabulary.
     """
 
     rug = _entity("rug")
     result = score_from_similarities(rug, _frames(rug, 0.22, 0.29), _ramp)
     assert result.checked and not result.passed and result.failed
-    assert "no rug" in result.detail
+    assert "something else" in result.detail
 
 
 def test_plants_under_rug_narration_are_rejected():
@@ -137,7 +159,7 @@ def test_plants_under_rug_narration_are_rejected():
     # "indoor potted plants" is one of the competitors, so a plant clip lands
     # on it far harder than on any of the rug prompts.
     per_frame = [
-        [0.19, 0.20, 0.18, 0.19] + [0.21, 0.34, 0.22, 0.20, 0.19, 0.20]
+        [0.19, 0.20, 0.18, 0.19] + [0.21, 0.34, 0.22, 0.20, 0.19]
         for _ in range(3)
     ]
     result = score_from_similarities(rug, per_frame, _ramp)
@@ -148,13 +170,13 @@ def test_one_bad_frame_does_not_condemn_a_clip_that_shows_the_object():
     """The median, for the same reason the pixel flags use one."""
 
     rug = _entity("rug")
-    per_frame = _frames(rug, 0.30, 0.24, count=2) + _frames(rug, 0.20, 0.30, count=1)
+    per_frame = _frames(rug, 0.30, 0.24, count=2) + _frames(rug, 0.20, 0.32, count=1)
     assert score_from_similarities(rug, per_frame, _ramp).passed
 
 
 def test_one_lucky_frame_does_not_rescue_a_clip_that_does_not():
     rug = _entity("rug")
-    per_frame = _frames(rug, 0.20, 0.30, count=2) + _frames(rug, 0.31, 0.22, count=1)
+    per_frame = _frames(rug, 0.20, 0.32, count=2) + _frames(rug, 0.31, 0.22, count=1)
     assert not score_from_similarities(rug, per_frame, _ramp).passed
 
 

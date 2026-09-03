@@ -44,19 +44,16 @@ from .logging_utils import get_logger
 log = get_logger("ENTITY")
 
 
-#: How far the positive reading has to beat the *average* competing one.
-#: Not the best competing one: a calibration run over sixty real Pexels clips
-#: that genuinely contain their object scored them at a median of 0.049 under
-#: best-versus-best, because "a close-up of furniture" and "a person standing
-#: indoors" are broad prompts and a broad prompt beats a specific one on CLIP
-#: similarity almost every time. That is the same generality bias
-#: ``_clip_semantic`` documents and solves, and this repeated it.
-ENTITY_MARGIN_LOW = -0.02
-ENTITY_MARGIN_HIGH = 0.06
+#: How far a distractor has to beat the required object before the shot counts
+#: as being about the distractor instead. The same shape as
+#: ``CONCEPT_MARGIN_*``, which is the one comparison in this codebase that has
+#: been checked against real footage and works.
+ENTITY_MARGIN_LOW = 0.0
+ENTITY_MARGIN_HIGH = 0.05
 
-#: The score a shot needs to count as showing its object. Set from the
-#: calibration run rather than by analogy - see ``vidfactory entity-check``.
-ENTITY_PRESENCE_PASS = 0.5
+#: How much dominance is too much. Set from the calibration run - see
+#: ``vidfactory entity-check`` - not by analogy.
+ENTITY_DOMINANCE_FAIL = 0.5
 
 
 @dataclass(frozen=True)
@@ -67,9 +64,14 @@ class VisualEntity:
     against the shot's own narration chunk rather than the whole section, so a
     passing mention of the sofa in rug advice does not start demanding sofas.
 
-    ``positives`` and ``competitors`` are what MobileCLIP actually scores. Both
-    are short: a long prompt drifts towards describing a whole scene, and the
-    question here is only whether one object is in the picture.
+    ``positives`` describe the object. ``competitors`` are what actually
+    turned up instead - ribbons for painted trim, plants for an undersized rug
+    - and the question asked of them is which one owns the frame, not whether
+    the object is somewhere in it. A living room contains a wall, a floor, a
+    window and a sofa at once, so presence separates nothing; being displaced
+    by something else does. Anything a shot of the object legitimately also
+    contains ("a close-up of furniture") is not a competitor, it is a false
+    positive waiting to happen.
 
     ``queries`` are what the repair pass searches with when the object is
     missing - phrased around the object rather than around the advice, because
@@ -101,7 +103,6 @@ ENTITIES: tuple[VisualEntity, ...] = (
             "a floor with no rug",
             "indoor potted plants",
             "a plain bare floor",
-            "a close-up of furniture",
             "a person standing indoors",
             "a door and a blank wall",
         ),
@@ -128,7 +129,6 @@ ENTITIES: tuple[VisualEntity, ...] = (
             "a bare window with no curtains",
             "a blank wall",
             "indoor potted plants",
-            "a close-up of furniture",
             "a person standing indoors",
         ),
         queries=(
@@ -154,7 +154,6 @@ ENTITIES: tuple[VisualEntity, ...] = (
         competitors=(
             "colourful clothing and ribbons",
             "indoor potted plants",
-            "a close-up of furniture",
             "an outdoor street scene",
             "a person at a desk",
         ),
@@ -180,7 +179,6 @@ ENTITIES: tuple[VisualEntity, ...] = (
             "a blank wall with nothing on it",
             "curtains beside a window",
             "indoor potted plants",
-            "a close-up of furniture",
             "a person standing indoors",
         ),
         queries=(
@@ -203,7 +201,6 @@ ENTITIES: tuple[VisualEntity, ...] = (
             "framed art on a wall",
             "a window with curtains",
             "indoor potted plants",
-            "a close-up of furniture",
         ),
         queries=(
             "large mirror opposite window living room",
@@ -225,7 +222,6 @@ ENTITIES: tuple[VisualEntity, ...] = (
         ),
         competitors=(
             "an empty room with no furniture",
-            "a close-up of a cushion",
             "indoor potted plants",
             "a kitchen counter",
             "an outdoor street scene",
@@ -248,7 +244,6 @@ ENTITIES: tuple[VisualEntity, ...] = (
         competitors=(
             "a room with no window",
             "a dark interior at night",
-            "a close-up of furniture",
             "indoor potted plants",
             "an outdoor street scene",
         ),
@@ -275,7 +270,6 @@ ENTITIES: tuple[VisualEntity, ...] = (
         competitors=(
             "a room with no lamp",
             "daylight through a window",
-            "a close-up of furniture",
             "indoor potted plants",
             "a person standing indoors",
         ),
@@ -296,7 +290,6 @@ ENTITIES: tuple[VisualEntity, ...] = (
         ),
         competitors=(
             "a room with no plants",
-            "a close-up of furniture",
             "a blank wall",
             "an outdoor garden",
         ),
@@ -319,7 +312,6 @@ ENTITIES: tuple[VisualEntity, ...] = (
         ),
         competitors=(
             "a blank wall with no shelves",
-            "a close-up of furniture",
             "indoor potted plants",
             "a person standing indoors",
         ),
@@ -455,60 +447,73 @@ def score_from_similarities(
     per_frame: Sequence[Sequence[float]],
     ramp: Any,
 ) -> EntityGrounding:
-    """Where the positive reading lands among all the readings, per frame.
+    """Is this shot about something *other* than the object it should show?
 
-    The first version of this took the best positive against the *best*
-    competitor, and a calibration run said so plainly: sixty real clips
-    containing their object scored a median of 0.049, while clips of something
-    else scored 0.373. Anti-correlated, not merely mis-thresholded.
+    Two calibration runs over real Pexels footage changed what this function
+    is allowed to claim, and the second one is the important one.
 
-    The cause is the generality bias :func:`_clip_semantic` already documents.
-    "a close-up of furniture" and "a person standing indoors" are broad, "a lit
-    floor lamp in a room" is specific, and CLIP scores the broad prompt higher
-    against almost any photograph - so a maximum taken over five broad
-    competitors beats a maximum taken over four specific positives whether or
-    not the lamp is there. Worse, it is not even wrong about the picture: a
-    clip of a rug under a sofa genuinely *is* a close-up of furniture.
+    The first version scored best-positive against best-competitor. Sixty
+    clips found by searching for their own object came back at a median of
+    0.049 while sixty clips of something else came back at 0.373 - inverted,
+    because a broad prompt beats a specific one on CLIP similarity against
+    almost any photograph. That is the generality bias ``_clip_semantic``
+    documents, and this had walked straight into it.
 
-    So this asks the scale-free question instead, the same two signals that
-    module settled on: where the best positive sits in the range of all the
-    similarities, and how far it beats the *average* competitor rather than
-    the luckiest one.
+    The second version fixed that and asked the scale-free question instead.
+    It came back honest and unhelpful: present 0.708, absent 0.737, thirty-one
+    of sixty controls above the median of the real thing. Chance.
 
-    The median over frames, for the reason the pixel flags use one: a single
-    frame where the camera has panned off the rug should not condemn a clip
-    that shows it, and a single lucky frame should not rescue one that does not.
+    The reason is not a bad prompt. It is that the question was wrong. A
+    living room photograph contains a wall, a floor, a window, a sofa and a
+    lamp *simultaneously*, so "does this frame contain a wall" is true of
+    almost all interior footage and cannot separate anything. Only mirror
+    (0.47 against 0.34) and storage (0.67 against 0.58) separated, because
+    those are the two objects a room can actually lack.
+
+    But the failures that started this were never subtle. Run 25 showed
+    colourful ribbons under painted trim and potted plants under an undersized
+    rug: not interiors missing a detail, but frames *dominated by something
+    else*. That is a difference a margin can see, and it is exactly the shape
+    of the negative-concept flags, which are the one comparison here that has
+    been checked against real footage and works.
+
+    So this measures dominance, not presence: how far the best distractor -
+    plants, ribbons, a person, a bare floor - beats the best description of
+    the object. A shot fails when something else clearly owns the frame, and
+    a shot where the object is merely one of several things present passes,
+    because that is a real living room and rejecting it would be wrong.
+
+    The median over frames, for the reason the pixel flags use one: one frame
+    where the camera has panned off the rug should not condemn a clip that
+    shows it.
     """
 
     offset = len(entity.positives)
-    margins: list[float] = []
+    scores: list[float] = []
     for similarities in per_frame:
         if len(similarities) <= offset:
             continue
         best_positive = max(similarities[:offset])
-        competitors = similarities[offset:]
-        low, high = min(similarities), max(similarities)
-        spread = high - low
-        position = (best_positive - low) / spread if spread > 1e-6 else 0.5
-        margin = best_positive - (sum(competitors) / len(competitors))
-        margins.append(
-            0.65 * position
-            + 0.35 * ramp(margin, ENTITY_MARGIN_LOW, ENTITY_MARGIN_HIGH)
+        best_distractor = max(similarities[offset:])
+        scores.append(
+            ramp(best_distractor - best_positive, ENTITY_MARGIN_LOW, ENTITY_MARGIN_HIGH)
         )
-    if not margins:
+    if not scores:
         return EntityGrounding(entity=entity.name, labels=entity.labels)
-    margins.sort()
-    score = margins[len(margins) // 2]
-    passed = score >= ENTITY_PRESENCE_PASS
+    scores.sort()
+    dominance = scores[len(scores) // 2]
+    passed = dominance < ENTITY_DOMINANCE_FAIL
     return EntityGrounding(
         entity=entity.name,
         labels=entity.labels,
         checked=True,
-        score=round(score, 3),
+        # Reported the way the field reads: 1.0 is "the object owns the frame".
+        score=round(1.0 - dominance, 3),
         passed=passed,
         detail=(
-            f"{entity.labels[0]} present ({score:.2f})" if passed
-            else f"no {entity.labels[0]} visible ({score:.2f})"
+            f"{entity.labels[0]} not displaced ({1.0 - dominance:.2f})" if passed
+            else f"the frame is about something else, not {entity.labels[0]} "
+                 f"({1.0 - dominance:.2f})"
         ),
     )
 
