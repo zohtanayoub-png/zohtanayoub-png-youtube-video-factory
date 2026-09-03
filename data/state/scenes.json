@@ -955,6 +955,150 @@
       "duration": null,
       "query": "bright styled living room natural light",
       "category": "living rooms"
+    },
+    {
+      "id": 107,
+      "video_id": 7,
+      "scene_id": "intro-000-00",
+      "narration": "Two rooms can have identical dimensions and feel completely different to stand in. The one that feels bigger is almost never the one with less furniture in it, and that surprises people.",
+      "duration": null,
+      "query": "bright styled living room natural light",
+      "category": "living rooms"
+    },
+    {
+      "id": 108,
+      "video_id": 7,
+      "scene_id": "intro-000-01",
+      "narration": "In this video we are going through 3 of them, one at a time, with the reasoning behind each one and exactly how to apply it in a real home.",
+      "duration": null,
+      "query": "sunlit living room wide shot",
+      "category": "living rooms"
+    },
+    {
+      "id": 109,
+      "video_id": 7,
+      "scene_id": "item-001-00",
+      "narration": "Number 1. Vary the height of everything you place on a surface.",
+      "duration": null,
+      "query": "styled console table decor",
+      "category": "living rooms"
+    },
+    {
+      "id": 110,
+      "video_id": 7,
+      "scene_id": "item-001-01",
+      "narration": "When objects on a shelf or console are all the same height, the eye skims across them and registers clutter rather than composition.",
+      "duration": null,
+      "query": "living room shelf styling",
+      "category": "living rooms"
+    },
+    {
+      "id": 111,
+      "video_id": 7,
+      "scene_id": "item-001-02",
+      "narration": "Work in loose triangles: something tall like a lamp or a vase of branches, something medium like stacked books, and something low and organic like a bowl or a small plant.",
+      "duration": null,
+      "query": "vase books coffee table styling",
+      "category": "living rooms"
+    },
+    {
+      "id": 112,
+      "video_id": 7,
+      "scene_id": "item-001-03",
+      "narration": "Odd numbers photograph and read better than even ones. Clear surfaces give the eye somewhere to rest, and a room with fewer things competing for attention reads as more spacious.",
+      "duration": null,
+      "query": "decorative objects interior shelf",
+      "category": "living rooms"
+    },
+    {
+      "id": 113,
+      "video_id": 7,
+      "scene_id": "item-002-00",
+      "narration": "That takes us to number 2. Ask yourself what your eye lands on first in that room. Then: Do not block the window.",
+      "duration": null,
+      "query": "clear window living room interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 114,
+      "video_id": 7,
+      "scene_id": "item-002-01",
+      "narration": "Daylight is the most valuable thing in a room, and a tall piece of furniture in front of the glass costs you light in every direction.",
+      "duration": null,
+      "query": "low furniture under window",
+      "category": "living rooms"
+    },
+    {
+      "id": 115,
+      "video_id": 7,
+      "scene_id": "item-002-02",
+      "narration": "Keep anything above windowsill height away from the window wall. If a piece must go there, choose something low or open in construction.",
+      "duration": null,
+      "query": "bright window natural light room",
+      "category": "living rooms"
+    },
+    {
+      "id": 116,
+      "video_id": 7,
+      "scene_id": "item-002-03",
+      "narration": "Light reaching the walls and corners shows your eye exactly where the room ends, and a room whose boundaries are visible reads as larger than one that fades into shadow a few feet in.",
+      "duration": null,
+      "query": "unobstructed window interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 117,
+      "video_id": 7,
+      "scene_id": "item-003-00",
+      "narration": "This is the one people get wrong most often. Paint the trim the same color as the walls.",
+      "duration": null,
+      "query": "walls and trim same color",
+      "category": "living rooms"
+    },
+    {
+      "id": 118,
+      "video_id": 7,
+      "scene_id": "item-003-01",
+      "narration": "Bright white trim against a colored wall draws a hard outline around every door and window, which chops up the room.",
+      "duration": null,
+      "query": "color drenched room interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 119,
+      "video_id": 7,
+      "scene_id": "item-003-02",
+      "narration": "Use the same color on walls and woodwork with a satin or eggshell finish on the trim. The room reads taller and much more expensive.",
+      "duration": null,
+      "query": "painted woodwork matching walls",
+      "category": "living rooms"
+    },
+    {
+      "id": 120,
+      "video_id": 7,
+      "scene_id": "item-003-03",
+      "narration": "This is the sort of thing people cannot name but always notice.",
+      "duration": null,
+      "query": "monochrome painted room",
+      "category": "living rooms"
+    },
+    {
+      "id": 121,
+      "video_id": 7,
+      "scene_id": "item-003-04",
+      "narration": "Low-contrast edges stop chopping the wall into pieces, so the surface reads as one large plane and the room feels bigger for it.",
+      "duration": null,
+      "query": "walls and trim same color",
+      "category": "living rooms"
+    },
+    {
+      "id": 122,
+      "video_id": 7,
+      "scene_id": "outro-000-00",
+      "narration": "That is all 3 of them. If you found something here worth trying, there are more videos like this on the channel.",
+      "duration": null,
+      "query": "bright styled living room natural light",
+      "category": "living rooms"
     }
   ]
 }
