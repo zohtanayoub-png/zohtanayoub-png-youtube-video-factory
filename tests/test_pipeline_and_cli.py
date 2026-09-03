@@ -178,7 +178,7 @@ def test_clip_history_is_loaded_for_ranking(local_pipeline):
 
 
 def test_pipeline_runs_end_to_end_with_local_clips(local_pipeline):
-    result = local_pipeline.run(topic_text="5 Small Living Room Ideas")
+    result = local_pipeline.run(topic_text="Small Living Room Ideas")
     assert result.video_path.exists()
     assert result.report.passed
     assert result.duration > 5.0
@@ -214,7 +214,7 @@ def test_the_offline_render_is_reproducible(tmp_path, has_ffmpeg, repo_root):
     scores = []
     for index in range(2):
         pipeline = _local_pipeline(tmp_path / f"run{index}", repo_root)
-        editorial = pipeline.run(topic_text="5 Small Living Room Ideas").editorial
+        editorial = pipeline.run(topic_text="Small Living Room Ideas").editorial
         scores.append(editorial.metrics["final_shot_visual_semantic_match_average"])
     assert scores[0] == scores[1]
 
@@ -237,7 +237,7 @@ def test_footage_that_does_not_show_the_narration_still_fails_qc(
     pipeline = _local_pipeline(tmp_path, repo_root, semantic=(0.20, 0.30))
 
     with pytest.raises(PipelineError) as failure:
-        pipeline.run(topic_text="5 Small Living Room Ideas")
+        pipeline.run(topic_text="Small Living Room Ideas")
     assert "final_shot_relevance" in str(failure.value)
     assert "minimum 0.5" in str(failure.value)
 
@@ -263,7 +263,7 @@ def test_a_failed_run_is_recorded(local_pipeline, monkeypatch):
         lambda self, scenes, engine=None: (_ for _ in ()).throw(RuntimeError("boom")),
     )
     with pytest.raises(RuntimeError):
-        local_pipeline.run(topic_text="20 Cozy Bedroom Ideas")
+        local_pipeline.run(topic_text="Cozy Bedroom Ideas")
     rows = local_pipeline.database.query("SELECT status FROM generations")
     assert rows[-1]["status"] == "failed"
 

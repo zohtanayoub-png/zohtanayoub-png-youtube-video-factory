@@ -49,6 +49,12 @@ log = get_logger("SCRIPT")
 
 WORDS_PER_ITEM_TARGET = 105
 
+#: The fewest words in which an idea can still say what to do and why it
+#: works. Below this it is a list entry, not advice - which is the line
+#: between "shorten the sections to fit the count" and "this count does not
+#: fit this duration".
+MIN_ITEM_WORDS = 30
+
 #: Sentence boundaries, for trimming a script back to its allotted time.
 _SENTENCES = re.compile(r"(?<=[.!?])\s+")
 #: Below this length the intro and outro are compacted so short videos
@@ -753,6 +759,17 @@ class TemplateScriptEngine:
                 raise ValueError(
                     f"The topic asks for {promised} ideas but only {pool_size} "
                     "support this title. Ask for fewer, or widen the topic."
+                )
+            affordable = int(
+                max(1.0, (target_words - overhead)) // MIN_ITEM_WORDS
+            )
+            if promised > affordable:
+                raise ValueError(
+                    f"{promised} ideas will not fit into "
+                    f"{duration_minutes:g} minutes: at {MIN_ITEM_WORDS} words each "
+                    f"that needs {promised * MIN_ITEM_WORDS + overhead} words and "
+                    f"there is room for about {int(target_words)}. Ask for "
+                    f"{affordable} or fewer, or for a longer video."
                 )
             if promised != wanted:
                 log.info(

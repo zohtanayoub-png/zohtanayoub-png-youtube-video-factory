@@ -151,18 +151,43 @@ def test_retitle_for_count(title, count, expected):
 
 
 def test_no_ungrammatical_one_item_phrasing():
-    topic = TopicEngine(language="en").from_user_input("5 Small Living Room Ideas")
+    # No count in the topic: this is about the wording when the duration
+    # leaves room for a single idea, not about honouring a request for five.
+    topic = TopicEngine(language="en").from_user_input("Small Living Room Ideas")
     script = generate_script(topic, duration_minutes=0.8, engine="template", language="en")
     assert " 1 ideas" not in script.text
     assert " 1 minutes" not in script.text
     assert not script.title.startswith("1 ")
 
 
-def test_item_count_is_capped_by_available_material():
+def test_a_count_beyond_the_material_is_refused_not_quietly_capped():
+    """A number the viewer typed is a request, so an impossible one is an error.
+
+    Run 22 silently turned "10 Small Living Room Tricks" into five. Capping
+    500 down to what happens to exist is the same behaviour, and the reply the
+    viewer needs is what is actually available.
+    """
+
+    with pytest.raises(ValueError, match="only"):
+        TopicEngine(language="en").from_user_input("500 Bathroom Ideas")
+
+
+def test_a_count_that_will_not_fit_the_duration_is_refused_with_the_arithmetic():
     engine = TemplateScriptEngine()
-    topic = TopicEngine(language="en").from_user_input("500 Bathroom Ideas")
-    count = engine.plan_item_count(topic, 20.0, pool_size=len(tips_for("bathrooms")))
-    assert count <= len(tips_for("bathrooms"))
+    topic = TopicEngine(language="en").from_user_input(
+        "25 Small Living Room Ideas That Make Any Space Look Bigger"
+    )
+    with pytest.raises(ValueError, match="will not fit"):
+        engine.plan_item_count(topic, 5.0, pool_size=len(tips_for("living rooms")))
+
+
+def test_a_count_the_duration_can_carry_is_honoured_exactly():
+    engine = TemplateScriptEngine()
+    topic = TopicEngine(language="en").from_user_input(
+        "10 Small Living Room Tricks That Make Your Space Look Bigger"
+    )
+    count = engine.plan_item_count(topic, 5.0, pool_size=len(tips_for("living rooms")))
+    assert count == 10
 
 
 # --------------------------------------------------------------------- scenes

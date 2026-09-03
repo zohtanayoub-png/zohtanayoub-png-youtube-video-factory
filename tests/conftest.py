@@ -49,7 +49,12 @@ def topic():
     # The shared fixtures are English: the Spanish pipeline has its own
     # module. The channel default is Spanish, so this says so explicitly.
     engine = TopicEngine(history=[], language="en")
-    return engine.from_user_input("25 Small Living Room Ideas That Make Any Space Look Bigger")
+    # No number in the title: these fixtures are about script structure, and
+    # a count in the topic is now a binding request that a short test render
+    # could not honour.
+    return engine.from_user_input(
+        "Small Living Room Ideas That Make Any Space Look Bigger"
+    )
 
 
 @pytest.fixture
