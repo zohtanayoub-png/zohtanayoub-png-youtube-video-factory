@@ -28,9 +28,9 @@ These are requirements, not preferences. Do not relax them.
 6. **The pipeline degrades, it does not crash.** A failed clip, a failed TTS
    chunk, a missing LLM, an unreachable provider - each has a fallback.
 7. **Content language and search language are different things.** The channel
-   narrates in Spanish by default; Pexels is always queried in English. A
-   Spanish string must never reach a stock provider, and an English string
-   must never reach the viewer. See `languages.py`.
+   narrates in US English by default and in Spanish on request; Pexels is
+   always queried in English whichever is chosen. A Spanish string must never
+   reach a stock provider. See `languages.py`.
 
 ## Layout
 
@@ -96,7 +96,8 @@ src/vidfactory/
   `visual_analysis` decodes three frames of every shortlisted candidate and
   measures them. `premium_visual_ratio` now requires the caption *and* the
   frames to agree.
-* **Spanish is the default, and it is written rather than translated.**
+* **Spanish is optional but not second-class, and it is written rather than
+  translated.**
   `knowledge_es` and `phrases_es` are original Spanish, not a pass over the
   English modules. Promise alignment, the causal check, the topic grammar and
   the metadata all have Spanish vocabulary of their own, because a translated

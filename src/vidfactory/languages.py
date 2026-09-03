@@ -1,6 +1,6 @@
 """Content language, and why it is not the same thing as search language.
 
-The channel narrates in Spanish. Pexels does not. A stock library indexed by
+The channel can narrate in English or Spanish. Pexels only speaks English. A stock library indexed by
 English-speaking contributors returns markedly better interior footage for
 ``floor to ceiling curtains living room`` than for ``cortinas de suelo a
 techo``, and translating the query is the wrong instinct: the narration is
@@ -9,7 +9,9 @@ what the viewer hears, the query is a lookup key into someone else's index.
 So this module holds two separate ideas:
 
 * **content language** - the language of the title, script, subtitles,
-  metadata, chapters and voice. Configurable, Spanish by default.
+  metadata, chapters and voice. Configurable, US English by default, with
+  Spanish available as a first-class alternative rather than a translation
+  layer.
 * **search language** - the language the stock providers are queried in.
   English, always, built from each idea's canonical English metadata rather
   than from the narration the viewer hears.
@@ -115,9 +117,12 @@ ENGLISH = Language(
 
 LANGUAGES: dict[str, Language] = {SPANISH.key: SPANISH, ENGLISH.key: ENGLISH}
 
-#: The channel's default. Changing this changes the language of every artifact
-#: a run produces; nothing else in the pipeline hard-codes a language.
-DEFAULT_LANGUAGE = SPANISH
+#: The channel's default. Changing this line changes the language of every
+#: artifact a run produces - title, script, voice, captions, metadata - and
+#: nothing else in the pipeline hard-codes a language, which is the whole
+#: point of this registry. Spanish stays fully supported: it is one workflow
+#: dropdown away and loses nothing by not being the default.
+DEFAULT_LANGUAGE = ENGLISH
 
 #: Everything a person might reasonably type or pick in a dropdown.
 _ALIASES: dict[str, str] = {

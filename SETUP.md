@@ -319,32 +319,38 @@ If it fails, leave it off. The videos are produced exactly as before.
 
 ---
 
-## Idioma y subtítulos
+## Language and subtitles
 
-Los vídeos salen **en español** por defecto. No hay nada que configurar.
+Videos come out **in English** by default, narrated by a female American
+voice. There is nothing to set up.
 
-Si quieres uno en inglés, en la pantalla de *Generate Video* elige
-`language: English`. El resto es automático: la voz, el guion, los subtítulos
-y los metadatos cambian de idioma solos. **No hace falta tocar la voz**: el
-desplegable `voice` puede quedarse en `Automatic`.
+Want one in Spanish? On the *Generate Video* screen pick `language: Spanish`.
+Everything else follows automatically - the voice, the script, the subtitles
+and the metadata all change language on their own. **You do not need to touch
+the voice**: leave the `voice` dropdown on `Automatic`.
 
-Los subtítulos salen de dos formas y las dos van en el artefacto:
+| Language | Voice it picks | Sounds like |
+|---|---|---|
+| English | `en_US-hfc_female-medium` | female, American, warm |
+| Spanish | `es_ES-sharvard-medium` | female, Castilian, warm |
 
-| Archivo | Para qué |
+Subtitles come out two ways and both are in the artifact:
+
+| File | What it is for |
 |---|---|
-| `subtitles.srt` | subirlo a YouTube; texto limpio, sin estilo |
-| `subtitles.ass` | el estilo premium, que ya va grabado en el vídeo |
+| `subtitles.srt` | upload to YouTube; clean text, no styling |
+| `subtitles.ass` | the premium style, already burned into the video |
 
-El vídeo final lleva los subtítulos **grabados en la imagen** con el estilo
-premium: dos líneas como máximo, frases cortas, una palabra clave en ámbar de
-vez en cuando, y un margen inferior amplio para que no los tape el reproductor.
-Si prefieres subtítulos blancos sin más, elige `subtitle_style: clean`. Si no
-los quieres en la imagen, elige `none` (el `.srt` se sigue generando).
+The finished video has the captions **burned into the picture** in the premium
+style: two lines at most, short phrases, an occasional keyword in warm amber,
+and a generous bottom margin so the player controls never cover them. Prefer
+plain white captions? Choose `subtitle_style: clean`. Do not want them in the
+picture at all? Choose `none` - the `.srt` is still produced.
 
-> Un detalle que quizá te sorprenda: las **búsquedas de imágenes siguen en
-> inglés** aunque el vídeo sea en español. Es a propósito. Pexels está
-> indexado en inglés y devuelve mucho mejor material para
-> `floor to ceiling curtains living room` que para su traducción.
+> One thing that may surprise you: the **stock footage searches stay in
+> English** even when the video is in Spanish. That is deliberate. Pexels is
+> indexed in English and returns far better material for
+> `floor to ceiling curtains living room` than for a translation of it.
 
 ---
 

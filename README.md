@@ -13,13 +13,15 @@ rendering service.
 
 ## Language
 
-Videos are produced in **Spanish (es-ES)** by default - title, hook, script,
-narration, subtitles, chapters, description, tags and summary. English is one
-dropdown away and loses nothing.
+Videos are produced in **US English (en-US)** by default - title, hook, script,
+narration, subtitles, chapters, description, tags and summary - narrated by
+`en_US-hfc_female-medium`, a female American voice.
 
-The Spanish is written, not translated: `knowledge_es.py` and `phrases_es.py`
-are original Spanish writing, and the promise checks, topic grammar and
-metadata all carry their own Spanish vocabulary.
+**Spanish (es-ES) is one dropdown away and loses nothing.** It is written, not
+translated: `knowledge_es.py` and `phrases_es.py` are original Spanish writing,
+and the promise checks, topic grammar and metadata all carry their own Spanish
+vocabulary. Choosing Spanish also chooses `es_ES-sharvard-medium`, a female
+Castilian voice - the `voice` input stays on `Automatic` either way.
 
 One thing deliberately stays in English: **the stock footage queries.** Pexels
 is indexed in English and returns far better interiors for `floor to ceiling
@@ -83,7 +85,7 @@ open-source ONNX export that runs on a CPU runner.
 |---|---|---|
 | Topic selection | built-in generator with similarity rejection | free |
 | Script writing | curated knowledge base + variation engine (optional local LLM) | free |
-| Narration | [Piper](https://github.com/OHF-Voice/piper1-gpl) neural TTS (`es_ES-sharvard-medium`), eSpeak NG fallback | free |
+| Narration | [Piper](https://github.com/OHF-Voice/piper1-gpl) neural TTS (`en_US-hfc_female-medium`, or `es_ES-sharvard-medium` in Spanish), eSpeak NG fallback | free |
 | Captions | ASS + libass burned in by FFmpeg, open-licence fonts | free |
 | Footage | Pexels and Pixabay APIs | free |
 | Frame inspection | FFmpeg decode + pixel statistics, optional CPU CLIP (ONNX) | free |

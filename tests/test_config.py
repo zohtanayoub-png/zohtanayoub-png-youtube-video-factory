@@ -13,9 +13,10 @@ def test_repository_config_is_valid(repo_root):
     assert config.width == 1920
     assert config.height == 1080
     assert config.fps == 30
-    # The channel narrates in Spanish for a Spanish-speaking audience.
-    assert config.get("channel.language") == "es-ES"
-    assert config.get("channel.audience_country") == "ES"
+    # The channel narrates in US English by default; Spanish is a workflow
+    # dropdown away and equally supported.
+    assert config.get("channel.language") == "en-US"
+    assert config.get("channel.audience_country") == "US"
 
 
 def test_music_is_always_disabled(repo_root, tmp_path):

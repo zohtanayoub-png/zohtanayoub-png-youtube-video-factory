@@ -6,11 +6,13 @@
 
 channel:
   name: HomeeDeeco
-  # Idioma del contenido: título, guion, narración, subtítulos y metadatos.
-  # "es-ES" (por defecto) o "en-US". El idioma de BÚSQUEDA de imágenes es
-  # siempre inglés y no se configura aquí: ver src/vidfactory/languages.py.
-  language: es-ES
-  audience_country: ES
+  # Content language: title, script, narration, subtitles and metadata.
+  # "en-US" (default) or "es-ES". Spanish is fully supported and written
+  # natively, not translated - see knowledge_es.py and phrases_es.py.
+  # The stock-footage SEARCH language is always English and is deliberately
+  # not configurable here; see src/vidfactory/languages.py for why.
+  language: en-US
+  audience_country: US
   niche: home decor
 
 video:
@@ -43,10 +45,12 @@ audio:
 
 tts:
   engine: auto                  # auto | piper | espeak | silent
-  # Vacío = la voz por defecto del idioma del canal. En español se usa
-  # es_ES-sharvard-medium (femenina, castellana, Piper, gratuita); en inglés
-  # en_US-hfc_female-medium. Solo hay que rellenarlo para forzar otra voz, y
-  # tiene que ser del mismo idioma que el guion.
+  # Empty = the default voice for the channel's language, which is what a
+  # beginner should leave it as:
+  #   English -> en_US-hfc_female-medium  (female, American, Piper, free)
+  #   Spanish -> es_ES-sharvard-medium    (female, Castilian, Piper, free)
+  # Only fill this in to force a different voice, and it has to belong to the
+  # same language as the script - a mismatch is refused rather than honoured.
   voice: ""
   fallback_voices: []
   speed: 1.0                    # 1.0 = natural pace (lower = slower)
@@ -56,21 +60,21 @@ tts:
   max_chunk_chars: 320          # long scripts are chunked so TTS never breaks
 
 # ---------------------------------------------------------------------------
-#  SUBTÍTULOS. Siempre se exporta subtitles.srt (accesibilidad y YouTube) y,
-#  salvo con style: none, también subtitles.ass con el estilo premium, que es
-#  el que se incrusta en la imagen. Todo con FFmpeg y libass: sin software de
-#  pago y sin fuentes propietarias.
+#  SUBTITLES. subtitles.srt is always exported (accessibility and YouTube).
+#  Unless style is "none", subtitles.ass is exported too and is what gets
+#  burned into the picture. All FFmpeg and libass: no paid software and no
+#  proprietary fonts. Works identically in English and Spanish.
 # ---------------------------------------------------------------------------
 subtitles:
   enabled: true
-  burn_in: true                 # graba los subtítulos en final_video.mp4
+  burn_in: true                 # burn the captions into final_video.mp4
   style: premium                # premium | clean | none
-  max_line_chars: 42            # solo afecta al .srt
+  max_line_chars: 42            # affects the .srt only
   max_lines: 2
 
 script:
   engine: auto                  # auto | llm | template  (template = always works)
-  words_per_minute: 0           # 0 = el ritmo real del idioma (ver languages.py)
+  words_per_minute: 0           # 0 = the language's own measured rate (languages.py)
   llm:
     enabled: false              # opt-in; template engine is the reliable default
     model_repo: Qwen/Qwen2.5-1.5B-Instruct-GGUF

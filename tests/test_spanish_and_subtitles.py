@@ -4,11 +4,15 @@ Two features, one test module, because they meet in the same place: the
 captions are burned in the language the script was written in, and both are
 wrong in the same way if the language plumbing leaks.
 
-The rule this module exists to defend is the separation in
-:mod:`vidfactory.languages`: the *content* language is Spanish and the
-*search* language is English. Everything the viewer hears or reads is Spanish;
-every string sent to Pexels is English, built from each idea's canonical
-English metadata rather than from the narration.
+The channel's default is US English. Spanish is not a translation layer bolted
+on the side - it is written natively and produces a complete video - so this
+module holds it to the same standard as English rather than to a lower one.
+
+The rule it exists to defend is the separation in
+:mod:`vidfactory.languages`: whatever the *content* language is, the *search*
+language is English. Everything the viewer hears or reads is in the chosen
+language; every string sent to Pexels is English, built from each idea's
+canonical English metadata rather than from the narration.
 """
 
 from __future__ import annotations
@@ -50,6 +54,7 @@ from vidfactory.topic_engine import TopicEngine
 from vidfactory.tts import normalize_spanish, spanish_number, voices_for_language
 
 SPANISH_TOPIC = "Trucos para que un salón pequeño parezca mucho más grande"
+ENGLISH_TOPIC = "Small Living Room Tricks That Make Your Space Look Bigger"
 
 
 @dataclass
@@ -63,18 +68,38 @@ class Chunk:
 
 @pytest.fixture(scope="module")
 def spanish_script():
+    """Spanish is opt-in now, so every Spanish test says so explicitly."""
+
     topic = TopicEngine(language="es").from_user_input(SPANISH_TOPIC)
     return generate_script(topic, duration_minutes=6.0, language="es")
+
+
+@pytest.fixture(scope="module")
+def english_script():
+    topic = TopicEngine(language="en").from_user_input(ENGLISH_TOPIC)
+    return generate_script(topic, duration_minutes=6.0, language="en")
 
 
 # ---------------------------------------------------------------------------
 # 1. The language itself
 # ---------------------------------------------------------------------------
 
-def test_spanish_is_the_default_language():
-    assert DEFAULT_LANGUAGE is SPANISH
-    assert DEFAULT_LANGUAGE.code == "es-ES"
-    assert resolve_language(None).code == "es-ES"
+def test_english_is_the_default_language():
+    assert DEFAULT_LANGUAGE is ENGLISH
+    assert DEFAULT_LANGUAGE.code == "en-US"
+    assert resolve_language(None).code == "en-US"
+    # A female American voice, chosen without anybody being asked.
+    assert DEFAULT_LANGUAGE.voices[0] == "en_US-hfc_female-medium"
+
+
+def test_spanish_remains_fully_available():
+    """Not the default any more, and not degraded either."""
+
+    assert resolve_language("Spanish") is SPANISH
+    assert SPANISH.code == "es-ES"
+    assert SPANISH.voices[0] == "es_ES-sharvard-medium"
+    assert SPANISH.clinging_words and SPANISH.words_per_minute > 0
+    assert len(tips_for(None, language="es")) >= 100
 
 
 def test_the_dropdown_labels_resolve():
@@ -91,12 +116,17 @@ def test_an_unknown_language_falls_back_rather_than_raising():
     assert resolve_language("") is DEFAULT_LANGUAGE
 
 
-def test_the_config_ships_spanish_and_premium_burned_in_captions():
+def test_the_config_ships_english_and_premium_burned_in_captions():
     config = load_config("config.yaml")
-    assert config.get("channel.language") == "es-ES"
+    assert config.get("channel.language") == "en-US"
+    assert config.get("channel.audience_country") == "US"
+    # Empty means "let the language choose", which is what a beginner should
+    # never have to touch.
+    assert config.get("tts.voice") == ""
     assert config.get("subtitles.style") == "premium"
     assert config.get("subtitles.burn_in") is True
     assert config.get("subtitles.enabled") is True
+    assert config.music_enabled is False
 
 
 # ---------------------------------------------------------------------------
@@ -177,10 +207,18 @@ def test_a_spanish_paragraph_without_a_reason_fails_the_causal_check():
     assert score_paragraph(good, promise).passed
 
 
-def test_english_still_produces_an_english_script():
-    topic = TopicEngine(language="en").from_user_input(
-        "Small Living Room Tricks That Make Your Space Look Bigger"
-    )
+def test_the_default_produces_an_english_script():
+    """No language argument anywhere: this is what a plain run does."""
+
+    topic = TopicEngine().from_user_input(ENGLISH_TOPIC)
+    script = generate_script(topic, duration_minutes=4.0)
+    assert script.language == "en"
+    assert not _has_spanish_marks(script.text)
+    assert script.promise_key == "bigger"
+
+
+def test_english_produces_an_english_script():
+    topic = TopicEngine(language="en").from_user_input(ENGLISH_TOPIC)
     script = generate_script(topic, duration_minutes=4.0, language="en")
     assert script.language == "en"
     assert not _has_spanish_marks(script.text)
@@ -476,6 +514,51 @@ def test_style_selection_and_none(tmp_path):
 def test_an_available_font_is_always_returned():
     font = available_font()
     assert font and isinstance(font, str)
+
+
+# ---------------------------------------------------------------------------
+# 8b. The premium captions in English
+#
+# English is the default language now, so the caption system is held to the
+# same standard in English as in Spanish rather than being assumed to work
+# because it works in the other one.
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def english_events():
+    chunks = [
+        Chunk("If your living room feels smaller than it really is, the problem "
+              "may not be the square footage.", 0.0, 6.5),
+        Chunk("Mount the rod 15 cm below the ceiling and the wall reads taller.",
+              6.5, 11.0),
+    ]
+    return events_from_chunks(chunks, PREMIUM, "en")
+
+
+def test_english_captions_are_short_and_two_lines_at_most(english_events):
+    assert english_events
+    assert max(e.lines for e in english_events) <= 2
+    metrics = report(english_events, PREMIUM)
+    assert 3 <= metrics["average_subtitle_words"] <= PREMIUM.max_words
+    assert metrics["subtitle_timing_passed"] is True
+    assert metrics["subtitle_safe_area_passed"] is True
+
+
+def test_english_emphasis_marks_measurements_and_outcomes():
+    assert emphasis_spans("mount the rod 15 cm below the ceiling", "en")
+    assert emphasis_spans("the wall reads taller and the room feels bigger", "en")
+    assert not emphasis_spans("and let the panels hang", "en")
+
+
+def test_english_ass_renders_with_the_premium_style(tmp_path):
+    chunks = [Chunk("Hang the curtains 15 cm below the ceiling line.", 0.0, 4.0)]
+    path, events, font = write_ass(chunks, tmp_path / "subtitles.ass",
+                                   style="premium", language="en")
+    body = path.read_text(encoding="utf-8")
+    assert "Style: Premium," in body
+    assert "\\fad(" in body
+    assert PREMIUM.accent in body, "no keyword emphasis reached the English file"
+    assert events and font
 
 
 # ---------------------------------------------------------------------------

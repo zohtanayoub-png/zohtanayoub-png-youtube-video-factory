@@ -26,7 +26,7 @@ class ConfigError(ValueError):
 DEFAULTS: dict[str, Any] = {
     "channel": {
         "name": "HomeeDeeco",
-        "language": "es-ES",
+        "language": "en-US",
         "audience_country": "US",
         "niche": "home decor",
     },
