@@ -59,14 +59,33 @@ def make_test_clip(
 
     target = Path(destination)
     target.parent.mkdir(parents=True, exist_ok=True)
-    # A moving gradient plus a drifting box gives the encoder real motion to
-    # compress, so the result behaves like genuine footage rather than a still.
+    # Blocks of furniture, a window and a floor band, plus two drifting boxes
+    # for motion. The shapes matter now that the pipeline inspects real
+    # frames: a flat colour field measures as an empty room, because that is
+    # exactly what it is, and the integration render would then exercise the
+    # visual stage only on footage it is right to reject.
+    sofa, cushion, window, plant, floor = _palette(color)
     filters = (
+        f"drawbox=x={int(width * 0.06)}:y={int(height * 0.52)}:"
+        f"w={int(width * 0.42)}:h={int(height * 0.30)}:color={sofa}:t=fill,"
+        f"drawbox=x={int(width * 0.10)}:y={int(height * 0.44)}:"
+        f"w={int(width * 0.09)}:h={int(height * 0.10)}:color={cushion}:t=fill,"
+        f"drawbox=x={int(width * 0.66)}:y={int(height * 0.10)}:"
+        f"w={int(width * 0.28)}:h={int(height * 0.52)}:color={window}:t=fill,"
+        f"drawbox=x={int(width * 0.54)}:y={int(height * 0.55)}:"
+        f"w={int(width * 0.11)}:h={int(height * 0.30)}:color={plant}:t=fill,"
+        f"drawbox=y={int(height * 0.84)}:w={width}:h={int(height * 0.16)}:"
+        f"color={floor}:t=fill,"
+        # Small objects: a shelf of things, framed art, a rug border. Without
+        # them a downscaled frame is one large flat plane and measures - quite
+        # correctly - as an unfurnished room.
+        + _detail_boxes(color, width, height)
+        +
         f"drawbox=x='mod(t*80\\,{width})':y='{height // 3}':w=320:h=240:"
         "color=white@0.35:t=fill,"
         f"drawbox=x='{width // 2}':y='mod(t*40\\,{height})':w=200:h=140:"
         "color=black@0.25:t=fill,"
-        "noise=alls=6:allf=t,format=yuv420p"
+        "noise=alls=22:allf=t+u,format=yuv420p"
     )
     run_ffmpeg(
         [
@@ -83,6 +102,50 @@ def make_test_clip(
         description="test clip",
     )
     return target
+
+
+def _detail_boxes(color: str, width: int, height: int) -> str:
+    """A deterministic scatter of small objects, as an FFmpeg filter fragment."""
+
+    value = int(str(color).replace("0x", ""), 16)
+    parts: list[str] = []
+    for index in range(14):
+        seed = (value + index * 2654435761) & 0xFFFFFFFF
+        x = 0.04 + ((seed >> 3) % 88) / 100.0
+        y = 0.08 + ((seed >> 11) % 78) / 100.0
+        w = 0.02 + ((seed >> 19) % 6) / 100.0
+        h = 0.02 + ((seed >> 23) % 8) / 100.0
+        shade = "0x%02x%02x%02x" % (
+            40 + (seed >> 5) % 200, 40 + (seed >> 13) % 200, 40 + (seed >> 21) % 200,
+        )
+        parts.append(
+            f"drawbox=x={int(width * x)}:y={int(height * y)}:"
+            f"w={max(6, int(width * w))}:h={max(6, int(height * h))}:"
+            f"color={shade}:t=fill"
+        )
+    return ",".join(parts) + ","
+
+
+def _palette(color: str) -> tuple[str, str, str, str, str]:
+    """Five related colours for one synthetic room, derived from its base."""
+
+    value = int(str(color).replace("0x", ""), 16)
+    r, g, b = (value >> 16) & 0xFF, (value >> 8) & 0xFF, value & 0xFF
+
+    def mix(dr: int, dg: int, db: int) -> str:
+        return "0x%02x%02x%02x" % (
+            max(12, min(243, r + dr)),
+            max(12, min(243, g + dg)),
+            max(12, min(243, b + db)),
+        )
+
+    return (
+        mix(-30, -55, -70),      # sofa, warmer and darker than the wall
+        mix(60, -10, -55),       # cushion, a warm accent
+        mix(45, 60, 75),         # window, cool and bright
+        mix(-70, 25, -60),       # plant, green
+        mix(10, -25, -50),       # floor, warm mid tone
+    )
 
 
 def _shift(color: str, step: int) -> str:

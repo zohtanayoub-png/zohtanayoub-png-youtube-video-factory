@@ -26,6 +26,13 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Sequence
 
+from .causal_alignment import (
+    PASS_THRESHOLD,
+    CausalReport,
+    repair_text,
+    score_paragraph,
+    validate_sections,
+)
 from .knowledge import ALL_CATEGORIES, Tip, tips_for
 from .title_alignment import (
     AlignmentResult,
@@ -81,6 +88,18 @@ class Script:
     rejected_ideas: list[dict[str, Any]] = field(default_factory=list)
     #: Share of the chosen ideas that support the promise (0.0 - 1.0).
     title_idea_alignment: float = 1.0
+    #: Second-stage validation: does the *written paragraph* explain how the
+    #: idea produces the outcome the title promised? See
+    #: :mod:`vidfactory.causal_alignment`.
+    causal: CausalReport = field(default_factory=CausalReport)
+
+    @property
+    def causal_promise_alignment_score(self) -> float:
+        return self.causal.overall
+
+    @property
+    def section_alignment_scores(self) -> list[float]:
+        return [round(r.score, 3) for r in self.causal.results]
 
     @property
     def text(self) -> str:
@@ -104,6 +123,7 @@ class Script:
             "word_count": self.word_count,
             "promise": {"key": self.promise_key, "label": self.promise_label},
             "title_idea_alignment": self.title_idea_alignment,
+            "causal_promise_alignment": self.causal.to_dict(),
             "rejected_ideas": list(self.rejected_ideas),
             "topic": self.topic.to_dict(),
             "sections": [
@@ -661,6 +681,21 @@ class TemplateScriptEngine:
                 )
             )
 
+        # Second stage: the ideas support the promise, but does the narration
+        # actually say so? Paragraphs that perform the action without ever
+        # explaining the effect are repaired from their own mechanism, and
+        # replaced from the spare pool when they cannot be.
+        causal = self._enforce_causal_promise(
+            sections,
+            promise,
+            spare_tips=pool[count:],
+            rng=rng,
+            total=count,
+            recent_patterns=recent_patterns,
+            used_transitions=used_transitions,
+            used_phrases=used_phrases,
+        )
+
         sections.append(self._outro(count, rng, compact=compact))
 
         script = Script(
@@ -675,18 +710,102 @@ class TemplateScriptEngine:
                 for r in rejected[:25]
             ],
             title_idea_alignment=alignment_ratio(chosen, promise),
+            causal=causal,
         )
         self._fit_to_duration(script, duration_minutes, rng)
+        # Fitting rewrites paragraphs, so the guarantee is re-checked (and
+        # re-repaired) against the text that will actually be spoken.
+        script.causal = self._revalidate_causal(script.sections, promise, causal)
         log.info(
             "%s words across %d sections (%s engine); title promise '%s' "
-            "satisfied by %.0f%% of the ideas",
+            "satisfied by %.0f%% of the ideas, causal alignment %.2f "
+            "(%d rewritten, %d replaced)",
             f"{script.word_count:,}",
             len(sections),
             self.name,
             promise.key,
             script.title_idea_alignment * 100,
+            script.causal.overall,
+            script.causal.rewrites,
+            script.causal.replacements,
         )
+        for result in script.causal.results:
+            log.info(
+                "  item %d %s (%.2f) - %s",
+                result.index,
+                "PASS" if result.passed else "BELOW TARGET",
+                result.score,
+                result.explain(),
+            )
         return script
+
+    # ------------------------------------------------------------------
+    def _enforce_causal_promise(
+        self,
+        sections: list[ScriptSection],
+        promise: Promise,
+        spare_tips: Sequence[Tip],
+        rng: random.Random,
+        total: int,
+        recent_patterns: list[str],
+        used_transitions: set[str],
+        used_phrases: set[str],
+    ) -> CausalReport:
+        """Make every item say why it delivers the title's promise.
+
+        Repair first - the idea is sound, only the writing was silent about
+        the effect. Replacement is the fallback for an idea whose mechanism
+        offers no explanation to borrow.
+        """
+
+        used: dict[str, int] = {}
+        report = validate_sections(sections, promise, rewrite=True, used=used)
+        spares = [t for t in spare_tips]
+        if not report.failures or not spares:
+            return report
+
+        by_index = {
+            int(s.index): position
+            for position, s in enumerate(sections)
+            if s.kind == "item"
+        }
+        replacements = 0
+        for failure in list(report.failures):
+            position = by_index.get(failure.index)
+            if position is None:
+                continue
+            while spares:
+                tip = spares.pop(0)
+                candidate = self._item(
+                    failure.index, total, tip, rng,
+                    recent_patterns, used_transitions, used_phrases,
+                )
+                candidate.text = (
+                    repair_text(candidate.text, promise, tip, used=used) or candidate.text
+                )
+                if score_paragraph(candidate.text, promise).score >= PASS_THRESHOLD:
+                    log.info(
+                        "Replaced item %d (%s) with %r, which explains the "
+                        "'%s' promise in its own words",
+                        failure.index, failure.heading, tip.get("title", ""), promise.key,
+                    )
+                    sections[position] = candidate
+                    replacements += 1
+                    break
+
+        final = validate_sections(sections, promise, rewrite=True, used=used)
+        final.rewrites += report.rewrites
+        final.replacements = replacements
+        return final
+
+    @staticmethod
+    def _revalidate_causal(
+        sections: Sequence[ScriptSection], promise: Promise, previous: CausalReport
+    ) -> CausalReport:
+        report = validate_sections(sections, promise, rewrite=True)
+        report.rewrites += previous.rewrites
+        report.replacements += previous.replacements
+        return report
 
     # ------------------------------------------------------------------
     def _intro(
@@ -960,8 +1079,29 @@ def generate_script(
 
             llm_engine = LLMScriptEngine(settings, words_per_minute=words_per_minute)
             script = llm_engine.generate(topic, duration_minutes, fallback=template_engine)
-            return script
+            return _ensure_causal_alignment(script)
         except Exception as exc:  # pragma: no cover - depends on runner capability
             log.warning("Local LLM engine unavailable (%s); using the template engine", exc)
 
     return template_engine.generate(topic, duration_minutes)
+
+
+def _ensure_causal_alignment(script: Script) -> Script:
+    """Apply the second-stage promise check to a script from any engine.
+
+    The template engine runs it during generation, where it can also replace
+    an idea. A model-written script arrives finished, so it gets the same
+    validation and the same repair - a rewritten model paragraph is still far
+    better than one that never explains itself.
+    """
+
+    if script.causal.results:
+        return script
+    promise = detect_promise(script.title, script.topic.angle)
+    script.causal = validate_sections(script.sections, promise, rewrite=True)
+    if script.causal.rewrites:
+        log.info(
+            "Added the missing causal explanation to %d %s-engine item(s)",
+            script.causal.rewrites, script.engine,
+        )
+    return script

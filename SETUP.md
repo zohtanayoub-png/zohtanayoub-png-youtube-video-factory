@@ -257,6 +257,42 @@ at least about five seconds.
 
 ---
 
+## How the factory decides a clip is good enough
+
+Before a clip is used, three real frames of it - near the start, the middle and
+near the end - are decoded with FFmpeg and measured. That is what catches the
+things a stock caption cannot tell you, because the caption is usually honest
+and still useless: "modern living room interior" is a true description of a
+floor plan of a modern living room, of a dog asleep in one, and of one where
+the sofa is still wrapped in plastic from the delivery.
+
+What the frames are checked for:
+
+| Rejected or heavily penalised | How it is spotted |
+|---|---|
+| Floor plans, drawings, documents | bright, colourless, made of hard thin lines |
+| Empty or unfurnished rooms | large flat areas, almost no edges, almost no colour |
+| Dark, poorly lit rooms | the luminance distribution itself |
+| Furniture under plastic sheeting | colourless drape with hard glints on the folds |
+| Renovation and building sites | dusty, low colour, busy with hard edges |
+| A person or pet as the subject | skin tones clustered in the middle of the frame |
+| Anything that does not show the narration | frame-to-sentence matching |
+
+There is also an optional AI vision model (CLIP, free and open source, runs on
+the CPU, cached between runs) that scores the same frames against written
+descriptions. It makes plastic covers, pets and room types much more reliable.
+It is **not required** - if it cannot be downloaded the frames are still
+inspected, and the report says which was used. To check:
+
+```bash
+python -m vidfactory visual-check
+```
+
+You do not have to do anything with this. It is on by default and looks after
+itself.
+
+---
+
 ## Optional: the local AI script model
 
 The scripts are written by a built-in engine that needs no model and no

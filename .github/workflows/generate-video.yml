@@ -145,11 +145,18 @@ jobs:
           pip install -r requirements.txt
           pip install -e .
 
+      - name: Install the optional visual model runtime
+        # Frame inspection always runs. ONNX Runtime is what additionally
+        # enables the CLIP concept scoring; without it the pipeline falls back
+        # to pixel statistics and records that in the editorial report.
+        continue-on-error: true
+        run: pip install "onnxruntime>=1.17"
+
       - name: Restore the cached voice and model files
         uses: actions/cache@v4
         with:
           path: .cache
-          key: vidfactory-cache-${{ inputs.voice }}-v1
+          key: vidfactory-cache-${{ inputs.voice }}-visual-v2
           restore-keys: |
             vidfactory-cache-
 
@@ -228,6 +235,85 @@ jobs:
               echo "Generation did not complete. Check the log above."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Report the editorial and visual quality measurements
+        # The artifact is not always convenient to open, and these numbers are
+        # the point of the run. Printing them into the job summary means the
+        # quality of a render can be reviewed from the run page alone.
+        if: always()
+        env:
+          OUTPUT_DIR: ${{ steps.generate.outputs.output_dir }}
+        run: |
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json, os, pathlib
+
+          directory = pathlib.Path(os.environ.get("OUTPUT_DIR") or "")
+          report = directory / "editorial_quality_report.json"
+          if not report.exists():
+              print("\n_No editorial quality report was produced._")
+              raise SystemExit(0)
+          data = json.loads(report.read_text())
+
+          print("\n### Editorial and visual quality\n")
+          print("| Measurement | Value |")
+          print("| --- | --- |")
+          for key in (
+              "visual_analysis_model",
+              "visual_analysis_frame_count",
+              "visually_inspected_clip_count",
+              "visual_semantic_match_average",
+              "low_relevance_clip_count",
+              "premium_visual_ratio",
+              "empty_room_clip_count",
+              "plastic_covered_clip_count",
+              "floor_plan_clip_count",
+              "renovation_clip_count",
+              "people_dominant_clip_count",
+              "dark_clip_count",
+              "causal_promise_alignment_score",
+              "unique_source_videos",
+              "source_video_reuse_count",
+              "shot_count",
+              "creator_diversity",
+              "visual_analysis_seconds",
+              "artifact_provenance_passed",
+          ):
+              if key in data:
+                  print(f"| `{key}` | {data[key]} |")
+
+          print("\n**Per-section causal alignment**\n")
+          print("| # | Heading | Score | Why it passed |")
+          print("| --- | --- | --- | --- |")
+          for section in data.get("section_alignment", [])[:30]:
+              print(
+                  f"| {section['index']} | {section['heading'][:48]} | "
+                  f"{section['causal_promise_alignment_score']} | {section['why'][:90]} |"
+              )
+
+          sources = directory / "video_sources.json"
+          if sources.exists():
+              clips = json.loads(sources.read_text()).get("clips", [])
+              print("\n**Selected footage, judged on its own frames**\n")
+              print("| Source | Semantic | Premium | Frames | Flags |")
+              print("| --- | --- | --- | --- | --- |")
+              for clip in clips[:40]:
+                  visual = clip.get("visual") or {}
+                  flags = ", ".join(
+                      f"{k} {v}" for k, v in (visual.get("flags") or {}).items()
+                  ) or "-"
+                  print(
+                      f"| {clip['provider']}:{clip['provider_id']} | "
+                      f"{visual.get('semantic_match', '-')} | "
+                      f"{visual.get('premium_visual_score', '-')} | "
+                      f"{visual.get('frame_count', 0)} | {flags[:70]} |"
+                  )
+
+          failed = [c for c in data.get("checks", []) if not c["passed"]]
+          if failed:
+              print("\n**Checks not passed**\n")
+              for check in failed:
+                  print(f"- `{check['name']}` ({check['severity']}): {check['detail']}")
+          PY
 
       # The artifact is scoped to this generation's own directory. The
       # previous "output/**" wildcard would sweep up every generation present

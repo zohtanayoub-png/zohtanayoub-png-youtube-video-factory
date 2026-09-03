@@ -35,6 +35,10 @@ class StockClip:
     author_url: str = ""
     license_name: str = ""
     preview_image: str = ""
+    #: Stills the provider publishes across the length of the video. Pexels
+    #: gives about fifteen; they let the beginning, middle and end of a clip
+    #: be inspected before a single frame of video is transferred.
+    preview_images: list[str] = field(default_factory=list)
     file_size: int = 0
     query: str = ""
     tags: list[str] = field(default_factory=list)
@@ -44,10 +48,17 @@ class StockClip:
     description: str = ""
     score: float = 0.0
     score_breakdown: dict[str, float] = field(default_factory=dict)
+    #: Unweighted stage-one dimensions, reused by the visual stage.
+    score_dimensions: dict[str, float] = field(default_factory=dict)
     #: Why the aspirational score landed where it did, for the QC report.
     aspirational_reasons: list[str] = field(default_factory=list)
     #: Premium visual signals (people / empty / dark / interior relevance).
     premium: dict[str, Any] = field(default_factory=dict)
+    #: What real frame inspection found, as a plain dict for the report.
+    #: See :mod:`vidfactory.visual_analysis`.
+    visual: dict[str, Any] = field(default_factory=dict)
+    #: How well the frames match the sentence being narrated (0.0 - 1.0).
+    visual_semantic_match: float = 0.0
     local_path: str = ""
     content_hash: str = ""
 
@@ -100,6 +111,8 @@ class StockClip:
             "score_breakdown": {k: round(v, 2) for k, v in self.score_breakdown.items()},
             "aspirational_reasons": list(self.aspirational_reasons),
             "premium": dict(self.premium),
+            "visual": dict(self.visual),
+            "visual_semantic_match_score": round(float(self.visual_semantic_match), 3),
             "content_hash": self.content_hash,
         }
 

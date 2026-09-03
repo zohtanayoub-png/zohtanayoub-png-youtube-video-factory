@@ -36,11 +36,14 @@ program refuse to run.
 ## How it works
 
 ```
-TOPIC  ->  TITLE  ->  ORIGINAL SCRIPT  ->  SCENE PLANNING
-   ->  VISUAL SEARCH QUERIES  ->  SEARCH STOCK VIDEOS  ->  RANK RESULTS
-   ->  DOWNLOAD CLIPS  ->  GENERATE NARRATION  ->  MATCH CLIPS TO NARRATION
-   ->  EDIT VIDEO  ->  GENERATE SUBTITLES  ->  RENDER 1080P MP4
-   ->  QUALITY CHECK  ->  YOUTUBE METADATA  ->  SAVE  ->  OPTIONAL UPLOAD
+TOPIC  ->  TITLE  ->  ORIGINAL SCRIPT  ->  DOES EVERY PARAGRAPH EXPLAIN THE
+   TITLE'S PROMISE?  ->  SCENE PLANNING  ->  VISUAL SEARCH QUERIES
+   ->  SEARCH STOCK VIDEOS  ->  RANK ON METADATA (cheap)  ->  SHORTLIST
+   ->  DECODE REAL FRAMES AND LOOK AT THEM  ->  RANK ON WHAT IS IN THEM
+   ->  DOWNLOAD CLIPS  ->  RE-CHECK THEIR OWN FRAMES  ->  GENERATE NARRATION
+   ->  MATCH CLIPS TO NARRATION  ->  EDIT VIDEO  ->  GENERATE SUBTITLES
+   ->  RENDER 1080P MP4  ->  QUALITY CHECK  ->  YOUTUBE METADATA
+   ->  SAVE  ->  OPTIONAL UPLOAD
 ```
 
 One design decision is worth knowing about: **the narration is created before
@@ -48,6 +51,15 @@ the footage is chosen.** Once the narration exists, the exact length of every
 sentence is known, so the visuals are cut to fit the words rather than the
 words being stretched to fit the visuals. That is what stops a clip freezing on
 screen for thirty seconds.
+
+The second is that **clips are judged by their pixels, not by their captions.**
+A stock caption saying "modern living room interior" is equally true of a floor
+plan of one, a dog asleep in one, and one with the sofa still wrapped in
+plastic from the delivery. So candidate footage has three real frames decoded
+from it - the beginning, the middle and the end - and those frames are
+measured. Nothing about that costs money: FFmpeg does the decoding, the
+statistics are computed in-process, and the optional CLIP model is an
+open-source ONNX export that runs on a CPU runner.
 
 ### The pieces
 
@@ -57,6 +69,7 @@ screen for thirty seconds.
 | Script writing | curated knowledge base + variation engine (optional local LLM) | free |
 | Narration | [Piper](https://github.com/OHF-Voice/piper1-gpl) neural TTS, eSpeak NG fallback | free |
 | Footage | Pexels and Pixabay APIs | free |
+| Frame inspection | FFmpeg decode + pixel statistics, optional CPU CLIP (ONNX) | free |
 | Editing and rendering | FFmpeg | free |
 | Subtitles | derived from the narration timeline (no speech recognition needed) | free |
 | Compute | GitHub Actions | free tier |
@@ -180,6 +193,37 @@ editorial one proves the video is actually watchable.
 * **unique source ratio** of at least 0.95
 * generic-query share, average clip score, creator / query / subject
   diversity, title-to-idea alignment, shot count and per-section coverage
+* **`causal_promise_alignment_score`** - every item must *say*, in the words
+  the viewer hears, how it produces the outcome the title promised. "Measure
+  before buying, because returns are expensive" does not belong in a video
+  called *...Make Your Space Look Bigger*; "measure, because oversized pieces
+  eat visible floor area and make the room feel cramped" does. Paragraphs that
+  fail are rewritten from the mechanism the idea already relies on, and
+  replaced if that is not possible. `section_alignment_scores` records each
+  one, and the run fails below 0.85.
+
+### Visual (measured from real frames)
+
+Also in `editorial_quality_report.json`:
+
+* **`visual_semantic_match_average`** - how well the frames of each clip match
+  the sentence being narrated
+* **`low_relevance_clip_count`** - clips that barely match what they illustrate
+* **`premium_visual_ratio`** - now requires the caption *and* the frames to
+  agree; it was 0.912 for a video containing a floor plan and a
+  plastic-wrapped sofa when captions were the only evidence
+* **`empty_room_clip_count`**, **`plastic_covered_clip_count`**,
+  **`floor_plan_clip_count`**, **`renovation_clip_count`**,
+  **`people_dominant_clip_count`**, **`dark_clip_count`**
+* **`visual_analysis_model`** and **`visual_analysis_frame_count`** - which
+  backend produced the numbers, and how many frames it actually opened
+
+Candidates whose frames disqualify them with high confidence are rejected;
+medium confidence is a heavy ranking penalty. Ranking priority after
+inspection is deliberately **relevance first**: semantic match (45) above
+interior subject (30), visual quality (18), novelty (12) and technical quality
+(8). A beautiful unrelated luxury interior loses to a plainer clip that
+demonstrates the advice.
 
 ### Technical
 

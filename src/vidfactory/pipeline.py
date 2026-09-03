@@ -16,7 +16,8 @@ import math
 import shutil
 import time
 import uuid
-from dataclasses import dataclass, field
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -36,10 +37,20 @@ from .provenance import (
     prepare_directory,
 )
 from .quality_control import QualityReport, validate_output
-from .ranking import ClipRanker, DiversitySettings, RankingContext, diversify, diversity_report
+from .ranking import (
+    ClipRanker,
+    DiversitySettings,
+    RankingContext,
+    VisualRankingSettings,
+    diversify,
+    diversity_report,
+    metadata_visual_flags,
+    rank_with_vision,
+)
 from .scene_planner import Scene, plan_scenes
 from .script_generator import Script, generate_script
 from .stock import StockClip, build_providers
+from .visual_analysis import VisualAnalyzer
 from .subtitles import generate_subtitles
 from .title_alignment import detect_promise, score_alignment
 from .topic_engine import Topic, TopicEngine
@@ -487,6 +498,19 @@ class VideoPipeline:
         if not ranked:
             raise PipelineError("No stock clip met the minimum quality requirements")
 
+        # ---- stage two: open the footage --------------------------------
+        # Everything so far has been captions. Now the shortlist gets its
+        # frames decoded and measured, and the order is rebuilt around what is
+        # actually in them.
+        ranked, visual_stats = self._inspect_footage(ranked, scenes, affinity, needed)
+        stats["visual"] = visual_stats
+
+        if not ranked:
+            raise PipelineError(
+                "Every candidate clip was rejected by frame inspection - "
+                "no footage in this search actually shows the narration"
+            )
+
         selected = diversify(
             ranked,
             needed,
@@ -539,7 +563,238 @@ class VideoPipeline:
 
         stats["downloaded"] = len(results)
         log.info("%d clips downloaded and validated", len(results))
+
+        # The shortlist was judged on provider stills. These are the frames
+        # that will actually be on screen, so the report is built from them.
+        if bool(self.config.get("visual.verify_downloads", True)):
+            self._verify_downloaded_frames(results, scenes)
+
         return results, affinity, stats
+
+    # ------------------------------------------------------------------
+    # Stage two: real frame inspection
+    # ------------------------------------------------------------------
+    def _visual_analyzer(self) -> VisualAnalyzer | None:
+        """Build the analyzer once per generation, model included if it loads.
+
+        Memoized: provisioning the model is the expensive part, and the
+        shortlist pass and the post-download verification pass both need it.
+        """
+
+        if hasattr(self, "_analyzer_cache"):
+            return self._analyzer_cache
+        analyzer = self._build_visual_analyzer()
+        self._analyzer_cache = analyzer
+        return analyzer
+
+    def _build_visual_analyzer(self) -> VisualAnalyzer | None:
+        if not bool(self.config.get("visual.enabled", True)):
+            log.info("Frame inspection is disabled; ranking on captions alone")
+            return None
+        model = None
+        model_settings = dict(self.config.get("visual.model", {}) or {})
+        if model_settings.get("enabled", True):
+            from .visual_model import load_model
+
+            model = load_model(model_settings)
+        return VisualAnalyzer(
+            model=model,
+            frames_per_clip=int(self.config.get("visual.frames_per_clip", 3)),
+            reject_confidence=float(self.config.get("visual.reject_confidence", 0.72)),
+            penalty_confidence=float(self.config.get("visual.penalty_confidence", 0.42)),
+            allow_remote_video=bool(self.config.get("visual.allow_remote_video", True)),
+        )
+
+    def _visual_settings(self) -> VisualRankingSettings:
+        weights = dict(self.config.get("visual.weights", {}) or {})
+        return VisualRankingSettings(
+            semantic=float(weights.get("semantic", 45)),
+            subject=float(weights.get("subject", 30)),
+            quality=float(weights.get("quality", 18)),
+            novelty=float(weights.get("novelty", 12)),
+            technical=float(weights.get("technical", 8)),
+            min_semantic=float(self.config.get("visual.min_semantic_match", 0.28)),
+        )
+
+    @staticmethod
+    def _scene_context(
+        scenes: Sequence[Scene], affinity: Mapping[str, Sequence[str]]
+    ) -> dict[str, Scene]:
+        """clip key -> the scene whose search returned it."""
+
+        by_id = {scene.scene_id: scene for scene in scenes}
+        context: dict[str, Scene] = {}
+        for scene_id, keys in (affinity or {}).items():
+            scene = by_id.get(scene_id)
+            if scene is None:
+                continue
+            for key in keys:
+                context.setdefault(key, scene)
+        return context
+
+    def _inspect_footage(
+        self,
+        ranked: Sequence[StockClip],
+        scenes: Sequence[Scene],
+        affinity: Mapping[str, Sequence[str]],
+        needed: int,
+    ) -> tuple[list[StockClip], dict[str, Any]]:
+        """Decode frames for the shortlist and re-rank on what they contain.
+
+        Only a shortlist is inspected, because decoding frames costs real time
+        and the metadata ranking is a perfectly good filter for the obvious
+        rejects. The shortlist is generous enough that the visual stage still
+        has room to reorder rather than merely confirm.
+        """
+
+        analyzer = self._visual_analyzer()
+        stats: dict[str, Any] = {
+            "model": analyzer.model_name if analyzer else "disabled",
+            "shortlisted": 0,
+            "analyzed": 0,
+            "frames": 0,
+            "rejected": 0,
+            "seconds": 0.0,
+        }
+        if analyzer is None or not ranked:
+            return list(ranked), stats
+
+        multiplier = float(self.config.get("visual.shortlist_multiplier", 1.6))
+        cap = int(self.config.get("visual.max_clips_analyzed", 260))
+        budget = float(self.config.get("visual.time_budget_seconds", 420))
+        workers = max(1, int(self.config.get("visual.workers", 4)))
+
+        size = min(len(ranked), cap, max(needed, int(math.ceil(needed * multiplier))))
+        shortlist = list(ranked[:size])
+        remainder = list(ranked[size:])
+        stats["shortlisted"] = len(shortlist)
+
+        context = self._scene_context(scenes, affinity)
+        started = time.time()
+        deadline = started + budget
+
+        def inspect(clip: StockClip) -> StockClip:
+            if time.time() > deadline:
+                return clip
+            scene = context.get(clip.key)
+            analysis = analyzer.analyze_clip(
+                clip,
+                query=clip.query or (scene.primary_visual_query if scene else ""),
+                narration=(scene.narration if scene else ""),
+                metadata_flags=metadata_visual_flags(clip, clip.query),
+            )
+            clip.visual = analysis.to_dict()
+            clip.visual_semantic_match = analysis.semantic_match
+            return clip
+
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            for clip in pool.map(inspect, shortlist):
+                if clip.visual.get("analyzed"):
+                    stats["analyzed"] += 1
+                    stats["frames"] += int(clip.visual.get("frame_count", 0))
+
+        stats["seconds"] = round(time.time() - started, 1)
+        timed_out = [c for c in shortlist if not c.visual]
+        if timed_out:
+            log.warning(
+                "Frame inspection ran out of its %.0fs budget with %d clips "
+                "unexamined; those keep their metadata ranking",
+                budget, len(timed_out),
+            )
+        stats["not_inspected"] = len(timed_out) + len(remainder)
+
+        settings = self._visual_settings()
+        examined = [c for c in shortlist if c.visual]
+        inspected = rank_with_vision(examined, settings)
+
+        # Same safety valve as the premium gate: rejecting footage is the
+        # right default, and shipping a video that repeats itself because the
+        # gate was too strict is worse than shipping one with a couple of
+        # weaker matches. Relax, and say so in the log and the report.
+        if len(inspected) < needed and settings.min_semantic > 0:
+            relaxed_settings = replace(settings, min_semantic=0.0)
+            relaxed = rank_with_vision(examined, relaxed_settings)
+            if len(relaxed) > len(inspected):
+                log.warning(
+                    "VISUAL RELEVANCE GATE RELAXED: only %d clips matched the "
+                    "narration well enough for %d shots; keeping %d weaker "
+                    "matches rather than repeating footage. Expect a lower "
+                    "visual_semantic_match_average.",
+                    len(inspected), needed, len(relaxed) - len(inspected),
+                )
+                stats["relevance_gate_relaxed"] = True
+                inspected = relaxed
+
+        stats["rejected"] = stats["analyzed"] - len(
+            [c for c in inspected if c.visual.get("analyzed")]
+        )
+        log.info(
+            "Frame inspection: %d clips, %d frames, %d rejected, %.1fs (%s)",
+            stats["analyzed"], stats["frames"], stats["rejected"],
+            stats["seconds"], stats["model"],
+        )
+
+        # Anything not inspected keeps its metadata score and queues behind
+        # everything that was: an unexamined clip is not evidence of quality.
+        tail = timed_out + remainder
+        if inspected and tail:
+            floor = min(c.score for c in inspected)
+            for clip in tail:
+                clip.score = min(clip.score, floor) - 1.0
+        return inspected + tail, stats
+
+    def _verify_downloaded_frames(
+        self, results: Sequence[Any], scenes: Sequence[Scene]
+    ) -> None:
+        """Re-run the analysis on the real video files that will be edited.
+
+        The shortlist was judged from provider stills, which are genuine
+        frames of the clip but not necessarily the frames the edit will use.
+        This pass reads the downloaded MP4 itself, so every number in the
+        editorial report describes footage that is actually in the video.
+        """
+
+        analyzer = self._visual_analyzer()
+        if analyzer is None or not results:
+            return
+        by_query = {scene.primary_visual_query: scene for scene in scenes}
+        started = time.time()
+
+        def verify(result: Any) -> None:
+            clip = result.clip
+            scene = by_query.get(clip.query)
+            analysis = analyzer.analyze_clip(
+                clip,
+                query=clip.query or (scene.primary_visual_query if scene else ""),
+                narration=(scene.narration if scene else ""),
+                video=clip.local_path or result.path,
+                metadata_flags=metadata_visual_flags(clip, clip.query),
+            )
+            if analysis.analyzed:
+                clip.visual = analysis.to_dict()
+                clip.visual_semantic_match = analysis.semantic_match
+
+        workers = max(1, int(self.config.get("visual.workers", 4)))
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            list(pool.map(verify, results))
+
+        # Nothing is dropped here - the edit is already sized to this footage
+        # and a short video is worse than an imperfect clip - but a clip whose
+        # own frames disagree with its preview stills is worth saying out
+        # loud, and it is counted in the editorial report either way.
+        regressions = [
+            r.clip for r in results if (r.clip.visual or {}).get("rejected")
+        ]
+        for clip in regressions:
+            log.warning(
+                "VERIFIED WORSE: %s - %s (it passed on its preview stills)",
+                clip.key, (clip.visual or {}).get("reject_reason", ""),
+            )
+        log.info(
+            "Verified %d downloaded clips against their own frames in %.1fs "
+            "(%d disagreed with their preview stills)",
+            len(results), time.time() - started, len(regressions),
+        )
 
     @staticmethod
     def _scene_search_order(scenes: Sequence[Scene]) -> list[Scene]:
@@ -711,6 +966,8 @@ class VideoPipeline:
                 thresholds=dict(self.config.get("editorial", {}) or {}),
                 provenance_passed=provenance_passed,
                 promise_alignment_failures=alignment_failures,
+                visual_stats=dict((search_stats or {}).get("visual", {}) or {}),
+                causal=getattr(script, "causal", None),
             )
             report.save(output_dir / "editorial_quality_report.json")
             return report

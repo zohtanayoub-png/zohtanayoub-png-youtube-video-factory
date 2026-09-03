@@ -195,6 +195,15 @@ def command_doctor(args: argparse.Namespace) -> int:
         print("[ok]   script engine   : template (deterministic, always works)")
         print("       local model     : disabled - run 'vidfactory llm-check' to test it here")
 
+    if bool(config.get("visual.enabled", True)):
+        model = dict(config.get("visual.model", {}) or {})
+        backend = model.get("repo", "?") if model.get("enabled", True) else "off"
+        print(f"[ok]   frame analysis  : on, {config.get('visual.frames_per_clip', 3)} "
+              f"frames per candidate (CLIP backend: {backend})")
+        print("       run 'vidfactory visual-check' to confirm the model loads here")
+    else:
+        print("[warn] frame analysis  : disabled - clips will be judged by caption only")
+
     providers = build_providers(dict(config.get("sources", {}) or {}))
     if providers:
         print(f"[ok]   stock providers : {', '.join(p.name for p in providers)}")
@@ -250,6 +259,39 @@ def command_llm_check(args: argparse.Namespace) -> int:
               f"llm mode would time out often here")
         return 3
     print(f"[FAIL] local model unavailable: {result.get('reason', 'unknown')}")
+    return 1
+
+
+def command_visual_check(args: argparse.Namespace) -> int:
+    """Report what frame inspection can actually do on this machine.
+
+    Pixel statistics always work. The CLIP backend has to be downloaded and
+    executed, and whether that succeeds on a given runner is a fact to be
+    measured rather than assumed - the same lesson ``llm-check`` exists for.
+    """
+
+    from .visual_model import benchmark
+
+    config = load_config(args.config)
+    settings = dict(config.get("visual.model", {}) or {})
+    print("Checking frame inspection. The first run downloads the CLIP export.")
+    result = benchmark(settings)
+    print(json.dumps(result, indent=2)[:2000])
+    print()
+    if result.get("model"):
+        print(f"[ok]   CLIP backend works: {result['model']} "
+              f"(provisioned in {result.get('provision_seconds')}s, "
+              f"{result.get('analysis_seconds')}s per frame batch)")
+        print("       concept scoring and scene-to-clip matching are both live")
+        return 0
+    if result.get("ok"):
+        print("[warn] no CLIP backend here, so frames are judged by pixel "
+              "statistics alone.")
+        print("       Empty rooms, dark scenes and floor plans are still "
+              "detected; plastic covers, pets and room types are weaker.")
+        print(f"       reason: {result.get('error', 'model could not be loaded')}")
+        return 3
+    print("[FAIL] frame inspection is not working at all - check FFmpeg")
     return 1
 
 
@@ -326,6 +368,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="seconds per section the runner can afford (default 120)",
     )
     llm_check.set_defaults(func=command_llm_check)
+
+    visual_check = subparsers.add_parser(
+        "visual-check",
+        help="check whether real frame inspection (and the CLIP backend) works here",
+    )
+    visual_check.set_defaults(func=command_visual_check)
 
     return parser
 

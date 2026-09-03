@@ -41,6 +41,9 @@ src/vidfactory/
   llm.py             optional local llama.cpp engine, always optional
   scene_planner.py   narration -> scenes -> per-scene visual queries
   queries.py         specific -> variant -> broad -> generic query ladder
+  visual_analysis.py FFmpeg frame sampling + pixel statistics + flags
+  visual_model.py    optional ONNX CLIP backend, always optional
+  causal_alignment.py does the written paragraph explain the title's promise
   title_alignment.py what a title promises, and which ideas actually deliver it
   editorial_qc.py    repetition, relevance and diversity gates (not ffprobe)
   stock/             provider adapters: base, pexels, pixabay, local, registry
@@ -73,6 +76,22 @@ src/vidfactory/
   the generic share is measured in the editorial report.
 * **Every idea must support the title's promise.** `title_alignment` rejects
   ideas that do not, before the script is written.
+* **Every written paragraph must say *why* it delivers that promise.**
+  `title_alignment` validates the idea; `causal_alignment` validates the
+  narration the viewer actually hears. "Measure before buying because returns
+  are expensive" fails a "look bigger" title; the same idea explained through
+  visible floor area passes. A failing paragraph is repaired from its own
+  mechanism, and replaced only if that is impossible.
+* **A clip is judged by its pixels, not by its caption.** Run 6 reported 91%
+  premium footage for a video containing a floor plan, two empty rooms and a
+  plastic-wrapped sofa, because Pexels described all of them as interiors.
+  `visual_analysis` decodes three frames of every shortlisted candidate and
+  measures them. `premium_visual_ratio` now requires the caption *and* the
+  frames to agree.
+* **Relevance outranks beauty.** The second ranking stage weights
+  scene-to-clip semantic match (45) above interior subject (30), visual
+  quality (18), novelty (12) and technical quality (8). A beautiful unrelated
+  luxury interior loses to a plainer clip that shows the advice.
 
 ## Non-obvious decisions
 
@@ -99,6 +118,18 @@ src/vidfactory/
   happens on a given machine; enable `script.llm.enabled` only if it passes
   there. Model choice if you do: Qwen2.5-1.5B-Instruct Q4_K_M, Apache-2.0,
   about 1.0 GB on disk and 2 GB of RAM at a 4k context.
+* **Frame inspection is two-stage on purpose.** Metadata ranking is cheap and
+  filters the obvious rejects; only a shortlist (`visual.shortlist_multiplier`,
+  capped by `visual.max_clips_analyzed`) has its frames decoded. Provider
+  preview stills are used where the provider publishes them - Pexels gives
+  about fifteen per video - so a candidate can be rejected without
+  transferring any of it. Downloaded clips are then re-inspected against
+  their own frames, so the numbers in the report describe what is on screen.
+* **The CLIP backend is optional and must stay that way.** `visual_model`
+  loads a small ONNX CLIP export on CPU and returns `None` on any failure.
+  `vidfactory visual-check` reports what a given machine can actually do.
+  Without it, pixel statistics still catch empty rooms, dark scenes and floor
+  plans; plastic covers, pets and room types get weaker.
 * **`data/state/*.json` is the durable store; SQLite is the working copy.**
   Runners are ephemeral and a binary `.db` is hostile to git.
 * **`autopilot.videos_per_week` is enforced by the workflow**, which counts

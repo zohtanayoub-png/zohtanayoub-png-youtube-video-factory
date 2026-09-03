@@ -43,11 +43,26 @@ jobs:
           sudo apt-get install -y --no-install-recommends ffmpeg espeak-ng
           ffmpeg -version | head -1
 
+      - name: Cache the visual analysis model
+        uses: actions/cache@v4
+        with:
+          path: .cache/visual
+          key: visual-model-${{ hashFiles('config.yaml') }}
+          restore-keys: visual-model-
+
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
           pip install -e .
+
+      - name: Install the optional visual model runtime
+        # ONNX Runtime is what lets frame inspection run the CLIP backend as
+        # well as pixel statistics. It is optional by design: if this step
+        # fails the pipeline still inspects frames, it just does so with
+        # statistics alone and says so in the editorial report.
+        continue-on-error: true
+        run: pip install "onnxruntime>=1.17"
 
 
       - name: Report which narration engine is available
@@ -63,6 +78,12 @@ jobs:
               print("::warning::Piper neural voice unavailable; narration would use "
                     f"the {engine.name} fallback on this runner.")
           PY
+
+      - name: Frame inspection self-check
+        # Non-blocking: reports whether the CLIP backend can be provisioned on
+        # a runner, the same way llm-check does for the local script model.
+        continue-on-error: true
+        run: python -m vidfactory visual-check
 
       - name: Unit tests
         run: python -m pytest -q -m "not integration"

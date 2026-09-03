@@ -489,6 +489,10 @@ class ClipRanker:
             "premium": premium_score,
         }
         clip.aspirational_reasons = aspirational_reasons + premium["reasons"][:3]
+        # The unweighted dimensions are kept because the visual stage reweights
+        # them: novelty and technical quality still matter after the frames
+        # have been inspected, but they matter far less than what is in them.
+        clip.score_dimensions = dict(raw)
         breakdown = {name: raw[name] * self.weights.get(name, 0.0) for name in raw}
         total = sum(breakdown.values())
 
@@ -700,3 +704,172 @@ def _looks_like_sibling(a: StockClip, b: StockClip) -> bool:
         return abs(int(a.provider_id) - int(b.provider_id)) <= 3
     except (TypeError, ValueError):
         return False
+
+
+# ---------------------------------------------------------------------------
+# Stage two: ranking on what the frames actually contain
+#
+# Everything above this line reads captions. Run 6 proved that is not enough:
+# a caption saying "modern living room interior" is true of a floor plan of a
+# modern living room, of a dog asleep in one, and of one with the sofa still
+# wrapped from the delivery.
+#
+# So the metadata ranking is now a shortlist, and the shortlist is judged on
+# its pixels. The order of importance is deliberately inverted from stage one:
+#
+#   1. does the footage demonstrate the sentence being narrated
+#   2. is it a residential interior at all
+#   3. is it beautiful
+#   4. is it new to this channel
+#   5. is it technically clean
+#
+# A gorgeous unrelated luxury interior loses to a plainer clip that shows the
+# thing being described. That is the whole point.
+# ---------------------------------------------------------------------------
+
+def metadata_visual_flags(clip: StockClip, query: str = "") -> dict[str, float]:
+    """Caption-derived priors for the visual flags, so the two can agree.
+
+    These are the same signals :func:`premium_visual_report` computes,
+    expressed in the vocabulary :mod:`vidfactory.visual_analysis` uses, so a
+    weak caption hint and a weak pixel hint can compound into a rejection
+    while neither would reject on its own.
+    """
+
+    text = clip.content_text
+    flags: dict[str, float] = {}
+
+    people, _ = people_dominance_penalty(clip)
+    if people:
+        flags["dominant_pet_or_person"] = round(people, 3)
+    empty, _ = empty_room_penalty(clip)
+    if empty:
+        flags["empty_room"] = round(empty, 3)
+    dark, _ = dark_scene_penalty(clip)
+    if dark:
+        flags["dark_scene"] = round(dark, 3)
+    if _phrase_hits(text, NON_HOME_SIGNALS):
+        flags["non_home_space"] = 0.7
+
+    plastic = _phrase_hits(
+        text,
+        ("plastic wrap", "plastic cover", "wrapped in plastic", "bubble wrap",
+         "dust sheet", "drop cloth", "covered furniture", "protective cover",
+         "plastic sheeting", "covered with plastic", "covered in plastic",
+         "furniture covered", "sofa covered", "under plastic", "shrink wrap"),
+    )
+    if plastic:
+        flags["plastic_covered_furniture"] = 0.8
+    renovation = _phrase_hits(
+        text,
+        ("renovation", "renovate", "renovating", "remodel", "refurbish",
+         "under construction", "unfinished", "demolition", "paint roller",
+         "ladder", "scaffold", "drill", "plaster"),
+    )
+    if renovation:
+        flags["renovation"] = 0.65
+    construction = _phrase_hits(
+        text, ("construction site", "building site", "concrete shell", "demolition")
+    )
+    if construction:
+        flags["construction"] = 0.8
+    plan = _phrase_hits(
+        text,
+        ("floor plan", "floorplan", "blueprint", "architectural drawing",
+         "technical drawing", "sketch", "cad", "layout plan", "diagram"),
+    )
+    if plan:
+        flags["floor_plan_or_document"] = 0.8
+    return flags
+
+
+@dataclass
+class VisualRankingSettings:
+    """Weights for the second stage. Semantic match dominates by design."""
+
+    semantic: float = 45.0
+    subject: float = 30.0
+    quality: float = 18.0
+    novelty: float = 12.0
+    technical: float = 8.0
+    #: Below this, the clip does not demonstrate the narration well enough to
+    #: earn a place, however good it looks.
+    min_semantic: float = 0.28
+    #: Multiplier applied to a flag's damage when it exceeds the penalty
+    #: confidence but not the rejection confidence.
+    flag_penalty: float = 60.0
+
+
+def visual_score(
+    clip: StockClip,
+    settings: VisualRankingSettings | None = None,
+) -> tuple[float, dict[str, float]]:
+    """Final score for a clip whose frames have been inspected."""
+
+    settings = settings or VisualRankingSettings()
+    analysis = clip.visual or {}
+    dimensions = clip.score_dimensions or {}
+
+    semantic = float(analysis.get("semantic_match", 0.5))
+    subject = float(analysis.get("interior_likeness", 0.5))
+    quality = float(analysis.get("premium_visual_score", 0.5))
+    novelty = float(dimensions.get("novelty", 1.0))
+    technical = (
+        float(dimensions.get("resolution", 0.5))
+        + float(dimensions.get("orientation", 0.5))
+        + float(dimensions.get("duration", 0.5))
+        + float(dimensions.get("quality", 0.5))
+    ) / 4.0
+
+    breakdown = {
+        "visual_semantic": semantic * settings.semantic,
+        "visual_subject": subject * settings.subject,
+        "visual_quality": quality * settings.quality,
+        "novelty": novelty * settings.novelty,
+        "technical": technical * settings.technical,
+    }
+    from .visual_analysis import FLAG_DAMAGE, PENALTY_CONFIDENCE
+
+    penalty = 0.0
+    for name, confidence in (analysis.get("flags") or {}).items():
+        confidence = float(confidence)
+        if confidence >= PENALTY_CONFIDENCE:
+            penalty += settings.flag_penalty * FLAG_DAMAGE.get(name, 0.3) * confidence
+    if penalty:
+        breakdown["visual_flag_penalty"] = -round(penalty, 3)
+    total = sum(breakdown.values())
+    return round(total, 3), {k: round(v, 3) for k, v in breakdown.items()}
+
+
+def rank_with_vision(
+    clips: Sequence[StockClip],
+    settings: VisualRankingSettings | None = None,
+) -> list[StockClip]:
+    """Re-order an inspected shortlist, dropping what the frames disqualified."""
+
+    settings = settings or VisualRankingSettings()
+    survivors: list[StockClip] = []
+    for clip in clips:
+        analysis = clip.visual or {}
+        if analysis.get("rejected"):
+            log.debug(
+                "visual reject %s: %s", clip.key, analysis.get("reject_reason", "")
+            )
+            continue
+        if analysis.get("analyzed") and float(
+            analysis.get("semantic_match", 1.0)
+        ) < settings.min_semantic:
+            log.debug(
+                "visual reject %s: semantic match %.2f below %.2f",
+                clip.key,
+                float(analysis.get("semantic_match", 0.0)),
+                settings.min_semantic,
+            )
+            continue
+        total, breakdown = visual_score(clip, settings)
+        clip.score = total
+        clip.score_breakdown = {**clip.score_breakdown, **breakdown}
+        clip.visual_semantic_match = float(analysis.get("semantic_match", 0.0))
+        survivors.append(clip)
+    survivors.sort(key=lambda c: c.score, reverse=True)
+    return survivors

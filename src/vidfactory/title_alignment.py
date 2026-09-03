@@ -29,6 +29,30 @@ Tip = dict[str, Any]
 
 
 @dataclass(frozen=True)
+class Mechanism:
+    """One concrete way an idea can actually cause the promised outcome.
+
+    ``because`` states the causal chain in plain narration. It is what
+    :mod:`vidfactory.causal_alignment` writes into a paragraph that performs
+    the action but never explains why it produces the result the title
+    promised - "measure before you buy" is good advice and, on its own, not an
+    explanation of why the room will look bigger.
+    """
+
+    name: str
+    words: tuple[str, ...]
+    because: str = ""
+    #: Alternate phrasings. One mechanism can end up explaining six items in a
+    #: twenty-five item video, and hearing the identical sentence six times is
+    #: exactly the template-like writing this project is trying to avoid.
+    also_because: tuple[str, ...] = ()
+
+    @property
+    def explanations(self) -> tuple[str, ...]:
+        return tuple(x for x in (self.because, *self.also_because) if x)
+
+
+@dataclass(frozen=True)
 class Promise:
     """What a title commits every idea in the video to deliver."""
 
@@ -53,7 +77,7 @@ class Promise:
     # promised outcome. When a promise defines any, an idea must match at
     # least one of them - supporting concepts on their own are not enough.
     # ------------------------------------------------------------------
-    mechanisms: tuple[tuple[str, ...], ...] = ()
+    mechanisms: tuple[Mechanism, ...] = ()
     #: Generic design principles that do not, by themselves, cause the
     #: outcome. Matching one is disqualifying...
     deny_signals: tuple[str, ...] = ()
@@ -106,40 +130,179 @@ PROMISES: tuple[Promise, ...] = (
         # Anything that matches none of these is not a space trick, however
         # good the advice is.
         mechanisms=(
-            # vertical emphasis
-            ("ceiling", "taller", "height", "vertical", "upward", "floor to ceiling",
-             "high on the wall", "up to the ceiling", "full height"),
-            # continuous sightlines and clear circulation
-            ("sightline", "sight line", "continuous", "uninterrupted", "unobstructed",
-             "flow", "walkway", "pathway", "circulation", "clear path", "keeps going"),
-            # furniture scale and visual weight
-            ("fewer, larger", "larger pieces", "oversized", "undersized", "too small",
-             "visual weight", "bulky", "heavy", "lighter", "scale"),
-            # clutter reduction and negative space
-            ("clutter", "declutter", "negative space", "clear surfaces",
-             "surfaces stay clear", "empty", "edited", "remove"),
-            # visible floor and raised furniture
-            ("visible legs", "slim legs", "raised on", "floats", "floating",
-             "wall-mount", "wall mounted", "floor continue", "see floor",
-             "sits flat on the ground"),
-            # mirrors and reflection
-            ("mirror", "reflect", "reflection", "glazed", "glass"),
-            # light distribution
-            ("natural light", "daylight", "sunlight", "bright", "pale",
-             "light colour", "light color", "airy", "window"),
-            # curtains and window treatment geometry
-            ("curtain", "drape", "rod", "panel", "blind"),
-            # furniture placement
-            ("against the wall", "push", "float the sofa", "placement",
-             "arrangement", "layout", "perimeter"),
-            # consistent flooring
-            ("flooring", "same floor", "one continuous", "floor finish"),
-            # avoiding visual fragmentation
-            ("chop", "chops", "fragment", "break up", "outline", "hard edge",
-             "edges", "same color as the walls", "same colour as the walls",
-             "low-contrast", "low contrast"),
-            # vertical storage
-            ("vertical storage", "up to the ceiling", "storage to the ceiling"),
+            Mechanism(
+                "vertical_emphasis",
+                ("ceiling", "taller", "height", "vertical", "upward", "floor to ceiling",
+                 "high on the wall", "up to the ceiling", "full height"),
+                "Carrying the eye upward makes the walls read taller, and taller "
+                "walls make the whole room feel bigger than its floor area says "
+                "it is.",
+                also_because=(
+                    "Your eye follows the tallest line in a room, so carrying that line all "
+                "the way up makes the ceiling read higher and the room feel bigger.",
+                    "Height is the one dimension a small room usually has to spare, and "
+                "using it makes the space feel larger without moving a wall.",
+                ),
+            ),
+            Mechanism(
+                "clear_sightlines",
+                ("sightline", "sight line", "continuous", "uninterrupted", "unobstructed",
+                 "flow", "walkway", "pathway", "circulation", "clear path", "keeps going"),
+                "An uninterrupted line of sight lets your eye travel all the way to "
+                "the far wall without stopping, and a room the eye can cross in one "
+                "go reads as larger than one it has to pick its way across.",
+                also_because=(
+                    "When nothing interrupts the view across a room, your eye runs straight "
+                "to the far wall, so the space reads as larger than its floor plan.",
+                    "A clear route through a room lets the eye finish the journey in one "
+                "go, which makes even a narrow space feel bigger.",
+                ),
+            ),
+            Mechanism(
+                "furniture_scale",
+                ("fewer, larger", "larger pieces", "oversized", "undersized", "too small",
+                 "visual weight", "bulky", "heavy", "lighter", "scale", "measure",
+                 "measurement", "dimensions", "tape measure"),
+                "Oversized pieces eat visible floor area and narrow the walking "
+                "paths, so a small room feels cramped even though its footprint "
+                "never changed.",
+                also_because=(
+                    "A piece that is too big for the room steals the floor around it, so "
+                "what is left over feels cramped even though nothing else changed.",
+                    "Getting the scale right leaves room to walk and room to look, which "
+                "makes a small space read as larger than it measures.",
+                ),
+            ),
+            Mechanism(
+                "less_clutter",
+                ("clutter", "declutter", "negative space", "clear surfaces",
+                 "surfaces stay clear", "empty", "edited", "remove"),
+                "Clear surfaces give the eye somewhere to rest, and a room with "
+                "fewer things competing for attention reads as more spacious.",
+                also_because=(
+                    "Every object on a surface is one more thing the eye has to process, so "
+                "clearing them makes the room feel more spacious straight away.",
+                    "Empty surface is what the eye reads as space, so leaving some makes the "
+                "room feel bigger without removing a single piece of furniture.",
+                ),
+            ),
+            Mechanism(
+                "visible_floor",
+                ("visible legs", "slim legs", "raised on", "floats", "floating",
+                 "wall-mount", "wall mounted", "floor continue", "see floor",
+                 "sits flat on the ground"),
+                "Every square foot of floor you can actually see is square footage "
+                "your eye counts, so keeping the floor visible under and around "
+                "furniture makes the room feel larger.",
+                also_because=(
+                    "Floor you can see is floor the eye counts, so lifting furniture off the "
+                "ground makes the room read as larger.",
+                    "A continuous run of visible floor tells the eye how deep the room goes, "
+                "which makes the space feel bigger than a floor broken up by solid "
+                "bases.",
+                ),
+            ),
+            Mechanism(
+                "mirrors_and_reflection",
+                ("mirror", "reflect", "reflection", "glazed", "glass"),
+                "A reflection adds depth your eye reads as real, so the far wall stops "
+                "behaving like the end of the room and the space feels bigger "
+                "than it measures.",
+                also_because=(
+                    "A mirror gives the eye somewhere further to look, so the room stops "
+                "ending at the wall and feels bigger.",
+                    "Reflected light and reflected depth both read as real space, which "
+                "makes a small room feel larger than its walls allow.",
+                ),
+            ),
+            Mechanism(
+                "light_distribution",
+                ("natural light", "daylight", "sunlight", "bright", "pale",
+                 "light colour", "light color", "airy", "window", "perimeter light",
+                 "wash the walls", "lamp", "sconce", "lighting", "ceiling light",
+                 "overhead light", "downlight", "light fitting", "light source",
+                 "single fitting"),
+                "Light reaching the walls and corners shows your eye exactly where "
+                "the room ends, and a room whose boundaries are visible reads as "
+                "larger than one that fades into shadow a few feet in.",
+                also_because=(
+                    "A room lit only in the middle fades out at the edges, so lighting the "
+                "perimeter shows the eye where the walls are and the space reads as "
+                "larger.",
+                    "Light on the walls makes the boundaries of the room visible, which "
+                "makes the whole space feel bigger than a single pool of light in "
+                "the centre.",
+                ),
+            ),
+            Mechanism(
+                "window_geometry",
+                ("curtain", "drape", "rod", "panel", "blind"),
+                "Hanging the fabric high and wide leaves the glass itself "
+                "uncovered, so more daylight reaches the room and the wall reads "
+                "taller than it measures.",
+                also_because=(
+                    "Fabric hung above and beyond the frame leaves the glass clear, so more "
+                "daylight gets in and the wall reads taller.",
+                    "Mounting the track close to the ceiling stretches the window upward, "
+                "which makes the wall read as taller and the room feel bigger.",
+                ),
+            ),
+            Mechanism(
+                "furniture_placement",
+                ("against the wall", "push", "float the sofa", "placement",
+                 "arrangement", "layout", "perimeter"),
+                "A deliberate arrangement opens up the routes you walk, so clear "
+                "pathways make a small room feel bigger to move through.",
+                also_because=(
+                    "Where the furniture sits decides where you can walk, so an arrangement "
+                "that keeps the routes clear makes a small room feel bigger.",
+                    "Pushing everything to the perimeter is not always the answer, but an "
+                "arrangement that leaves the paths open reads as more spacious.",
+                ),
+            ),
+            Mechanism(
+                "continuous_flooring",
+                ("flooring", "same floor", "one continuous", "floor finish"),
+                "One continuous floor finish stops the eye counting separate small "
+                "zones, so the whole space reads as larger than a floor broken "
+                "into sections.",
+                also_because=(
+                    "Breaking the floor into different finishes tells the eye it is looking "
+                "at several small areas, so keeping it continuous makes the space "
+                "read as larger.",
+                    "One floor running through the whole room gives the eye nothing to "
+                "divide, which makes the space feel bigger than the same area cut "
+                "into zones.",
+                ),
+            ),
+            Mechanism(
+                "low_contrast_edges",
+                ("chop", "chops", "fragment", "break up", "outline", "hard edge",
+                 "edges", "same color as the walls", "same colour as the walls",
+                 "low-contrast", "low contrast"),
+                "Low-contrast edges stop chopping the wall into pieces, so the surface "
+                "reads as one large plane and the room feels bigger for it.",
+                also_because=(
+                    "Strong outlines chop a wall into pieces, so matching the tones lets the "
+                "surface read as one large plane and the room feel bigger.",
+                    "When the trim disappears into the wall, the eye stops counting edges "
+                "and the room reads as larger.",
+                ),
+            ),
+            Mechanism(
+                "vertical_storage",
+                ("vertical storage", "up to the ceiling", "storage to the ceiling"),
+                "Taking storage up to the ceiling uses the height instead of the floor, "
+                "so the same belongings leave more visible floor behind and the "
+                "room feels more spacious.",
+                also_because=(
+                    "Storage that stops at waist height wastes the wall above it, so "
+                "carrying it to the ceiling leaves more visible floor and the room "
+                "feels bigger.",
+                    "Using the height for storage keeps the floor free, which makes a small "
+                "room feel considerably more spacious.",
+                ),
+            ),
         ),
         # Supporting evidence, counted only once a mechanism is present.
         concepts=(
@@ -172,20 +335,58 @@ PROMISES: tuple[Promise, ...] = (
             "look cheap", "make a space look cheap", "designer",
         ),
         mechanisms=(
-            ("material", "stone", "marble", "brass", "solid wood", "leather",
-             "wool", "linen", "oak", "walnut"),
-            ("finish", "matte", "honed", "gloss", "sheen", "brushed", "polished"),
-            ("hardware", "handle", "lever", "knob", "tap", "faucet", "switch plate"),
-            ("oversized", "generous", "fuller", "larger", "wider", "scale"),
-            ("dimmer", "sconce", "layered", "warm light", "lamp", "picture light"),
-            ("moulding", "molding", "panelling", "paneling", "skirting",
-             "architectural", "trim", "detail", "junction", "mitred", "edge"),
-            ("cable", "cables", "wiring", "conceal", "hidden", "tidy", "plastic"),
-            ("upholster", "upholstery", "headboard", "padded", "velvet"),
-            ("frame", "framed", "mount", "gallery", "artwork"),
-            ("flowers", "branches", "greenery", "plant"),
-            ("curtain", "drape", "panel", "hem"),
-            ("empty", "clear", "editing", "restraint", "remove"),
+            Mechanism("materials",
+                      ("material", "stone", "marble", "brass", "solid wood", "leather",
+                       "wool", "linen", "oak", "walnut"),
+                      "Real materials age instead of wearing out, and that is the "
+                      "difference the eye reads as expensive."),
+            Mechanism("finishes",
+                      ("finish", "matte", "honed", "gloss", "sheen", "brushed", "polished"),
+                      "A considered finish catches light the way costly surfaces do, "
+                      "so the whole piece reads as more expensive."),
+            Mechanism("hardware",
+                      ("hardware", "handle", "lever", "knob", "tap", "faucet", "switch plate"),
+                      "Hardware is what your hand touches, so upgrading it changes "
+                      "how expensive the room feels every single day."),
+            Mechanism("generous_scale",
+                      ("oversized", "generous", "fuller", "larger", "wider", "scale"),
+                      "Generous proportions read as chosen for the room rather than "
+                      "chosen to a price, which makes the whole arrangement look "
+                      "more expensive."),
+            Mechanism("layered_light",
+                      ("dimmer", "sconce", "layered", "warm light", "lamp", "picture light"),
+                      "Layered, dimmable light models the room the way a showroom "
+                      "does, which is most of what makes a space look expensive."),
+            Mechanism("architectural_detail",
+                      ("moulding", "molding", "panelling", "paneling", "skirting",
+                       "architectural", "trim", "detail", "junction", "mitred", "edge"),
+                      "Crisp architectural detail is the mark of work that was "
+                      "finished properly, and that is what reads as high end."),
+            Mechanism("concealment",
+                      ("cable", "cables", "wiring", "conceal", "hidden", "tidy", "plastic"),
+                      "Visible cables and plastic are what make an otherwise good "
+                      "room look cheap, so hiding them lifts everything around them."),
+            Mechanism("upholstery",
+                      ("upholster", "upholstery", "headboard", "padded", "velvet"),
+                      "Upholstery adds the depth and weight cheap furniture is missing, so "
+                      "the piece reads as far more expensive than it cost."),
+            Mechanism("framing",
+                      ("frame", "framed", "mount", "gallery", "artwork"),
+                      "Proper framing and mounting turn an ordinary print into something "
+                      "that looks bought from a gallery, which makes cheap art "
+                      "read as considered."),
+            Mechanism("greenery",
+                      ("flowers", "branches", "greenery", "plant"),
+                      "Fresh greenery is the cheapest thing in the room and the one "
+                      "that most reliably reads as expensive."),
+            Mechanism("window_dressing",
+                      ("curtain", "drape", "panel", "hem"),
+                      "Curtains that break at the floor look made to measure, so the whole "
+                      "window reads as custom rather than cheap."),
+            Mechanism("restraint",
+                      ("empty", "clear", "editing", "restraint", "remove"),
+                      "Editing leaves the good pieces room to be seen, which is why "
+                      "restraint reads as expensive."),
         ),
         deny_signals=("acoustic", "water pressure", "scent"),
         rescue_signals=(
@@ -210,15 +411,33 @@ PROMISES: tuple[Promise, ...] = (
         label="make the home feel warmer and cozier",
         title_signals=("cozy", "cosy", "warmer home", "feel warmer", "inviting"),
         mechanisms=(
-            ("warm", "glow", "evening", "low light", "lamp", "candle", "dimmer",
-             "kelvin", "2700", "2200"),
-            ("soft", "wool", "throw", "cushion", "sheepskin", "linen", "boucle",
-             "upholster", "texture", "tactile"),
-            ("wood", "timber", "oak", "natural material", "honey", "amber"),
-            ("enclos", "nook", "corner", "intimate", "lower", "ceiling",
-             "at your back", "window seat"),
-            ("acoustic", "sound", "absorb", "echo", "rug", "curtain", "books"),
-            ("scent", "senses", "lived in", "personal", "candle"),
+            Mechanism("warm_low_light",
+                      ("warm", "glow", "evening", "low light", "lamp", "candle", "dimmer",
+                       "kelvin", "2700", "2200"),
+                      "Warm light low in the room reads as evening, and evening is "
+                      "what your body understands as cozy."),
+            Mechanism("soft_texture",
+                      ("soft", "wool", "throw", "cushion", "sheepskin", "linen", "boucle",
+                       "upholster", "texture", "tactile"),
+                      "Soft texture invites touch, and that makes a room feel warm rather "
+                      "than merely furnished."),
+            Mechanism("natural_material",
+                      ("wood", "timber", "oak", "natural material", "honey", "amber"),
+                      "Natural materials carry warmth in their colour, so they make "
+                      "the whole room feel less clinical."),
+            Mechanism("enclosure",
+                      ("enclos", "nook", "corner", "intimate", "lower", "ceiling",
+                       "at your back", "window seat"),
+                      "Something solid at your back is what makes a seat feel safe, "
+                      "and a seat that feels safe feels cozy."),
+            Mechanism("acoustics",
+                      ("acoustic", "sound", "absorb", "echo", "rug", "curtain", "books"),
+                      "Soft surfaces absorb the echo, so a quiet room feels warm in a way "
+                      "a bright one that rings never does."),
+            Mechanism("personal_traces",
+                      ("scent", "senses", "lived in", "personal", "candle"),
+                      "Signs of being lived in are what separate a home from a "
+                      "showroom, and that is most of what cozy means."),
         ),
         deny_signals=("resale", "declutter quota", "sixty thirty ten"),
         rescue_signals=("cozy", "cosy", "warm", "inviting", "relax", "comfortable"),
@@ -300,14 +519,35 @@ PROMISES: tuple[Promise, ...] = (
         label="bring more light into the room",
         title_signals=("brighter", "more light", "lighting", "dark room", "light up"),
         mechanisms=(
-            ("light source", "lamp", "bulb", "sconce", "pendant", "dimmer",
-             "fixture", "uplight", "led"),
-            ("daylight", "window", "sunlight", "natural light", "glass"),
-            ("mirror", "reflect", "reflection", "gloss", "sheen"),
-            ("pale", "light colour", "light color", "white", "bright"),
-            ("kelvin", "warm white", "colour temperature", "color temperature",
-             "layer", "layered", "shade", "diffuse"),
-            ("curtain", "blind", "clear the sill", "unobstructed"),
+            Mechanism("more_light_sources",
+                      ("light source", "lamp", "bulb", "sconce", "pendant", "dimmer",
+                       "fixture", "uplight", "led"),
+                      "More separate light sources fill the gaps one ceiling fitting "
+                      "leaves, so the room is brighter everywhere rather than under "
+                      "one spot."),
+            Mechanism("daylight",
+                      ("daylight", "window", "sunlight", "natural light", "glass"),
+                      "Anything that lets more daylight in raises the light level of "
+                      "the whole room for free."),
+            Mechanism("reflection",
+                      ("mirror", "reflect", "reflection", "gloss", "sheen"),
+                      "Reflective surfaces bounce the light you already have back into the "
+                      "room, so the same fittings leave the space noticeably "
+                      "brighter."),
+            Mechanism("pale_surfaces",
+                      ("pale", "light colour", "light color", "white", "bright"),
+                      "Pale surfaces reflect far more of the light that hits them, "
+                      "so the same bulbs go further."),
+            Mechanism("colour_temperature",
+                      ("kelvin", "warm white", "colour temperature", "color temperature",
+                       "layer", "layered", "shade", "diffuse"),
+                      "Getting the colour temperature and the shade right stops the "
+                      "light being swallowed before it reaches the room."),
+            Mechanism("unobstructed_windows",
+                      ("curtain", "blind", "clear the sill", "unobstructed"),
+                      "Clearing the window itself is the single largest change you can "
+                      "make, so the room receives far more daylight and stops "
+                      "feeling dark by mid-afternoon."),
         ),
         deny_signals=GENERIC_DESIGN_PRINCIPLES,
         rescue_signals=("bright", "brighter", "light", "dark", "gloomy", "dim"),
@@ -386,8 +626,11 @@ class AlignmentResult:
     score: float
     matched_groups: list[str] = field(default_factory=list)
     counters: list[str] = field(default_factory=list)
-    #: The direct causal mechanism(s) by which this idea delivers the promise.
+    #: Names of the direct causal mechanism(s) by which this idea delivers
+    #: the promise, e.g. ``furniture_scale``.
     mechanisms: list[str] = field(default_factory=list)
+    #: The exact words that matched, for the log and the report.
+    mechanism_words: list[str] = field(default_factory=list)
     #: Generic-principle signals that disqualified it, if any.
     denied_by: list[str] = field(default_factory=list)
 
@@ -458,11 +701,13 @@ def score_alignment(tip: Tip, promise: Promise) -> AlignmentResult:
 
     # 2. Direct-causation gate.
     mechanisms: list[str] = []
+    mechanism_words: list[str] = []
     if promise.mechanisms:
-        for group in promise.mechanisms:
-            hit = next((word for word in group if word in text), None)
+        for family in promise.mechanisms:
+            hit = next((word for word in family.words if word in text), None)
             if hit:
-                mechanisms.append(hit)
+                mechanisms.append(family.name)
+                mechanism_words.append(hit)
         if not mechanisms:
             return AlignmentResult(tip=tip, score=0.0, counters=counters)
 
@@ -477,6 +722,7 @@ def score_alignment(tip: Tip, promise: Promise) -> AlignmentResult:
         return AlignmentResult(
             tip=tip, score=0.0, matched_groups=matched,
             counters=counters, mechanisms=mechanisms,
+            mechanism_words=mechanism_words,
         )
 
     if promise.mechanisms:
@@ -494,6 +740,7 @@ def score_alignment(tip: Tip, promise: Promise) -> AlignmentResult:
         matched_groups=matched,
         counters=counters,
         mechanisms=mechanisms,
+        mechanism_words=mechanism_words,
     )
 
 
@@ -540,3 +787,40 @@ def alignment_ratio(
         return 0.0
     hits = sum(1 for tip in tips if score_alignment(tip, promise).score >= threshold)
     return round(hits / len(tips), 3)
+
+
+def mechanisms_for(promise: Promise, text: str) -> list[Mechanism]:
+    """Every mechanism family a piece of text touches, in declaration order."""
+
+    haystack = str(text or "").lower()
+    return [
+        family
+        for family in promise.mechanisms
+        if any(word in haystack for word in family.words)
+    ]
+
+
+def rank_mechanisms(promise: Promise, text: str) -> list[Mechanism]:
+    """Mechanisms a text touches, most specifically matched first.
+
+    Declaration order is the wrong order for repairing a paragraph: "do not
+    center the ceiling light" matches ``vertical_emphasis`` on the bare word
+    "ceiling" and ``light_distribution`` on the whole phrase "ceiling light",
+    and the second is the mechanism the idea is actually about.
+    """
+
+    haystack = str(text or "").lower()
+    scored: list[tuple[int, int, int, Mechanism]] = []
+    for position, family in enumerate(promise.mechanisms):
+        matched = [word for word in family.words if word in haystack]
+        if matched:
+            scored.append((len(matched), max(len(w) for w in matched), -position, family))
+    scored.sort(key=lambda item: item[:3], reverse=True)
+    return [family for *_, family in scored]
+
+
+def mechanism_by_name(promise: Promise, name: str) -> Mechanism | None:
+    for family in promise.mechanisms:
+        if family.name == name:
+            return family
+    return None
