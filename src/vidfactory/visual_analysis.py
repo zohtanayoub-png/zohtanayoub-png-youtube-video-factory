@@ -48,9 +48,13 @@ STAT_SIZE: tuple[int, int] = (96, 54)
 
 #: How far a negative concept must out-score every positive one before the
 #: flag is certain. CLIP text-image cosines for related prompts differ by
-#: hundredths, so these are small on purpose.
-CONCEPT_MARGIN_LOW = -0.015
-CONCEPT_MARGIN_HIGH = 0.055
+#: hundredths, so the range is small - but it starts at exactly zero, because
+#: a negative concept that merely *ties* the best positive is not evidence of
+#: anything. Starting below zero gave every clip a floor on every flag: the
+#: first margin-scored render put "construction" at 0.2 to 0.44 on all forty
+#: clips and dropped premium_visual_ratio to 8%.
+CONCEPT_MARGIN_LOW = 0.0
+CONCEPT_MARGIN_HIGH = 0.05
 #: The same idea for the scene prompt's margin over the average alternative.
 SEMANTIC_MARGIN_LOW = -0.02
 SEMANTIC_MARGIN_HIGH = 0.06

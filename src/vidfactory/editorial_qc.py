@@ -22,6 +22,10 @@ from .logging_utils import get_logger
 
 log = get_logger("EDITQC")
 
+#: A clip below this shows some other subject better than it shows the
+#: sentence it illustrates. Measured, not guessed - see config.yaml.
+LOW_RELEVANCE_MATCH = 0.35
+
 
 @dataclass
 class EditorialCheck:
@@ -234,7 +238,7 @@ def build_report(
     semantic_average = (
         round(sum(semantic_scores) / len(semantic_scores), 3) if semantic_scores else 0.0
     )
-    low_relevance = sum(1 for s in semantic_scores if s < 0.45)
+    low_relevance = sum(1 for s in semantic_scores if s < LOW_RELEVANCE_MATCH)
 
     # A clip is premium only if its caption *and* its pixels agree. Run 6
     # reported 91% premium footage from captions alone while the video

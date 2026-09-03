@@ -326,3 +326,22 @@ def test_a_clearly_negative_frame_is_still_flagged():
     angles.update({d: 0.9 for d in DISTRACTOR_PROMPTS})
     analysis = _analysis(angles)
     assert analysis.flags.get("plastic_covered_furniture", 0) > 0.6
+
+
+def test_a_negative_concept_that_merely_ties_a_positive_is_not_evidence():
+    """The floor bug: every clip carried construction at 0.2 to 0.44.
+
+    A margin ramp that starts below zero turns "no better than the positives"
+    into a fifth of a flag, and eleven of those multiply premium_visual_score
+    down to nothing.
+    """
+
+    angles = {c: 0.50 for c in POSITIVE_CONCEPTS}
+    angles.update({text: 0.50 for text, _ in NEGATIVE_CONCEPTS})
+    angles["a photo of a styled living room"] = 0.50
+    angles.update({d: 0.50 for d in DISTRACTOR_PROMPTS})
+    analysis = _analysis(angles)
+    assert not any(
+        analysis.flags.get(flag, 0) for _, flag in NEGATIVE_CONCEPTS
+    ), analysis.flags
+    assert analysis.premium_visual_score > 0.5
