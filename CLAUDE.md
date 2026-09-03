@@ -61,6 +61,8 @@ src/vidfactory/
   causal_alignment.py does the written paragraph explain the title's promise
   contradiction.py   does the paragraph argue *for* its own heading
   concepts.py        is the paragraph about the same thing as its heading
+  principles.py      does the causal sentence explain *this* section's idea
+  entities.py        the object a concrete shot has to actually contain
   title_alignment.py what a title promises, and which ideas actually deliver it
   editorial_qc.py    repetition, relevance and diversity gates (not ffprobe)
   stock/             provider adapters: base, pexels, pixabay, local, registry
@@ -182,6 +184,47 @@ src/vidfactory/
   the seating floating" and "choose one large enough for the front legs" were
   searched and scored identically. `ShotIntent.search_text` is always English
   and is what CLIP scores the frames against.
+* **Similarity is not presence.** Run 25 averaged 0.569 across the clips on
+  screen with not one below the 0.50 floor, and showed colourful ribbons for
+  "paint the trim the same colour as the walls" and potted plants for "a rug
+  too small to reach the sofa". No threshold on sentence similarity would have
+  caught it: a styled living room genuinely *is* similar to a sentence about
+  the rug in it - same palette, same furniture, same vocabulary. The rug is
+  simply not there. `entities.py` maps concrete advice to the object it
+  requires and MobileCLIP scores the frames against short "it is here" prompts
+  against short prompts naming the failures actually observed ("a floor with
+  no rug", "indoor potted plants", "colourful clothing and ribbons"); the
+  verdict is the margin between them. `entity_grounding_failure_count` is an
+  **error**, additional to every existing threshold and a replacement for
+  none. A failed shot is repaired first, searched by the object rather than by
+  the advice - the advice is what found the plants - and a replacement must
+  improve the semantic score **and** contain the object. Abstract advice
+  requires nothing: demanding an object the sentence never promised rejects
+  good footage.
+* **The subject is the object named first, not the one named most.** "A rug
+  too small to reach the sofa leaves the seating floating" names seating twice
+  and the rug once. It is rug advice; the sofa is the landmark the rug is
+  measured against.
+* **A principle is not an object either.** "Balance visual weight across the
+  room" names nothing physical, so the cross-concept check had no subject and
+  correctly returned 0 while run 25 explained that section through furniture
+  footprint and walking paths. `principles.py` gives abstract headings a
+  subject of their own, and `primary_concept_contamination_count` is an
+  **error**. It fires only on sentences carrying a causal connective, only
+  when a competing vocabulary appears at least twice, and only when the
+  section's own appears not at all - a false positive here rewrites a
+  paragraph that was already right.
+* **An optional example is not the principle.** A section offering a plant, a
+  lamp, a mirror or a chair and then explaining itself through the mirror's
+  reflection has given three readers in four no reason at all. The repair
+  conditions the sentence rather than deleting it - "if you choose the mirror,
+  a reflection adds depth" - because the reason is true, it just has to say
+  which case it covers. `optional_example_leakage_count` is an **error**.
+* **Long-form quality is measured, not assumed.** Run 22 finished at a 0.638
+  premium ratio and run 25, three times longer, at 0.493.
+  `final_shot_premium_visual_ratio` targets 0.60: a warning in test mode, a
+  gate in production. The answer to a weak pool is more pages and more query
+  variants, never a lower definition of premium.
 * **Relevance outranks beauty.** The second ranking stage weights
   scene-to-clip semantic match (45) above interior subject (30), visual
   quality (18), novelty (12) and technical quality (8). A beautiful unrelated
