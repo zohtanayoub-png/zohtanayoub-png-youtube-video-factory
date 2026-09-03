@@ -237,3 +237,22 @@ def test_importing_the_committed_history_keeps_the_mode_columns(tmp_path):
     stats = database.clip_mode_stats()
     assert stats["clips"] > 0
     assert stats["test"] > 0, "development history must survive a round trip"
+
+
+def test_the_measured_speech_rate_survives_an_export_and_import(tmp_path):
+    """A measurement that lives only in the runner's database is not a measurement.
+
+    schema_info was not in SNAPSHOT_TABLES, so run 23 measured 182 words per
+    minute, wrote it to an ephemeral SQLite file, and the next render started
+    again from the engine's declared 155 - which is exactly the 300s request
+    that came out at 263s.
+    """
+
+    first = Database(str(tmp_path / "a.db"))
+    first.initialize()
+    first.record_speech_rate("piper", "en_US-hfc_female-medium", 798, 264.0)
+    first.export_state(tmp_path / "state")
+
+    second = Database(str(tmp_path / "b.db"))
+    second.import_state(tmp_path / "state")
+    assert second.measured_speech_rate("piper", "en_US-hfc_female-medium") > 150.0

@@ -101,7 +101,14 @@ CREATE INDEX IF NOT EXISTS idx_topics_slug ON topics(slug);
 """
 
 # Tables exported to / imported from JSON snapshots (in dependency order).
-SNAPSHOT_TABLES: tuple[str, ...] = ("topics", "videos", "clips", "scenes", "generations")
+#
+# schema_info is in the list because it holds the measured speech rate, and a
+# measurement that lives only in the runner's ephemeral database is not a
+# measurement - run 23 recorded 175 words per minute and the next run started
+# again from the engine's declared 155.
+SNAPSHOT_TABLES: tuple[str, ...] = (
+    "topics", "videos", "clips", "scenes", "generations", "schema_info",
+)
 
 
 def utcnow() -> str:
@@ -512,7 +519,12 @@ class Database:
         out_dir.mkdir(parents=True, exist_ok=True)
         written: list[Path] = []
         for table in SNAPSHOT_TABLES:
-            rows = [dict(row) for row in self.query(f"SELECT * FROM {table} ORDER BY id")]
+            # schema_info is keyed by name rather than by an autoincrement id.
+            order = "key" if table == "schema_info" else "id"
+            rows = [
+                dict(row)
+                for row in self.query(f"SELECT * FROM {table} ORDER BY {order}")
+            ]
             target = out_dir / f"{table}.json"
             payload = {"table": table, "version": SCHEMA_VERSION, "rows": rows}
             target.write_text(

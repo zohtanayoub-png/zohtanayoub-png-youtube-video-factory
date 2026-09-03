@@ -1,0 +1,14 @@
+{
+  "table": "schema_info",
+  "version": 1,
+  "rows": [
+    {
+      "key": "speech_rate:piper:en_US-hfc_female-medium",
+      "value": "181.68"
+    },
+    {
+      "key": "version",
+      "value": "1"
+    }
+  ]
+}
