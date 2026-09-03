@@ -299,6 +299,19 @@ jobs:
           print("| Measurement | Value |")
           print("| --- | --- |")
           for key in (
+              "language",
+              "tts_voice",
+              "tts_engine",
+              "subtitle_style",
+              "burn_in_subtitles",
+              "subtitles_srt_exported",
+              "subtitles_ass_exported",
+              "subtitle_font",
+              "subtitle_event_count",
+              "average_subtitle_words",
+              "max_subtitle_lines",
+              "subtitle_safe_area_passed",
+              "subtitle_timing_passed",
               "visual_analysis_model",
               "visual_analysis_frame_count",
               "visually_inspected_clip_count",
@@ -355,6 +368,79 @@ jobs:
               print("\n**Checks not passed**\n")
               for check in failed:
                   print(f"- `{check['name']}` ({check['severity']}): {check['detail']}")
+          PY
+
+      - name: Inspect the burned-in captions
+        # Measured, not assumed. The premium style is only worth anything if
+        # the captions are actually in the picture, in the lower third, and
+        # bright enough to read - so three real frames of the finished video
+        # are decoded and the caption band is measured against the rest of
+        # the frame. Downloading the artifact to look at it by hand is not
+        # something a scheduled run can do.
+        if: always()
+        continue-on-error: true
+        env:
+          OUTPUT_DIR: ${{ steps.generate.outputs.output_dir }}
+        run: |
+          python - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
+          import os, pathlib, sys
+          sys.path.insert(0, "src")
+          from vidfactory.visual_analysis import decode_frame, measure
+          from vidfactory.ffmpeg_utils import probe_media
+
+          directory = pathlib.Path(os.environ.get("OUTPUT_DIR") or "")
+          video = directory / "final_video.mp4"
+          if not video.exists():
+              print("\n_No video to inspect._")
+              raise SystemExit(0)
+
+          duration = probe_media(video).duration
+          print("\n### Burned-in captions, measured on real frames\n")
+          print("| At | Caption band brightness | Rest of frame | Contrast | Verdict |")
+          print("| --- | --- | --- | --- | --- |")
+
+          legible = 0
+          samples = [duration * f for f in (0.25, 0.5, 0.75)]
+          for at in samples:
+              frame = decode_frame(video, at, size=(192, 108))
+              if frame is None or not frame.ok:
+                  print(f"| {at:.1f}s | - | - | - | frame not decoded |")
+                  continue
+              width, height = frame.width, frame.height
+              # The style puts captions at 118px above the bottom of a 1080
+              # frame, which is the band from about 78% to 93% of the height.
+              band = range(int(height * 0.78), int(height * 0.94))
+              rest = range(0, int(height * 0.70))
+
+              def stats(rows):
+                  values = []
+                  for y in rows:
+                      for x in range(width):
+                          i = (y * width + x) * 3
+                          values.append(
+                              0.299 * frame.pixels[i]
+                              + 0.587 * frame.pixels[i + 1]
+                              + 0.114 * frame.pixels[i + 2]
+                          )
+                  if not values:
+                      return 0.0, 0.0
+                  mean = sum(values) / len(values)
+                  spread = max(values) - min(values)
+                  return mean, spread
+
+              band_mean, band_spread = stats(band)
+              rest_mean, rest_spread = stats(rest)
+              # Text creates local contrast the surrounding footage does not.
+              contrast = band_spread - rest_spread
+              ok = band_spread > 110 and band_mean > rest_mean - 40
+              legible += int(ok)
+              print(
+                  f"| {at:.1f}s | {band_mean:.0f} (spread {band_spread:.0f}) | "
+                  f"{rest_mean:.0f} (spread {rest_spread:.0f}) | {contrast:+.0f} | "
+                  f"{'legible' if ok else 'no strong text signal'} |"
+              )
+
+          print(f"\n**{legible} of {len(samples)} sampled frames carry legible captions.**")
           PY
 
       # The artifact is scoped to this generation's own directory. The

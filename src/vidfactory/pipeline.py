@@ -692,7 +692,11 @@ class VideoPipeline:
             analysis = analyzer.analyze_clip(
                 clip,
                 query=clip.query or (scene.primary_visual_query if scene else ""),
-                narration=(scene.narration if scene else ""),
+                # The English description of the scene, never the narration.
+                # CLIP is scoring an image against a text prompt; handing it a
+                # Spanish sentence measures how Spanish the prompt is, not how
+                # well the frame shows what is being said.
+                narration=(scene.search_text if scene else ""),
                 metadata_flags=metadata_visual_flags(clip, clip.query),
             )
             clip.visual = analysis.to_dict()
@@ -778,7 +782,7 @@ class VideoPipeline:
             analysis = analyzer.analyze_clip(
                 clip,
                 query=clip.query or (scene.primary_visual_query if scene else ""),
-                narration=(scene.narration if scene else ""),
+                narration=(scene.search_text if scene else ""),
                 video=clip.local_path or result.path,
                 metadata_flags=metadata_visual_flags(clip, clip.query),
             )
