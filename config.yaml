@@ -96,6 +96,10 @@ sources:
   # spent, then deeper pages, then the rest of its query ladder. Each round
   # costs API calls and frame decoding, so the budget is small; the log says
   # when it runs and when it gives up.
+  # Gather this many times the download count before the metadata sweep
+  # stops early. Ranking rejects roughly half of what is gathered, so at 2x
+  # the visual stage was handed 40 clips for 29 shots and could not choose.
+  candidate_pool_multiplier: 4.0
   relevance_search_budget: 2
   # How many of the worst-matching scenes each round re-searches. Every scene
   # at once turned a four minute render into a forty minute one on a runner:

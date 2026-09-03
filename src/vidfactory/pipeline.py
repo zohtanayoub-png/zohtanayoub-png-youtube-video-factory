@@ -340,6 +340,13 @@ class VideoPipeline:
         # earlier videos to repeat footage.
         headroom = float(sources.get("candidate_headroom", 1.35))
         needed = max(3, int(math.ceil(shots_needed * headroom)))
+        # How large a pool to gather before the metadata sweep stops early.
+        # At 2x, run 19 ranked 40 clips for 29 shots and the visual stage had
+        # nothing to choose from: its candidate average and its final-shot
+        # average were both 0.48, which is what "no selection happened" looks
+        # like. Ranking discards a good half of what is gathered, so the sweep
+        # has to over-collect for the shortlist multiplier to mean anything.
+        pool_target = float(sources.get("candidate_pool_multiplier", 4.0))
 
         candidates: dict[str, StockClip] = {}
         affinity: dict[str, list[str]] = {}
@@ -412,7 +419,7 @@ class VideoPipeline:
                 # plenty of footage: each idea has to contribute its own
                 # queries, or its shots end up drawn from another idea's
                 # search results and stop illustrating the narration.
-                if not visit_every_scene and len(candidates) >= needed * 2:
+                if not visit_every_scene and len(candidates) >= needed * pool_target:
                     return
                 before = len(candidates)
                 harvest(scene, pages=pages, include_generic=include_generic)
@@ -841,6 +848,9 @@ class VideoPipeline:
         workers = max(1, int(self.config.get("visual.workers", 4)))
 
         size = min(len(ranked), cap, max(needed, int(math.ceil(needed * multiplier))))
+        # `needed` is the download count; the shortlist exists so the visual
+        # stage can reject. Capping it at the download count would mean
+        # inspecting exactly what we intend to keep.
         shortlist = list(ranked[:size])
         remainder = list(ranked[size:])
         stats["shortlisted"] = len(shortlist)
