@@ -1576,6 +1576,168 @@
       "duration": null,
       "query": "bright styled living room natural light",
       "category": "living rooms"
+    },
+    {
+      "id": 176,
+      "video_id": 11,
+      "scene_id": "intro-000-00",
+      "narration": "La mayoría de las habitaciones pequeñas no van cortas de metros. Van cortas de líneas de visión, de luz y de altura aprovechada, y las tres cosas se arreglan en un fin de semana.",
+      "duration": null,
+      "query": "bright styled living room natural light",
+      "category": "living rooms"
+    },
+    {
+      "id": 177,
+      "video_id": 11,
+      "scene_id": "intro-000-01",
+      "narration": "En este vídeo vamos a ver tres, una por una, con el motivo que hay detrás de cada una y cómo aplicarla en una casa real.",
+      "duration": null,
+      "query": "sunlit living room wide shot",
+      "category": "living rooms"
+    },
+    {
+      "id": 178,
+      "video_id": 11,
+      "scene_id": "item-001-00",
+      "narration": "Número 1. Pon plantas de verdad, y grandes. Una sola planta de 120 a 180 centímetros en la esquina que más luz recibe hace más que seis macetas pequeñas repartidas.",
+      "duration": null,
+      "query": "large indoor plant living room corner",
+      "category": "living rooms"
+    },
+    {
+      "id": 179,
+      "video_id": 11,
+      "scene_id": "item-001-01",
+      "narration": "Ficus lyrata, kentia o monstera si hay luz indirecta abundante. Una planta con volumen aporta una escala vertical que ningún objeto decorativo consigue, y suaviza las esquinas duras de la habitación.",
+      "duration": null,
+      "query": "fiddle leaf fig interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 180,
+      "video_id": 11,
+      "scene_id": "item-001-02",
+      "narration": "Llevar la mirada hacia arriba hace que la pared se lea más alta, y una pared más alta hace que la habitación entera parezca más grande de lo que dicen sus metros.",
+      "duration": null,
+      "query": "green plants modern interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 181,
+      "video_id": 11,
+      "scene_id": "item-002-00",
+      "narration": "Idea número 2. Separa el sofá unos centímetros de la pared.",
+      "duration": null,
+      "query": "floating sofa living room layout",
+      "category": "living rooms"
+    },
+    {
+      "id": 182,
+      "video_id": 11,
+      "scene_id": "item-002-01",
+      "narration": "Pegar todos los muebles al perímetro deja un vacío muerto en el centro y, aunque parezca lo contrario, hace que la habitación se sienta más vacía y menos generosa.",
+      "duration": null,
+      "query": "console table behind sofa",
+      "category": "living rooms"
+    },
+    {
+      "id": 183,
+      "video_id": 11,
+      "scene_id": "item-002-02",
+      "narration": "Deja entre 8 y 15 centímetros entre el respaldo y la pared y aprovecha ese hueco con una consola estrecha.",
+      "duration": null,
+      "query": "spacious modern living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 184,
+      "video_id": 11,
+      "scene_id": "item-002-03",
+      "narration": "Esa mínima holgura se lee de inmediato como una decisión y no como un descuido.",
+      "duration": null,
+      "query": "living room furniture arrangement",
+      "category": "living rooms"
+    },
+    {
+      "id": 185,
+      "video_id": 11,
+      "scene_id": "item-002-04",
+      "narration": "Una distribución pensada abre los recorridos, así que los pasos libres hacen que una habitación pequeña se sienta más grande al moverte por ella.",
+      "duration": null,
+      "query": "floating sofa living room layout",
+      "category": "living rooms"
+    },
+    {
+      "id": 186,
+      "video_id": 11,
+      "scene_id": "item-003-00",
+      "narration": "Esto nos lleva a la número 3. Imagina entrar dos veces en la misma habitación, una con esto hecho y otra sin ello.",
+      "duration": null,
+      "query": "large mirror reflecting window light",
+      "category": "living rooms"
+    },
+    {
+      "id": 187,
+      "video_id": 11,
+      "scene_id": "item-003-01",
+      "narration": "Coloca un espejo grande frente a la ventana, no en la pared del fondo.",
+      "duration": null,
+      "query": "leaning floor mirror living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 188,
+      "video_id": 11,
+      "scene_id": "item-003-02",
+      "narration": "Un espejo enfrentado a la ventana devuelve luz y profundidad reales a la habitación, mientras que el mismo espejo en la pared opuesta a la puerta solo refleja el pasillo.",
+      "duration": null,
+      "query": "mirror opposite window interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 189,
+      "video_id": 11,
+      "scene_id": "item-003-03",
+      "narration": "Un espejo de 80 por 120 centímetros o más, apoyado o colgado, en la pared perpendicular a la ventana.",
+      "duration": null,
+      "query": "round mirror bright living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 190,
+      "video_id": 11,
+      "scene_id": "item-003-04",
+      "narration": "Comprueba antes qué se refleja: lo que se ve en él pasa a formar parte de la decoración.",
+      "duration": null,
+      "query": "large mirror reflecting window light",
+      "category": "living rooms"
+    },
+    {
+      "id": 191,
+      "video_id": 11,
+      "scene_id": "item-003-05",
+      "narration": "Repartir tres espejos pequeños por la pared no da profundidad, da la sensación de que faltaba algo que colgar.",
+      "duration": null,
+      "query": "leaning floor mirror living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 192,
+      "video_id": 11,
+      "scene_id": "item-003-06",
+      "narration": "Un reflejo añade una profundidad que el ojo lee como real, así que la pared deja de comportarse como el final de la habitación y el espacio parece más grande.",
+      "duration": null,
+      "query": "mirror opposite window interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 193,
+      "video_id": 11,
+      "scene_id": "outro-000-00",
+      "narration": "Esas son las tres. Si te ha servido, suscribirte ayuda a que te llegue el siguiente.",
+      "duration": null,
+      "query": "bright styled living room natural light",
+      "category": "living rooms"
     }
   ]
 }
