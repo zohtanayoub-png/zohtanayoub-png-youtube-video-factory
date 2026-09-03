@@ -1099,6 +1099,168 @@
       "duration": null,
       "query": "bright styled living room natural light",
       "category": "living rooms"
+    },
+    {
+      "id": 123,
+      "video_id": 8,
+      "scene_id": "intro-000-00",
+      "narration": "If your living room feels smaller than it really is, the problem may not be the square footage.",
+      "duration": null,
+      "query": "bright styled living room natural light",
+      "category": "living rooms"
+    },
+    {
+      "id": 124,
+      "video_id": 8,
+      "scene_id": "intro-000-01",
+      "narration": "A handful of ordinary decorating choices can visually shrink a room, and reversing them can make the exact same space feel dramatically bigger.",
+      "duration": null,
+      "query": "sunlit living room wide shot",
+      "category": "living rooms"
+    },
+    {
+      "id": 125,
+      "video_id": 8,
+      "scene_id": "intro-000-02",
+      "narration": "Here are 3 ideas worth knowing, each with the principle behind it and a practical way to put it into your own home this week.",
+      "duration": null,
+      "query": "elegant living room morning light",
+      "category": "living rooms"
+    },
+    {
+      "id": 126,
+      "video_id": 8,
+      "scene_id": "item-001-00",
+      "narration": "Next, number 1. Hang art at eye level and scale it to the furniture, which is easier than it sounds.",
+      "duration": null,
+      "query": "large art above sofa living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 127,
+      "video_id": 8,
+      "scene_id": "item-001-01",
+      "narration": "Art that floats near the ceiling breaks the visual connection with the furniture below it, and undersized art above a large sofa makes the whole wall look unfinished.",
+      "duration": null,
+      "query": "gallery wall living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 128,
+      "video_id": 8,
+      "scene_id": "item-001-02",
+      "narration": "Center the piece about fifty-seven to sixty inches from the floor, and choose something that spans roughly two-thirds of the width of whatever sits beneath it.",
+      "duration": null,
+      "query": "framed artwork interior wall",
+      "category": "living rooms"
+    },
+    {
+      "id": 129,
+      "video_id": 8,
+      "scene_id": "item-001-03",
+      "narration": "Leave six to eight inches between the top of the sofa and the bottom of the frame.",
+      "duration": null,
+      "query": "minimalist wall art living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 130,
+      "video_id": 8,
+      "scene_id": "item-001-04",
+      "narration": "A tiny frame stranded above a three-seat sofa is one of the most common and most avoidable mistakes in a living room.",
+      "duration": null,
+      "query": "large art above sofa living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 131,
+      "video_id": 8,
+      "scene_id": "item-001-05",
+      "narration": "Oversized pieces eat visible floor area and narrow the walking paths, so a small room feels cramped even though its footprint never changed.",
+      "duration": null,
+      "query": "gallery wall living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 132,
+      "video_id": 8,
+      "scene_id": "item-002-00",
+      "narration": "Picture the room before and after this single change. Aim for at least three light sources per room. One ceiling light produces a flat, shadowless, institutional wash.",
+      "duration": null,
+      "query": "layered lighting living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 133,
+      "video_id": 8,
+      "scene_id": "item-002-01",
+      "narration": "Multiple pools of light create the depth that makes a room feel considered. Ceiling for general light, a lamp near seating for reading, and something low or wall-mounted for atmosphere.",
+      "duration": null,
+      "query": "multiple lamps interior evening",
+      "category": "living rooms"
+    },
+    {
+      "id": 134,
+      "video_id": 8,
+      "scene_id": "item-002-02",
+      "narration": "In the evening, use only the lower two.",
+      "duration": null,
+      "query": "floor lamp and table lamp",
+      "category": "living rooms"
+    },
+    {
+      "id": 135,
+      "video_id": 8,
+      "scene_id": "item-002-03",
+      "narration": "Light reaching the walls and corners shows your eye exactly where the room ends, and a room whose boundaries are visible reads as larger than one that fades into shadow a few feet in.",
+      "duration": null,
+      "query": "ambient home lighting",
+      "category": "living rooms"
+    },
+    {
+      "id": 136,
+      "video_id": 8,
+      "scene_id": "item-003-00",
+      "narration": "Keep that in mind while we look at this. Number 3, and this one is a favorite. Leave the corners of the room resolved.",
+      "duration": null,
+      "query": "corner plant floor lamp living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 137,
+      "video_id": 8,
+      "scene_id": "item-003-01",
+      "narration": "Empty, awkward corners are where a room visibly runs out of ideas, and stuffing them with random small objects makes it worse.",
+      "duration": null,
+      "query": "styled room corner interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 138,
+      "video_id": 8,
+      "scene_id": "item-003-02",
+      "narration": "A tall plant, a floor lamp, a leaning mirror or a single chair with a small table. One considered object beats three leftovers.",
+      "duration": null,
+      "query": "reading nook corner chair",
+      "category": "living rooms"
+    },
+    {
+      "id": 139,
+      "video_id": 8,
+      "scene_id": "item-003-03",
+      "narration": "A reflection adds depth your eye reads as real, so the far wall stops behaving like the end of the room and the space feels bigger than it measures.",
+      "duration": null,
+      "query": "living room corner decor",
+      "category": "living rooms"
+    },
+    {
+      "id": 140,
+      "video_id": 8,
+      "scene_id": "outro-000-00",
+      "narration": "That is all 3 of them. If this was useful, subscribing helps you catch the next one.",
+      "duration": null,
+      "query": "bright styled living room natural light",
+      "category": "living rooms"
     }
   ]
 }
