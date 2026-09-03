@@ -2008,6 +2008,159 @@
       "duration": null,
       "query": "bright styled living room natural light",
       "category": "living rooms"
+    },
+    {
+      "id": 224,
+      "video_id": 14,
+      "scene_id": "intro-000-00",
+      "narration": "If your living room feels smaller than it really is, the problem may not be the square footage.",
+      "duration": null,
+      "query": "bright styled living room natural light",
+      "category": "living rooms"
+    },
+    {
+      "id": 225,
+      "video_id": 14,
+      "scene_id": "intro-000-01",
+      "narration": "A handful of ordinary decorating choices can visually shrink a room, and reversing them can make the exact same space feel dramatically bigger.",
+      "duration": null,
+      "query": "sunlit living room wide shot",
+      "category": "living rooms"
+    },
+    {
+      "id": 226,
+      "video_id": 14,
+      "scene_id": "intro-000-02",
+      "narration": "Here are 3 ideas worth knowing, each with the principle behind it and a practical way to put it into your own home this week.",
+      "duration": null,
+      "query": "elegant living room morning light",
+      "category": "living rooms"
+    },
+    {
+      "id": 227,
+      "video_id": 14,
+      "scene_id": "item-001-00",
+      "narration": "That takes us to number 1. Do not center the ceiling light by default.",
+      "duration": null,
+      "query": "ceiling light living room interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 228,
+      "video_id": 14,
+      "scene_id": "item-001-01",
+      "narration": "The middle of the ceiling is almost never where the light is needed, which is why so many rooms have a bright empty center and a dim sofa.",
+      "duration": null,
+      "query": "pendant over seating area",
+      "category": "living rooms"
+    },
+    {
+      "id": 229,
+      "video_id": 14,
+      "scene_id": "item-001-02",
+      "narration": "Move or swag the fixture over the actual activity zone, or leave it off entirely and light the room from the perimeter with lamps.",
+      "duration": null,
+      "query": "modern ceiling fixture home",
+      "category": "living rooms"
+    },
+    {
+      "id": 230,
+      "video_id": 14,
+      "scene_id": "item-001-03",
+      "narration": "Worth doing even if you change nothing else on this list.",
+      "duration": null,
+      "query": "living room ceiling lamp",
+      "category": "living rooms"
+    },
+    {
+      "id": 231,
+      "video_id": 14,
+      "scene_id": "item-001-04",
+      "narration": "Light reaching the walls and corners shows your eye exactly where the room ends, and a room whose boundaries are visible reads as larger than one that fades into shadow a few feet in.",
+      "duration": null,
+      "query": "ceiling light living room interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 232,
+      "video_id": 14,
+      "scene_id": "item-002-00",
+      "narration": "Here is where it gets interesting. Number 2 on the list. This is the one people get wrong most often. Measure the room before you buy anything.",
+      "duration": null,
+      "query": "measuring room floor plan",
+      "category": "living rooms"
+    },
+    {
+      "id": 233,
+      "video_id": 14,
+      "scene_id": "item-002-01",
+      "narration": "Furniture almost always looks smaller in a showroom, and returning a sofa is one of the most expensive mistakes in home decorating.",
+      "duration": null,
+      "query": "tape measure interior planning",
+      "category": "living rooms"
+    },
+    {
+      "id": 234,
+      "video_id": 14,
+      "scene_id": "item-002-02",
+      "narration": "Tape the outline of a piece on the floor with painter's tape and live with it for two days. Check doorways, stair turns and lift dimensions too.",
+      "duration": null,
+      "query": "empty room before furniture",
+      "category": "living rooms"
+    },
+    {
+      "id": 235,
+      "video_id": 14,
+      "scene_id": "item-002-03",
+      "narration": "Oversized pieces eat visible floor area and narrow the walking paths, so a small room feels cramped even though its footprint never changed.",
+      "duration": null,
+      "query": "room layout planning",
+      "category": "living rooms"
+    },
+    {
+      "id": 236,
+      "video_id": 14,
+      "scene_id": "item-003-00",
+      "narration": "Here is something that changes a room faster than most people expect. Number 3, and this one is a favorite. Which of these would you notice if it were missing?",
+      "duration": null,
+      "query": "full length curtains luxury interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 237,
+      "video_id": 14,
+      "scene_id": "item-003-01",
+      "narration": "Probably this: make the window treatments oversized. Generous fabric is one of the clearest signals of money in a room, because skimpy curtains are the default in every rental.",
+      "duration": null,
+      "query": "generous drapes living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 238,
+      "video_id": 14,
+      "scene_id": "item-003-02",
+      "narration": "Panels roughly twice the width of the window so they still look full when closed, hung high and wide, and hemmed to just kiss the floor.",
+      "duration": null,
+      "query": "linen curtain panels window",
+      "category": "living rooms"
+    },
+    {
+      "id": 239,
+      "video_id": 14,
+      "scene_id": "item-003-03",
+      "narration": "Hanging the fabric high and wide leaves the glass itself uncovered, so more daylight reaches the room and the wall reads taller than it measures.",
+      "duration": null,
+      "query": "elegant window treatment",
+      "category": "living rooms"
+    },
+    {
+      "id": 240,
+      "video_id": 14,
+      "scene_id": "outro-000-00",
+      "narration": "So that is the full list. That is it for today. Thanks for spending the time.",
+      "duration": null,
+      "query": "bright styled living room natural light",
+      "category": "living rooms"
     }
   ]
 }
