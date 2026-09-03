@@ -119,6 +119,15 @@ class VideoPipeline:
         # pool, phrase pack, promise vocabulary, voice, pronunciation,
         # subtitle chunking and metadata all follow from it.
         self.language = language_from_config(config)
+        # Whether this render claims its footage for the long-term cooldown.
+        # Anything that is not explicitly "production" is treated as a test,
+        # because the expensive mistake is claiming footage by accident.
+        self.generation_mode = (
+            Database.PRODUCTION
+            if str(config.get("generation.mode", "test")).strip().lower()
+            == Database.PRODUCTION
+            else Database.TEST
+        )
         self.state_dir = Path(state_dir)
         # A run label may repeat (a re-run reuses the workflow run number), so
         # the generation id adds a timestamp and a random suffix. Every path
@@ -517,6 +526,106 @@ class VideoPipeline:
         ranked, visual_stats = self._inspect_footage(ranked, scenes, affinity, needed)
         stats["visual"] = visual_stats
 
+        # ---- stage three: search again for what did not match ------------
+        #
+        # Run 16 warned that 19 of 49 clips barely matched their narration and
+        # used them anyway. A clip that does not show the sentence it sits
+        # under is a research failure, not a tolerable defect, so a scene
+        # whose footage misses the bar sends the search back out: the shot
+        # intents it has not tried yet, then deeper pages, then the rest of
+        # its ladder. Only when that budget is spent does a weaker clip
+        # become acceptable, and the log says when it happened.
+        min_semantic = float(self._visual_settings().min_semantic)
+        research_budget = int(sources.get("relevance_search_budget", 2))
+        deep_page = {scene.scene_id: max_pages for scene in scene_order}
+        tried: dict[str, set[str]] = {}
+        stats["relevance_research_rounds"] = 0
+        stats["relevance_research_added"] = 0
+
+        def scene_best_match(scene: Scene) -> float:
+            """The best measured match among the clips this scene's search found."""
+
+            best = 0.0
+            for key in affinity.get(scene.scene_id, []):
+                clip = candidates.get(key)
+                visual = dict(getattr(clip, "visual", {}) or {}) if clip else {}
+                if visual.get("analyzed"):
+                    best = max(best, float(visual.get("semantic_match", 0.0)))
+            return best
+
+        def extra_queries(scene: Scene) -> list[str]:
+            """Queries this scene has not spent yet, most specific first."""
+
+            seen = tried.setdefault(scene.scene_id, set())
+            ordered: list[str] = []
+            for intent in getattr(scene, "shot_intents", []) or []:
+                for text in (intent.search_text, intent.query):
+                    if text and text not in seen:
+                        ordered.append(text)
+            for query in scene.specific_queries:
+                if query.text not in seen:
+                    ordered.append(query.text)
+            return list(dict.fromkeys(ordered))[:4]
+
+        for round_number in range(1, max(0, research_budget) + 1):
+            if min_semantic <= 0:
+                break
+            strong = [
+                c for c in ranked
+                if float(dict(c.visual or {}).get("semantic_match", 0.0)) >= min_semantic
+            ]
+            if len(strong) >= needed:
+                break
+            weak = [s for s in scene_order if scene_best_match(s) < min_semantic]
+            if not weak:
+                break
+            log.info(
+                "Relevance research round %d: %d clip(s) clear %.2f for %d shots; "
+                "re-searching %d scene(s) whose footage does not show their narration",
+                round_number, len(strong), min_semantic, needed, len(weak),
+            )
+            added = 0
+            for scene in weak:
+                bucket = affinity.setdefault(scene.scene_id, [])
+                page = deep_page.get(scene.scene_id, max_pages) + 1
+                deep_page[scene.scene_id] = page
+                for query_text in extra_queries(scene):
+                    tried.setdefault(scene.scene_id, set()).add(query_text)
+                    for provider in providers:
+                        pages = (1, page) if provider.supports_pagination else (1,)
+                        for which in pages:
+                            for clip in run(provider, query_text, which):
+                                if clip.key not in candidates:
+                                    candidates[clip.key] = clip
+                                    added += 1
+                                if clip.key not in bucket:
+                                    bucket.append(clip.key)
+            stats["relevance_research_rounds"] = round_number
+            stats["relevance_research_added"] += added
+            if not added:
+                log.info("Relevance research found no new footage; stopping")
+                break
+            log.info("Relevance research added %d new candidate(s)", added)
+            ranked = ranker.rank(list(candidates.values()), context)
+            ranked, visual_stats = self._inspect_footage(
+                ranked, scenes, affinity, needed
+            )
+            stats["visual"] = visual_stats
+
+        if stats["relevance_research_rounds"]:
+            remaining = [
+                s.scene_id for s in scene_order if scene_best_match(s) < min_semantic
+            ]
+            if remaining:
+                log.warning(
+                    "RELEVANCE FALLBACK: %d scene(s) still have no clip matching "
+                    "their narration at %.2f after %d research round(s); their "
+                    "shots use the best available footage instead. Scenes: %s",
+                    len(remaining), min_semantic,
+                    stats["relevance_research_rounds"], ", ".join(remaining[:6]),
+                )
+                stats["relevance_fallback_scenes"] = len(remaining)
+
         if not ranked:
             raise PipelineError(
                 "Every candidate clip was rejected by frame inspection - "
@@ -644,6 +753,24 @@ class VideoPipeline:
                 context.setdefault(key, scene)
         return context
 
+    @staticmethod
+    def _intent_by_query(scenes: Sequence[Scene]) -> dict[str, str]:
+        """query text -> the English shot intent that asked for it.
+
+        A clip remembers the query that found it, so this is how a clip gets
+        scored against the sentence it will actually illustrate rather than
+        against the whole paragraph. Run 16 put a coffee-table close-up under
+        narration about floor space because both shared one scene-level
+        prompt.
+        """
+
+        intents: dict[str, str] = {}
+        for scene in scenes:
+            for intent in getattr(scene, "shot_intents", []) or []:
+                if intent.query and intent.search_text:
+                    intents.setdefault(intent.query, intent.search_text)
+        return intents
+
     def _inspect_footage(
         self,
         ranked: Sequence[StockClip],
@@ -682,21 +809,31 @@ class VideoPipeline:
         stats["shortlisted"] = len(shortlist)
 
         context = self._scene_context(scenes, affinity)
+        intents = self._intent_by_query(scenes)
         started = time.time()
         deadline = started + budget
 
         def inspect(clip: StockClip) -> StockClip:
+            # Already measured on an earlier pass. Re-searching for better
+            # footage must not re-decode the frames it has already seen.
+            if clip.visual:
+                return clip
             if time.time() > deadline:
                 return clip
             scene = context.get(clip.key)
             analysis = analyzer.analyze_clip(
                 clip,
                 query=clip.query or (scene.primary_visual_query if scene else ""),
-                # The English description of the scene, never the narration.
-                # CLIP is scoring an image against a text prompt; handing it a
-                # Spanish sentence measures how Spanish the prompt is, not how
-                # well the frame shows what is being said.
-                narration=(scene.search_text if scene else ""),
+                # The English description of what this shot should show, never
+                # the narration. CLIP is scoring an image against a text
+                # prompt; handing it a Spanish sentence measures how Spanish
+                # the prompt is, not how well the frame shows what is said.
+                # The shot intent is preferred over the scene's because it is
+                # the sentence this clip will actually sit under.
+                narration=(
+                    intents.get(clip.query or "")
+                    or (scene.search_text if scene else "")
+                ),
                 metadata_flags=metadata_visual_flags(clip, clip.query),
             )
             clip.visual = analysis.to_dict()
@@ -940,6 +1077,10 @@ class VideoPipeline:
         subtitle_metrics.update({
             "subtitle_style": style_name.lower(),
             "burn_in_subtitles": bool(burned),
+            "generation_mode": self.generation_mode,
+            "footage_claimed_for_cooldown": (
+                self.generation_mode == Database.PRODUCTION
+            ),
             "subtitles_srt_exported": subtitles_path is not None,
             "subtitles_ass_exported": ass_path is not None,
         })
@@ -1160,6 +1301,7 @@ class VideoPipeline:
                 duration=clip.get("duration"),
                 content_hash=clip.get("content_hash"),
                 topic=topic.slug,
+                mode=self.generation_mode,
             )
         result.video_id = video_id  # type: ignore[attr-defined]
 

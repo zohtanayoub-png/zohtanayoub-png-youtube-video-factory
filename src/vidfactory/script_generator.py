@@ -26,6 +26,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Sequence
 
+from .contradiction import find_contradictions
 from .causal_alignment import (
     PASS_THRESHOLD,
     CausalReport,
@@ -918,17 +919,34 @@ class TemplateScriptEngine:
                     recent_patterns, used_transitions, used_phrases,
                 )
                 candidate.text = (
-                    repair_text(candidate.text, promise, tip, used=used) or candidate.text
-                )
-                if score_paragraph(candidate.text, promise).score >= PASS_THRESHOLD:
-                    log.info(
-                        "Replaced item %d (%s) with %r, which explains the "
-                        "'%s' promise in its own words",
-                        failure.index, failure.heading, tip.get("title", ""), promise.key,
+                    repair_text(
+                        candidate.text, promise, tip,
+                        used=used, heading=candidate.heading,
                     )
-                    sections[position] = candidate
-                    replacements += 1
-                    break
+                    or candidate.text
+                )
+                if score_paragraph(candidate.text, promise).score < PASS_THRESHOLD:
+                    continue
+                # A replacement that argues against its own heading is not a
+                # replacement, it is the same bug with a different idea.
+                if find_contradictions(
+                    candidate.heading, candidate.text,
+                    language=getattr(promise, "language", "en"),
+                ):
+                    log.info(
+                        "Skipped %r as a replacement: its explanation contradicts "
+                        "its own heading",
+                        tip.get("title", ""),
+                    )
+                    continue
+                log.info(
+                    "Replaced item %d (%s) with %r, which explains the "
+                    "'%s' promise in its own words",
+                    failure.index, failure.heading, tip.get("title", ""), promise.key,
+                )
+                sections[position] = candidate
+                replacements += 1
+                break
 
         final = validate_sections(sections, promise, rewrite=True, used=used)
         final.rewrites += report.rewrites

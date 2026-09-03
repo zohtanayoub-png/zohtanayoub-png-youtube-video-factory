@@ -293,6 +293,39 @@ itself.
 
 ---
 
+## Test renders and the footage cooldown
+
+A clip is not used again for 45 days after a video uses it, so the channel
+never shows the same footage twice in a fortnight. That rule should only count
+videos you actually publish.
+
+Every render therefore has a **mode**:
+
+| Mode | What it does to the cooldown |
+| --- | --- |
+| `test` (default) | records that the clip was tried, and leaves it available |
+| `production` | claims the clip for the next 45 days |
+
+In **Actions → Generate Video** it is the *Generation mode* dropdown, and it
+defaults to `test`. Switch it to `production` for a video that is going on the
+channel. The run summary prints `generation_mode` and
+`footage_claimed_for_cooldown` so you can always see which one it was.
+
+If development renders have already locked up footage:
+
+```bash
+python -m vidfactory cooldown                      # how much is locked up
+python -m vidfactory cooldown --release --dry-run  # what a release would free
+python -m vidfactory cooldown --release            # free it
+```
+
+`--release` **moves** the usage into development history rather than deleting
+it: every row, count and timestamp survives, and only the cooldown stops
+seeing them. Limit it with `--before 2026-09-01T00:00:00Z` or
+`--topic some-slug` if some of your renders were real.
+
+---
+
 ## Optional: the local AI script model
 
 The scripts are written by a built-in engine that needs no model and no

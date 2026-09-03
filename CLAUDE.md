@@ -27,7 +27,13 @@ These are requirements, not preferences. Do not relax them.
    committed.
 6. **The pipeline degrades, it does not crash.** A failed clip, a failed TTS
    chunk, a missing LLM, an unreachable provider - each has a fallback.
-7. **Content language and search language are different things.** The channel
+7. **A development render must not claim production footage.** `generation.mode`
+   is `test` by default; only `production` writes a clip's `last_used_at`, and
+   only that column feeds the cooldown. Sixteen development renders had already
+   taken 465 Pexels videos out of circulation for 45 days each before anything
+   was published; `vidfactory cooldown --release` moves that usage into the
+   development columns without deleting a row.
+8. **Content language and search language are different things.** The channel
    narrates in US English by default and in Spanish on request; Pexels is
    always queried in English whichever is chosen. A Spanish string must never
    reach a stock provider. See `languages.py`.
@@ -52,6 +58,7 @@ src/vidfactory/
   visual_analysis.py FFmpeg frame sampling + pixel statistics + flags
   visual_model.py    optional ONNX CLIP backend, always optional
   causal_alignment.py does the written paragraph explain the title's promise
+  contradiction.py   does the paragraph argue *for* its own heading
   title_alignment.py what a title promises, and which ideas actually deliver it
   editorial_qc.py    repetition, relevance and diversity gates (not ffprobe)
   stock/             provider adapters: base, pexels, pixabay, local, registry
@@ -110,6 +117,39 @@ src/vidfactory/
 * **ASS alpha is inverted.** `00` is opaque, `FF` is invisible. The first
   burned-in captions used `&HC8` for the outline - 78% *transparent* - and
   white text on a pale wall had almost nothing holding it.
+* **An explanation has a direction, and it must point the same way as the
+  heading.** Run 16 shipped "Buy one bigger thing instead of three medium
+  things ... Oversized pieces eat visible floor area, so a small room feels
+  cramped". It scored 1.00 for causal alignment, because it does state a
+  mechanism, a connective and the promised outcome - it just states them
+  against the advice. `contradiction.py` reads each item as
+  `recommended_action -> mechanism -> desired_outcome`, and a sentence blaming
+  the pole the heading recommends is rejected: first by refusing that
+  explanation during repair, then by a post-write check that rewrites the
+  paragraph and finally replaces the idea. `contradiction_count` is an **error**
+  in the editorial report, not a warning.
+* **A large mirror and an oversized sofa are not the same mechanism.**
+  `statement_piece_scale` (fewer, larger objects reduce visual fragmentation)
+  and `furniture_footprint_scale` (an oversized sofa eats visible floor) share
+  no words and no explanations. One mechanism owning both is what let the sofa
+  sentence be appended to the artwork advice.
+* **An idea must deliver the promise with its *primary* mechanism.**
+  `subject_deny_signals` is matched against an idea's title and tags only and
+  cannot be rescued, because "Mix at least three materials in every room" is a
+  texture tip however many sentences about reflection get bolted on.
+* **Low relevance triggers a new search, not a warning.** A scene whose footage
+  does not match its narration sends the search back out - the shot intents it
+  has not spent, then deeper pages, then the rest of its ladder - for
+  `sources.relevance_search_budget` rounds. Only then is a weaker clip
+  acceptable, and the log says so.
+* **Production is graded on the clips that reach the screen.** `final_shot_*`
+  metrics measure the edit; `candidate_*` measure the search. Run 16 gated on
+  the candidate pool and reported "19 of 49 low relevance" for a 36-shot video.
+* **Every 3-6 second chunk of narration gets its own visual intent.** A scene
+  used to carry one query for a whole paragraph, so "an undersized rug leaves
+  the seating floating" and "choose one large enough for the front legs" were
+  searched and scored identically. `ShotIntent.search_text` is always English
+  and is what CLIP scores the frames against.
 * **Relevance outranks beauty.** The second ranking stage weights
   scene-to-clip semantic match (45) above interior subject (30), visual
   quality (18), novelty (12) and technical quality (8). A beautiful unrelated
@@ -169,6 +209,8 @@ python -m pytest -q -m "not integration"   # ~400 fast tests
 python -m pytest -q -m integration         # a genuine ~60 s 1080p render
 python -m vidfactory llm-check             # is the optional local model viable here
 python -m vidfactory visual-check          # is the CLIP backend viable here
+python -m vidfactory cooldown              # how much footage is locked up
+python -m vidfactory cooldown --release --dry-run   # what a release would free
 ```
 
 The integration test uses FFmpeg-generated synthetic footage and the offline TTS

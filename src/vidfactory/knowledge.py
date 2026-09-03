@@ -45,11 +45,11 @@ _add("living rooms", [
         "tags": ["curtains", "windows", "height", "living room"],
     },
     {
-        "title": "Buy a rug that is genuinely too big rather than slightly too small",
+        "title": "Choose a rug that is generously sized, not undersized",
         "why": "A rug defines the seating zone. When it is undersized, the furniture floats on the floor with no visual anchor and the whole seating group reads as smaller and more scattered than it actually is.",
-        "how": "Aim for a rug wide enough that at least the front legs of every seat sit on it. In most living rooms that means eight by ten feet, not five by seven, and it should extend roughly six to eight inches past the sides of the sofa.",
+        "how": "Aim for a rug wide enough that at least the front legs of every seat sit on it, and keep it proportional to the room: leave a consistent border of floor showing around the edges rather than running it wall to wall. In most living rooms that means eight by ten feet, not five by seven.",
         "mistake": "The classic error is a small rug centered under the coffee table only, which shrinks the room and makes expensive furniture look accidental.",
-        "queries": ["large living room rug sofa", "modern living room carpet interior", "area rug under coffee table", "neutral rug living room design"],
+        "queries": ["large living room rug sofa", "sofa front legs on rug", "properly sized living room rug", "modern living room carpet interior", "area rug under coffee table", "neutral rug living room design"],
         "tags": ["rug", "layout", "living room", "floor"],
     },
     {

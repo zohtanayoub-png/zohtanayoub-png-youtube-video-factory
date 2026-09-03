@@ -197,7 +197,9 @@ def build_report(
         "max_promise_alignment_failures": 0,
         "min_visual_semantic_match": 0.45,
         "max_low_relevance_clips": 0.15,
-        "min_causal_promise_alignment": 0.85,
+        "min_final_shot_semantic_match": 0.50,
+        "max_final_shot_low_relevance": 0.15,
+        "min_causal_promise_alignment": 0.90,
         **dict(thresholds or {}),
     }
 
@@ -285,8 +287,53 @@ def build_report(
         if rated
         else 0.0
     )
+    # ------------------------------------------------------------------
+    # Candidate clips vs the clips actually on screen.
+    #
+    # Run 16 reported "19 of 49 clips barely match" and gated on that number,
+    # which mixes clips that were downloaded with clips that made the edit.
+    # The viewer only ever sees the second group, so that is what production
+    # is graded on; the candidate figures stay in the report because a wide
+    # gap between them means the ranker is doing its job.
+    # ------------------------------------------------------------------
+    final_keys = {s.clip_key for s in shots}
+    final_visual: list[dict[str, Any]] = []
+    final_premium: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    for clip, premium, visual in zip(selected, premium_reports, visual_reports):
+        if getattr(clip, "key", None) not in final_keys:
+            continue
+        final_premium.append((premium, visual))
+        if visual.get("analyzed"):
+            final_visual.append(visual)
+
+    final_scores = [float(v.get("semantic_match", 0.0)) for v in final_visual]
+    final_semantic_average = (
+        round(sum(final_scores) / len(final_scores), 3) if final_scores else 0.0
+    )
+    final_low_relevance = sum(1 for s in final_scores if s < LOW_RELEVANCE_MATCH)
+    final_low_relevance_pct = (
+        round(final_low_relevance / len(final_scores), 3) if final_scores else 0.0
+    )
+    final_premium_clips = 0
+    for premium, visual in final_premium:
+        by_caption = bool(premium.get("is_premium", False))
+        if visual.get("analyzed"):
+            final_premium_clips += int(
+                by_caption and bool(visual.get("is_premium_visual"))
+            )
+        else:
+            final_premium_clips += int(by_caption)
+    final_premium_ratio = (
+        round(final_premium_clips / len(final_premium), 3) if final_premium else 0.0
+    )
+
     visual_meta = dict(visual_stats or {})
     causal_score = float(getattr(causal, "overall", 1.0)) if causal is not None else 1.0
+    contradiction_report = getattr(causal, "contradiction", None)
+    contradictions = [
+        c.to_dict() for c in getattr(contradiction_report, "items", []) or []
+    ]
+    contradiction_count = len(contradictions)
     section_scores = (
         [round(float(r.score), 3) for r in getattr(causal, "results", [])]
         if causal is not None
@@ -319,6 +366,16 @@ def build_report(
         # ---- real frame inspection --------------------------------------
         "visual_semantic_match_average": semantic_average,
         "low_relevance_clip_count": low_relevance,
+        "candidate_visual_semantic_match_average": semantic_average,
+        "candidate_low_relevance_count": low_relevance,
+        "candidate_inspected_count": len(inspected),
+        # What the viewer actually sees, which is what production is graded on.
+        "final_shot_count": len(final_keys),
+        "final_shot_inspected_count": len(final_visual),
+        "final_shot_visual_semantic_match_average": final_semantic_average,
+        "final_shot_low_relevance_count": final_low_relevance,
+        "final_shot_low_relevance_percentage": final_low_relevance_pct,
+        "final_shot_premium_visual_ratio": final_premium_ratio,
         "visual_analysis_model": visual_meta.get("model", "not run"),
         "visual_analysis_frame_count": int(visual_meta.get("frames", 0)) or sum(
             int(v.get("frame_count", 0)) for v in inspected
@@ -337,6 +394,13 @@ def build_report(
         ),
         "causal_rewrites": int(getattr(causal, "rewrites", 0)),
         "causal_replacements": int(getattr(causal, "replacements", 0)),
+        # ---- self-contradiction ------------------------------------------
+        # A paragraph can explain itself perfectly and still argue against
+        # its own heading. Run 16 shipped two of those, so this is an error
+        # rather than a warning: a video that tells the viewer to do the
+        # opposite of its own advice is not publishable.
+        "contradiction_count": contradiction_count,
+        "contradictions": contradictions,
         # ---- language, voice and captions --------------------------------
         **dict(production or {}),
         "search": stats,
@@ -344,6 +408,18 @@ def build_report(
     }
 
     checks = [
+        EditorialCheck(
+            "no_self_contradiction",
+            contradiction_count == 0,
+            (
+                f"{contradiction_count} section(s) argue against their own "
+                "heading: "
+                + "; ".join(c.get("why", "") for c in contradictions[:2])
+                if contradiction_count
+                else "no section contradicts its own advice"
+            ),
+            severity="error",
+        ),
         EditorialCheck(
             "no_source_video_reuse",
             reuse_count <= int(limits["max_source_reuse"]),
@@ -408,21 +484,50 @@ def build_report(
             f"{empty_clips} empty",
             severity="warning",
         ),
+        # No frames inspected means nothing was measured, which is not the
+        # same as measuring badly. Without the optional CLIP backend, or on a
+        # run where inspection timed out, these gates have no evidence and
+        # must not invent a failure.
         EditorialCheck(
-            "visual_semantic_match",
-            semantic_average >= float(limits["min_visual_semantic_match"]),
-            f"frames match the narration at {semantic_average:.2f} on average "
-            f"(minimum {limits['min_visual_semantic_match']}), measured on "
-            f"{len(inspected)} clip(s) by {visual_meta.get('model', 'no model')}",
-            severity="warning",
+            "final_shot_relevance",
+            (
+                not final_visual
+                or final_semantic_average
+                >= float(limits["min_final_shot_semantic_match"])
+            ),
+            (
+                f"the {len(final_visual)} clips actually on screen match their "
+                f"narration at {final_semantic_average:.2f} on average "
+                f"(minimum {limits['min_final_shot_semantic_match']}); across "
+                f"all {len(inspected)} candidates it was {semantic_average:.2f}"
+                if final_visual
+                else "no frames were inspected, so relevance is unmeasured"
+            ),
         ),
         EditorialCheck(
-            "low_relevance_clips",
-            (low_relevance / len(inspected) if inspected else 0.0)
-            <= float(limits["max_low_relevance_clips"]),
-            f"{low_relevance} of {len(inspected)} inspected clips barely match "
-            f"the sentence they illustrate "
-            f"(limit {float(limits['max_low_relevance_clips']):.0%})",
+            "final_shot_low_relevance",
+            (
+                not final_visual
+                or final_low_relevance_pct
+                <= float(limits["max_final_shot_low_relevance"])
+            ),
+            (
+                f"{final_low_relevance} of {len(final_visual)} clips on screen "
+                f"({final_low_relevance_pct:.0%}) barely match the sentence "
+                f"they illustrate (limit "
+                f"{float(limits['max_final_shot_low_relevance']):.0%}); "
+                f"{low_relevance} of {len(inspected)} candidates did"
+                if final_visual
+                else "no frames were inspected, so relevance is unmeasured"
+            ),
+        ),
+        EditorialCheck(
+            "candidate_pool_relevance",
+            not inspected
+            or semantic_average >= float(limits["min_visual_semantic_match"]),
+            f"the candidate pool averaged {semantic_average:.2f} "
+            f"(minimum {limits['min_visual_semantic_match']}) across "
+            f"{len(inspected)} inspected clips",
             severity="warning",
         ),
         EditorialCheck(

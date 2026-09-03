@@ -91,6 +91,12 @@ sources:
   per_query_results: 30
   max_pages: 3                  # how deep to page a productive query
   candidate_headroom: 1.35      # download this much more than the shot count
+  # When a scene's footage does not actually show what the narration says,
+  # search again rather than accepting it: the shot intents that scene has not
+  # spent, then deeper pages, then the rest of its query ladder. Each round
+  # costs API calls and frame decoding, so the budget is small; the log says
+  # when it runs and when it gives up.
+  relevance_search_budget: 2
   min_width: 1280
   min_height: 720
   prefer_width: 1920
@@ -166,6 +172,19 @@ youtube:
   category_id: "26"             # Howto & Style
   made_for_kids: false
 
+# Whether this render's footage counts against the long-term cooldown.
+#
+#   production  the clips it uses are claimed for sources.cooldown_days
+#   test        the clips are recorded as tried, and stay available
+#
+# The default is test on purpose. Sixteen development renders reached the
+# cooldown before anything was published, which took 465 Pexels videos out of
+# circulation for forty-five days each; `vidfactory cooldown --release` is the
+# repair. Set this to production - or pass --mode production - for a render
+# that is actually going on the channel.
+generation:
+  mode: test
+
 output:
   directory: output
   keep_workdir: false           # delete downloaded footage after a successful render
@@ -196,9 +215,17 @@ editorial:
   # 0.43. The score is where a scene's own prompt lands among nine plausible
   # alternatives, so 0.5 means "mid-pack" and below 0.35 means the frames are
   # a better fit for some other subject than for the sentence they illustrate.
-  min_visual_semantic_match: 0.40  # average frame-to-narration match
-  max_low_relevance_clips: 0.30    # share of clips below 0.35 individually
-  min_causal_promise_alignment: 0.85
+  min_visual_semantic_match: 0.40  # candidate pool average (warning only)
+  max_low_relevance_clips: 0.30    # share of candidates below 0.35 individually
+  # The gate is on the clips that actually reach the screen, not on everything
+  # the search downloaded. Run 16 graded the candidate pool and reported "19 of
+  # 49 low relevance" for a video with 36 shots in it, which measures the
+  # search rather than the edit. Low-relevance candidates are now re-searched
+  # (see sources.relevance_search_budget) instead of tolerated, so the bar for
+  # what survives to the timeline is higher than the bar for what was fetched.
+  min_final_shot_semantic_match: 0.50
+  max_final_shot_low_relevance: 0.15
+  min_causal_promise_alignment: 0.90
 
 quality:
   min_file_mb: 1.0

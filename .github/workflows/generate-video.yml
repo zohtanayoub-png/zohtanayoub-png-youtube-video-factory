@@ -57,6 +57,12 @@ on:
         required: false
         type: boolean
         default: true
+      generation_mode:
+        description: "Production claims its footage for 45 days; test does not"
+        required: false
+        type: choice
+        default: "test"
+        options: [test, production]
       upload_to_youtube:
         description: "Upload to YouTube when it is finished"
         required: false
@@ -101,6 +107,10 @@ on:
         required: false
         type: boolean
         default: true
+      generation_mode:
+        required: false
+        type: string
+        default: "production"
       upload_to_youtube:
         required: false
         type: boolean
@@ -229,6 +239,7 @@ jobs:
           INPUT_VOICE: ${{ inputs.voice }}
           INPUT_SUBTITLES: ${{ inputs.subtitles }}
           INPUT_BURN_IN: ${{ inputs.burn_in_subtitles }}
+          INPUT_MODE: ${{ inputs.generation_mode }}
           INPUT_UPLOAD: ${{ inputs.upload_to_youtube }}
           INPUT_PRIVACY: ${{ inputs.privacy_status }}
           RUN_NUMBER: ${{ github.run_number }}
@@ -245,6 +256,7 @@ jobs:
             --voice "${INPUT_VOICE}" \
             --subtitles "${INPUT_SUBTITLES}" \
             --burn-in "${INPUT_BURN_IN}" \
+            --mode "${INPUT_MODE}" \
             --upload "${INPUT_UPLOAD}" \
             --privacy "${INPUT_PRIVACY}" \
             --run-id "run-${RUN_NUMBER}" \
@@ -318,8 +330,15 @@ jobs:
               "visual_analysis_model",
               "visual_analysis_frame_count",
               "visually_inspected_clip_count",
-              "visual_semantic_match_average",
-              "low_relevance_clip_count",
+              "candidate_visual_semantic_match_average",
+              "candidate_low_relevance_count",
+              "candidate_inspected_count",
+              "final_shot_count",
+              "final_shot_inspected_count",
+              "final_shot_visual_semantic_match_average",
+              "final_shot_low_relevance_count",
+              "final_shot_low_relevance_percentage",
+              "final_shot_premium_visual_ratio",
               "premium_visual_ratio",
               "premium_visual_ratio_caption_only",
               "empty_room_clip_count",
@@ -329,6 +348,9 @@ jobs:
               "people_dominant_clip_count",
               "dark_clip_count",
               "causal_promise_alignment_score",
+              "contradiction_count",
+              "generation_mode",
+              "footage_claimed_for_cooldown",
               "unique_source_videos",
               "source_video_reuse_count",
               "shot_count",
@@ -540,6 +562,11 @@ jobs:
               "subtitle_event_count", "average_subtitle_words",
               "max_subtitle_lines", "subtitle_safe_area_passed",
               "subtitle_timing_passed",
+              "generation_mode",
+              "footage_claimed_for_cooldown",
+              "contradiction_count",
+              "final_shot_visual_semantic_match_average",
+              "final_shot_low_relevance_percentage",
           ):
               if key in data:
                   print(f"- **{key}**: `{data[key]}`")

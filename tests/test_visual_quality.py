@@ -291,7 +291,7 @@ def test_the_same_idea_with_an_oversized_furniture_explanation_passes():
     result = score_paragraph(MEASURE_WITH_REASON, BIGGER)
     assert result.passed
     assert result.score == 1.0
-    assert "furniture_scale" in result.mechanisms
+    assert "furniture_footprint_scale" in result.mechanisms
 
 
 def test_the_ceiling_light_idea_is_repaired_with_the_lighting_mechanism():

@@ -83,6 +83,17 @@ class Promise:
     deny_signals: tuple[str, ...] = ()
     #: ...unless the idea explicitly claims the outcome in its own words.
     rescue_signals: tuple[str, ...] = ()
+    #: Subjects that can never deliver this promise, however the idea is
+    #: written. Unlike ``deny_signals`` these are matched against the idea's
+    #: title and tags only - its *primary* subject - and cannot be rescued.
+    #:
+    #: Run 16 put "Mix at least three materials in every room" into a video
+    #: about making a small living room look bigger. It got in because its body
+    #: mentions "one small reflective element", which matched the mirror
+    #: mechanism, and a rescue sentence about reflection was enough to keep it.
+    #: But the idea is a warmth-and-texture tip; no amount of secondary
+    #: sentences make its primary mechanism a spatial one.
+    subject_deny_signals: tuple[str, ...] = ()
     #: Which language this promise's vocabulary is written in.
     language: str = "en"
 
@@ -106,6 +117,23 @@ SPACE_OUTCOMES: tuple[str, ...] = (
     "stretches", "stretch the", "perceived", "visually",
     "sense of space", "feeling of space", "square footage",
 )
+
+#: Subjects that are simply not spatial. An idea whose *title or tags* are
+#: about one of these is a styling, warmth or material idea; it may be excellent
+#: advice and it does not belong in a video promising a room will look bigger.
+#: Matched against the idea's subject only, so a passing mention of texture in
+#: the body of a genuine space trick is harmless.
+#: Matched on whole words, so "Keep one continuous flooring material" - a
+#: genuine space trick - is not caught by the plural "materials" that marks a
+#: texture-mixing tip.
+NON_SPATIAL_SUBJECTS: tuple[str, ...] = (
+    "texture", "textures", "materials", "tactile",
+    "warmth", "cozy", "cosy", "scent", "sound", "acoustic",
+    "metal finish", "metals", "colour rule", "color rule",
+    "palette", "color formula", "colour formula", "seasonal",
+    "personality", "sentimental",
+)
+
 
 #: Generic colour-theory and styling principles. Useful advice, but they do
 #: not by themselves change how large a room reads.
@@ -160,19 +188,71 @@ PROMISES: tuple[Promise, ...] = (
                 "go, which makes even a narrow space feel bigger.",
                 ),
             ),
+            # ------------------------------------------------------------------
+            # Two different things that both used to be called "scale".
+            #
+            # A large mirror, artwork or lamp and an oversized sofa do opposite
+            # things to a small room, and run 16 shipped the sofa explanation
+            # under the artwork advice because one mechanism owned both. They
+            # are separate families now and neither one's sentences are
+            # available to the other.
+            # ------------------------------------------------------------------
             Mechanism(
-                "furniture_scale",
-                ("fewer, larger", "larger pieces", "oversized", "undersized", "too small",
-                 "visual weight", "bulky", "heavy", "lighter", "scale", "measure",
-                 "measurement", "dimensions", "tape measure"),
-                "Oversized pieces eat visible floor area and narrow the walking "
+                "statement_piece_scale",
+                ("statement piece", "one bigger", "bigger thing", "one large",
+                 "larger piece", "larger pieces", "fewer, larger", "fewer larger",
+                 "one oversized", "one big", "large artwork", "artwork",
+                 "substantial", "focal point", "single large"),
+                "A dozen small objects give the eye a dozen things to process, so "
+                "swapping them for one substantial piece cuts the visual clutter "
+                "and the room reads as calmer and more spacious.",
+                also_because=(
+                    "One piece the eye can settle on beats a wall of small ones it has to "
+                "count, which is why a single generous object makes a room feel "
+                "more spacious rather than busier.",
+                    "Fewer, larger objects break the room into fewer pieces, so the space "
+                "reads as one calm whole and feels bigger for it.",
+                ),
+            ),
+            Mechanism(
+                "furniture_footprint_scale",
+                # "undersized" and "too small" are deliberately absent: they
+                # describe whatever object is undersized, which is usually the
+                # rug, and claiming them here made the sofa mechanism outrank
+                # the rug mechanism on rug advice.
+                ("oversized sofa", "oversized furniture", "too big for the room",
+                 "footprint", "visual weight", "bulky", "measure", "measurement",
+                 "dimensions", "tape measure", "seat depth", "deep sofa"),
+                # Cautionary: this family is about the mistake, so its sentences
+                # blame the oversized piece. The contradiction check keeps them
+                # away from advice that recommends going larger.
+                "Oversized furniture eats visible floor area and narrows the walking "
                 "paths, so a small room feels cramped even though its footprint "
                 "never changed.",
                 also_because=(
-                    "A piece that is too big for the room steals the floor around it, so "
+                    "A sofa that is too big for the room steals the floor around it, so "
                 "what is left over feels cramped even though nothing else changed.",
                     "Getting the scale right leaves room to walk and room to look, which "
                 "makes a small space read as larger than it measures.",
+                ),
+            ),
+            Mechanism(
+                "rug_scale",
+                ("rug", "carpet", "area rug"),
+                # A rug is not furniture and not a statement piece: the failure
+                # mode is a rug too small to reach the seating, so the sentences
+                # blame the undersized one and argue for the generous one.
+                "A rug too small to reach the furniture leaves the seating floating "
+                "in separate pieces, so one large enough to catch the front legs "
+                "pulls the group into a single zone and the floor reads as more "
+                "spacious.",
+                also_because=(
+                    "An undersized rug cuts the floor into a small island surrounded by "
+                "leftovers, while a generously sized one lets the whole floor read "
+                "as one surface and the room feel bigger.",
+                    "When the rug reaches under the seats, the eye reads one connected "
+                "area instead of scattered furniture, which makes the space feel "
+                "larger than it measures.",
                 ),
             ),
             Mechanism(
@@ -323,6 +403,7 @@ PROMISES: tuple[Promise, ...] = (
         required_groups=1,
         deny_signals=GENERIC_DESIGN_PRINCIPLES,
         rescue_signals=SPACE_OUTCOMES,
+        subject_deny_signals=NON_SPATIAL_SUBJECTS,
         counter_signals=(
             "conversation", "comfort", "cozy", "scent", "sound", "acoustic",
             "seasonal", "maintenance", "regrout", "towel", "water pressure",
@@ -631,6 +712,19 @@ def _tip_text(tip: Tip) -> str:
     return " ".join(parts).lower()
 
 
+def _tip_subject(tip: Tip) -> str:
+    """What the idea is *primarily* about: its title and its tags.
+
+    Deliberately not the body. An idea's ``why`` and ``how`` mention whatever
+    they need to, and judging the subject by them is how a texture tip that
+    happens to name a brass lamp ends up counting as a lighting idea.
+    """
+
+    return " ".join(
+        [str(tip.get("title", "")), " ".join(str(t) for t in tip.get("tags", []))]
+    ).lower()
+
+
 #: An idea must clear this to be considered "supports the title promise".
 DEFAULT_THRESHOLD = 0.5
 
@@ -642,7 +736,7 @@ class AlignmentResult:
     matched_groups: list[str] = field(default_factory=list)
     counters: list[str] = field(default_factory=list)
     #: Names of the direct causal mechanism(s) by which this idea delivers
-    #: the promise, e.g. ``furniture_scale``.
+    #: the promise, e.g. ``furniture_footprint_scale``.
     mechanisms: list[str] = field(default_factory=list)
     #: The exact words that matched, for the log and the report.
     mechanism_words: list[str] = field(default_factory=list)
@@ -681,6 +775,20 @@ def _hits(text: str, phrases: Sequence[str]) -> list[str]:
     return [p for p in phrases if p in text]
 
 
+def _word_hits(text: str, phrases: Sequence[str]) -> list[str]:
+    """Whole-word matches only.
+
+    Substring matching is right for the body of an idea, where "reflective"
+    should count as reflection. It is wrong for the subject, where "material"
+    inside "flooring material" would disqualify a continuous-flooring tip.
+    """
+
+    return [
+        p for p in phrases
+        if p.strip() and re.search(rf"\b{re.escape(p.strip())}\b", text)
+    ]
+
+
 def score_alignment(tip: Tip, promise: Promise) -> AlignmentResult:
     """How strongly one idea supports the promise a title makes (0.0 - 1.0).
 
@@ -703,6 +811,16 @@ def score_alignment(tip: Tip, promise: Promise) -> AlignmentResult:
         return AlignmentResult(tip=tip, score=0.0, counters=["declared elsewhere"])
 
     counters = _hits(text, promise.counter_signals)
+
+    # 0. Some subjects simply cannot deliver some promises. This is checked
+    #    against the idea's title and tags, and there is no rescue: an idea
+    #    about mixing textures is a texture idea even if a sentence in it
+    #    mentions reflection.
+    off_subject = _word_hits(_tip_subject(tip), promise.subject_deny_signals)
+    if off_subject:
+        return AlignmentResult(
+            tip=tip, score=0.0, counters=counters, denied_by=off_subject
+        )
 
     # 1. Generic design principles are rejected unless the idea itself
     #    explains that it produces the promised outcome.
@@ -825,12 +943,20 @@ def rank_mechanisms(promise: Promise, text: str) -> list[Mechanism]:
     """
 
     haystack = str(text or "").lower()
-    scored: list[tuple[int, int, int, Mechanism]] = []
+    scored: list[tuple[int, int, int, int, Mechanism]] = []
     for position, family in enumerate(promise.mechanisms):
         matched = [word for word in family.words if word in haystack]
-        if matched:
-            scored.append((len(matched), max(len(w) for w in matched), -position, family))
-    scored.sort(key=lambda item: item[:3], reverse=True)
+        if not matched:
+            continue
+        # How often the subject actually comes up, not just whether it does.
+        # Rug advice says "rug" four times and "floats" once; ranking on the
+        # longest matched word alone made a passing mention of floating
+        # furniture outrank the thing the paragraph is about.
+        occurrences = sum(haystack.count(word) for word in matched)
+        scored.append(
+            (occurrences, len(matched), max(len(w) for w in matched), -position, family)
+        )
+    scored.sort(key=lambda item: item[:4], reverse=True)
     return [family for *_, family in scored]
 
 

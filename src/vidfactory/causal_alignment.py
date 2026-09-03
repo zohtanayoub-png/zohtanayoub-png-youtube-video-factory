@@ -35,6 +35,13 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Sequence
 
+from .contradiction import (
+    AdviceDirection,
+    Contradiction,
+    ContradictionReport,
+    find_contradictions,
+    read_direction,
+)
 from .logging_utils import get_logger
 from .title_alignment import (
     GENERAL,
@@ -114,10 +121,14 @@ class CausalResult:
     evidence: str = ""
     repaired: bool = False
     replaced: bool = False
+    #: Sentences that argue against this section's own heading.
+    contradictions: list[Contradiction] = field(default_factory=list)
+    #: What the heading tells the viewer to do, and to avoid.
+    direction: AdviceDirection | None = None
 
     @property
     def passed(self) -> bool:
-        return self.score >= PASS_THRESHOLD
+        return self.score >= PASS_THRESHOLD and not self.contradictions
 
     def explain(self) -> str:
         outcome = self.outcomes[0] if self.outcomes else ""
@@ -154,6 +165,9 @@ class CausalResult:
             "evidence": self.evidence,
             "repaired": self.repaired,
             "replaced": self.replaced,
+            "contradiction_count": len(self.contradictions),
+            "contradictions": [c.to_dict() for c in self.contradictions],
+            "direction": self.direction.to_dict() if self.direction else {},
         }
 
 
@@ -226,11 +240,20 @@ def repair_text(
     promise: Promise,
     tip: dict[str, Any] | None = None,
     used: dict[str, int] | None = None,
+    heading: str = "",
 ) -> str | None:
     """Add the missing causal explanation, or ``None`` if there is none to add.
 
     The sentence comes from the mechanism the idea already relies on, so the
     repair explains *this* idea rather than bolting a generic claim onto it.
+
+    ``heading`` is what stops the repair reversing the advice. Mechanism
+    explanations have a direction - some describe why the recommended thing
+    works, others why the mistake fails - and appending the wrong one is
+    exactly how run 16 ended up telling viewers to buy one bigger thing and
+    then explaining that bigger things make a room feel cramped. A candidate
+    sentence that contradicts the heading is skipped, and the next phrasing of
+    the same mechanism is tried instead.
     """
 
     candidates: list[Mechanism] = rank_mechanisms(promise, str(text or ""))
@@ -241,6 +264,8 @@ def repair_text(
             if family not in candidates:
                 candidates.append(family)
     counters = used if used is not None else {}
+    language = getattr(promise, "language", "en")
+    direction = read_direction(heading, language=language) if heading else None
     for family in candidates:
         options = family.explanations
         if not options:
@@ -249,10 +274,33 @@ def repair_text(
         for offset in range(len(options)):
             sentence = options[(start + offset) % len(options)]
             repaired = f"{str(text).rstrip()} {sentence}".strip()
-            if score_paragraph(repaired, promise).score >= PASS_THRESHOLD:
-                counters[family.name] = start + offset + 1
-                return repaired
+            if score_paragraph(repaired, promise).score < PASS_THRESHOLD:
+                continue
+            if direction and find_contradictions(
+                heading, sentence, language=language, direction=direction
+            ):
+                log.debug(
+                    "Skipped the %s explanation for %r: it argues against the heading",
+                    family.name, heading,
+                )
+                continue
+            counters[family.name] = start + offset + 1
+            return repaired
     return None
+
+
+def strip_contradictions(
+    text: str, contradictions: Sequence[Contradiction]
+) -> str:
+    """Remove the sentences that argue against the heading, keeping the rest."""
+
+    offending = {c.sentence.strip() for c in contradictions}
+    kept = [
+        s.strip()
+        for s in _SENTENCE_SPLIT.split(str(text or ""))
+        if s.strip() and s.strip() not in offending
+    ]
+    return " ".join(kept)
 
 
 @dataclass
@@ -263,6 +311,9 @@ class CausalReport:
     results: list[CausalResult] = field(default_factory=list)
     rewrites: int = 0
     replacements: int = 0
+    #: Sections whose paragraph argued against their own heading, and what
+    #: was done about it. Production requires this to be empty.
+    contradiction: ContradictionReport = field(default_factory=ContradictionReport)
 
     @property
     def overall(self) -> float:
@@ -274,6 +325,10 @@ class CausalReport:
     def failures(self) -> list[CausalResult]:
         return [r for r in self.results if not r.passed]
 
+    @property
+    def contradiction_count(self) -> int:
+        return self.contradiction.count
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "promise": self.promise_key,
@@ -283,6 +338,7 @@ class CausalReport:
             "rewrites": self.rewrites,
             "replacements": self.replacements,
             "sections": [r.to_dict() for r in self.results],
+            **self.contradiction.to_dict(),
         }
 
 
@@ -301,22 +357,28 @@ def validate_sections(
 
     report = CausalReport(promise_key=promise.key)
     counters = used if used is not None else {}
+    language = getattr(promise, "language", "en")
+
+    def rescore(section: Any) -> CausalResult:
+        outcome = score_paragraph(section.text, promise)
+        outcome.index = int(getattr(section, "index", 0))
+        outcome.heading = str(getattr(section, "heading", ""))
+        return outcome
+
     for section in sections:
         if getattr(section, "kind", "item") != "item":
             continue
-        result = score_paragraph(section.text, promise)
-        result.index = int(getattr(section, "index", 0))
-        result.heading = str(getattr(section, "heading", ""))
+        heading = str(getattr(section, "heading", ""))
+        tip = getattr(section, "tip", None)
+        result = rescore(section)
 
-        if rewrite and not result.passed:
+        if rewrite and result.score < PASS_THRESHOLD:
             repaired = repair_text(
-                section.text, promise, getattr(section, "tip", None), used=counters
+                section.text, promise, tip, used=counters, heading=heading
             )
             if repaired:
                 section.text = repaired
-                result = score_paragraph(repaired, promise)
-                result.index = int(getattr(section, "index", 0))
-                result.heading = str(getattr(section, "heading", ""))
+                result = rescore(section)
                 result.repaired = True
                 report.rewrites += 1
                 log.info(
@@ -329,5 +391,59 @@ def validate_sections(
                     "cannot be repaired from its own mechanism",
                     result.index, result.heading, promise.key,
                 )
+
+        # ------------------------------------------------------------------
+        # Post-write contradiction check. Everything above is about whether
+        # the paragraph explains itself; this is about whether the explanation
+        # is on the same side as the heading. A paragraph can score 1.00 and
+        # still tell the viewer the opposite of what the heading told them,
+        # which is what run 16 shipped twice.
+        # ------------------------------------------------------------------
+        mechanism = result.mechanisms[0] if result.mechanisms else ""
+        outcome_word = result.outcomes[0] if result.outcomes else ""
+        direction = read_direction(
+            heading, mechanism=mechanism, outcome=outcome_word, language=language
+        )
+        result.direction = direction
+        found = find_contradictions(
+            heading, section.text, language=language, direction=direction
+        )
+        if found and rewrite:
+            # Drop the offending sentences and try to explain it again, this
+            # time with the heading in hand so the repair cannot re-add one.
+            trimmed = strip_contradictions(section.text, found)
+            candidate = trimmed
+            if score_paragraph(trimmed, promise).score < PASS_THRESHOLD:
+                candidate = repair_text(
+                    trimmed, promise, tip, used=counters, heading=heading
+                ) or trimmed
+            still = find_contradictions(
+                heading, candidate, language=language, direction=direction
+            )
+            if not still and score_paragraph(candidate, promise).score >= PASS_THRESHOLD:
+                section.text = candidate
+                result = rescore(section)
+                result.direction = direction
+                result.repaired = True
+                report.contradiction.rewrites += 1
+                log.info(
+                    "Item %s (%s) contradicted its own heading; rewrote it "
+                    "without the offending sentence",
+                    result.index, heading,
+                )
+                found = []
+            else:
+                found = still or found
+
+        if found:
+            for item in found:
+                item.index = result.index
+            result.contradictions = list(found)
+            report.contradiction.items.extend(found)
+            log.error(
+                "Item %s (%s) contradicts its own advice: %s",
+                result.index, heading, found[0].explain(),
+            )
+        report.contradiction.directions.append(direction)
         report.results.append(result)
     return report

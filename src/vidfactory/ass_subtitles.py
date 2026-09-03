@@ -85,7 +85,7 @@ class SubtitleStyle:
     """One caption look, in the coordinates of a 1920x1080 frame."""
 
     name: str
-    font_size: int = 58
+    font_size: int = 63
     #: &HAABBGGRR - blue, green, red, and an *inverted* alpha byte where 00
     #: is opaque and FF is invisible. Getting that backwards is why the first
     #: burned-in captions had almost no rim: &HC8 is 78% transparent, not 78%
@@ -232,22 +232,31 @@ def split_phrases(
 
 #: Words worth emphasising because they carry the instruction, not because
 #: something needed to move. Measurements and numbers are always in.
+#: Deliberately excludes "always", "never", "one", "two" and "three".
+#: Emphasis is for the words the viewer would write down - the outcome the
+#: technique produces and the measurement it needs - not for whichever word
+#: happened to sound emphatic. A highlight on "always" teaches the eye to
+#: ignore highlights.
 _EMPHASIS_ES = (
     "más grande", "más amplio", "más amplia", "más alto", "más alta",
-    "más espacioso", "más luminoso", "más caro", "más cara", "acogedor",
-    "nunca", "siempre", "jamás", "el doble", "la mitad", "gratis",
+    "más espacioso", "más luminoso", "más caro", "más cara",
+    "el doble", "la mitad", "gratis", "agobiante", "amplitud",
     "hasta el techo", "del suelo al techo", "a ras de techo",
 )
 _EMPHASIS_EN = (
     "bigger", "larger", "taller", "wider", "brighter", "more expensive",
-    "never", "always", "twice", "half", "free", "floor to ceiling",
+    "more spacious", "spacious", "cramped", "twice", "half", "free",
+    "floor to ceiling", "wall to wall", "front legs",
 )
 _MEASUREMENT = re.compile(
     r"\b\d+(?:[.,]\d+)?\s*(?:%|cm|mm|m|km|kg|in|ft|k|kelvin|"
     r"centímetros?|metros?|milímetros?|grados?|euros?|por ciento)\b",
     re.IGNORECASE | re.UNICODE,
 )
-_BARE_NUMBER = re.compile(r"\b\d+(?:[.,]\d+)?\b")
+#: Bare numbers are worth marking when they carry information. "3" does not -
+#: it is "three" in digits, which is on the do-not-emphasise list - so a plain
+#: number under four is skipped unless a unit made it a measurement above.
+_BARE_NUMBER = re.compile(r"\b(?:\d*[4-9]\d*|\d{2,}|\d+[.,]\d+)\b")
 
 
 def emphasis_spans(phrase: str, language: Any = None) -> list[tuple[int, int]]:
@@ -326,8 +335,13 @@ def format_ass_time(seconds: float) -> str:
     return f"{hours:d}:{minutes:02d}:{secs:02d}.{centiseconds:02d}"
 
 
-def _wrap_two_lines(phrase: str, max_line_chars: int = 34) -> tuple[str, int]:
-    """At most two lines, balanced, broken between words."""
+def _wrap_two_lines(phrase: str, max_line_chars: int = 42) -> tuple[str, int]:
+    """One line when it fits comfortably, two balanced lines when it does not.
+
+    Never more than two. The budget is per line and deliberately generous: a
+    five or six word caption reads faster as one line than as two, and at
+    1080p there is room for it well inside the safe area.
+    """
 
     words = phrase.split()
     if not words:
@@ -354,7 +368,7 @@ def events_from_chunks(
     chunks: Sequence[object],
     style: SubtitleStyle = PREMIUM,
     language: Any = None,
-    max_line_chars: int = 34,
+    max_line_chars: int = 42,
 ) -> list[AssEvent]:
     """Turn the TTS timeline into caption events.
 
