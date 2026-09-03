@@ -6,8 +6,11 @@
 
 channel:
   name: HomeeDeeco
-  language: en-US
-  audience_country: US
+  # Idioma del contenido: título, guion, narración, subtítulos y metadatos.
+  # "es-ES" (por defecto) o "en-US". El idioma de BÚSQUEDA de imágenes es
+  # siempre inglés y no se configura aquí: ver src/vidfactory/languages.py.
+  language: es-ES
+  audience_country: ES
   niche: home decor
 
 video:
@@ -40,25 +43,34 @@ audio:
 
 tts:
   engine: auto                  # auto | piper | espeak | silent
-  voice: en_US-hfc_female-medium   # warm, clear American English female voice
-  fallback_voices:
-    - en_US-amy-medium
-    - en_US-lessac-medium
+  # Vacío = la voz por defecto del idioma del canal. En español se usa
+  # es_ES-sharvard-medium (femenina, castellana, Piper, gratuita); en inglés
+  # en_US-hfc_female-medium. Solo hay que rellenarlo para forzar otra voz, y
+  # tiene que ser del mismo idioma que el guion.
+  voice: ""
+  fallback_voices: []
   speed: 1.0                    # 1.0 = natural pace (lower = slower)
   sentence_pause_seconds: 0.28
   paragraph_pause_seconds: 0.55
   scene_pause_seconds: 0.45
   max_chunk_chars: 320          # long scripts are chunked so TTS never breaks
 
+# ---------------------------------------------------------------------------
+#  SUBTÍTULOS. Siempre se exporta subtitles.srt (accesibilidad y YouTube) y,
+#  salvo con style: none, también subtitles.ass con el estilo premium, que es
+#  el que se incrusta en la imagen. Todo con FFmpeg y libass: sin software de
+#  pago y sin fuentes propietarias.
+# ---------------------------------------------------------------------------
 subtitles:
   enabled: true
-  burn_in: false                # default: ship a .srt file, do not burn in
-  max_line_chars: 42
+  burn_in: true                 # graba los subtítulos en final_video.mp4
+  style: premium                # premium | clean | none
+  max_line_chars: 42            # solo afecta al .srt
   max_lines: 2
 
 script:
   engine: auto                  # auto | llm | template  (template = always works)
-  words_per_minute: 150         # narration speed used to size the script
+  words_per_minute: 0           # 0 = el ritmo real del idioma (ver languages.py)
   llm:
     enabled: false              # opt-in; template engine is the reliable default
     model_repo: Qwen/Qwen2.5-1.5B-Instruct-GGUF

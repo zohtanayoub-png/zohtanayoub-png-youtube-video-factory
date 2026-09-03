@@ -48,6 +48,18 @@ VOICE_BASE = os.environ.get(
 #: Voices that ship as documented choices. Any other valid Piper voice name
 #: also works - the repository path is derived from the name itself.
 VOICE_PATHS: dict[str, str] = {
+    # --- Spanish -------------------------------------------------------
+    # sharvard is the female Castilian voice in the Piper catalogue and the
+    # channel default. The others are fallbacks in order of how well they
+    # substitute for it: a neutral Latin American female voice is a far better
+    # failure mode for a Spanish channel than a male one or an English one.
+    "es_ES-sharvard-medium": "es/es_ES/sharvard/medium",
+    "es_MX-claude-high": "es/es_MX/claude/high",
+    "es_ES-davefx-medium": "es/es_ES/davefx/medium",
+    "es_ES-mls_9972-low": "es/es_ES/mls_9972/low",
+    "es_ES-carlfm-x_low": "es/es_ES/carlfm/x_low",
+    "es_MX-ald-medium": "es/es_MX/ald/medium",
+    # --- English -------------------------------------------------------
     "en_US-hfc_female-medium": "en/en_US/hfc_female/medium",
     "en_US-amy-medium": "en/en_US/amy/medium",
     "en_US-lessac-medium": "en/en_US/lessac/medium",
@@ -111,8 +123,145 @@ _ABBREVIATIONS = {
 }
 
 
-def normalize_for_speech(text: str) -> str:
+# ---------------------------------------------------------------------------
+# Spanish
+#
+# Piper's Spanish voices read digits, but they read them the way a phonemizer
+# does rather than the way a narrator does: "2,4" comes out as two separate
+# numbers, "10 %" as "diez" followed by a pause, and "cm" as two letters. For
+# long-form narration that is the difference between a voice you can listen to
+# for twenty minutes and one you cannot, so the numbers are written out here
+# before they ever reach the model.
+# ---------------------------------------------------------------------------
+
+_ES_UNITS: dict[str, str] = {
+    "cm": "centímetros",
+    "mm": "milímetros",
+    "km": "kilómetros",
+    "kg": "kilos",
+    "m2": "metros cuadrados",
+    "m²": "metros cuadrados",
+    "m": "metros",
+    "l": "litros",
+    "h": "horas",
+    "€": "euros",
+    "K": "kelvin",
+}
+
+_ES_ABBREVIATIONS = {
+    r"\bp\.\s?ej\.\s*": "por ejemplo, ",
+    r"\betc\.": "etcétera",
+    r"\baprox\.": "aproximadamente",
+    r"\bTV\b": "tele",
+    r"\bLED\b": "led",
+    r"\bnº\s*": "número ",
+    r"\bn\.º\s*": "número ",
+    r"\bm²": " metros cuadrados",
+    r"\bºC\b": " grados",
+    r"\b1\.000\b": "mil",
+}
+
+_ES_UNITS_0_15 = (
+    "cero", "uno", "dos", "tres", "cuatro", "cinco", "seis", "siete", "ocho",
+    "nueve", "diez", "once", "doce", "trece", "catorce", "quince",
+)
+_ES_TENS = {
+    2: "veinte", 3: "treinta", 4: "cuarenta", 5: "cincuenta",
+    6: "sesenta", 7: "setenta", 8: "ochenta", 9: "noventa",
+}
+_ES_HUNDREDS = {
+    1: "ciento", 2: "doscientos", 3: "trescientos", 4: "cuatrocientos",
+    5: "quinientos", 6: "seiscientos", 7: "setecientos", 8: "ochocientos",
+    9: "novecientos",
+}
+_ES_TEENS = {
+    16: "dieciséis", 17: "diecisiete", 18: "dieciocho", 19: "diecinueve",
+    21: "veintiuno", 22: "veintidós", 23: "veintitrés", 24: "veinticuatro",
+    25: "veinticinco", 26: "veintiséis", 27: "veintisiete", 28: "veintiocho",
+    29: "veintinueve",
+}
+
+
+def spanish_number(value: int) -> str:
+    """Escribe un entero en palabras. Cubre de 0 a 999.999, que es de sobra
+    para medidas, porcentajes y precios en un guion de decoración."""
+
+    value = int(value)
+    if value < 0:
+        return "menos " + spanish_number(-value)
+    if value <= 15:
+        return _ES_UNITS_0_15[value]
+    if value in _ES_TEENS:
+        return _ES_TEENS[value]
+    if value < 100:
+        tens, ones = divmod(value, 10)
+        base = _ES_TENS[tens]
+        return base if ones == 0 else f"{base} y {_ES_UNITS_0_15[ones]}"
+    if value == 100:
+        return "cien"
+    if value < 1000:
+        hundreds, rest = divmod(value, 100)
+        base = _ES_HUNDREDS[hundreds]
+        return base if rest == 0 else f"{base} {spanish_number(rest)}"
+    if value < 1_000_000:
+        thousands, rest = divmod(value, 1000)
+        base = "mil" if thousands == 1 else f"{spanish_number(thousands)} mil"
+        return base if rest == 0 else f"{base} {spanish_number(rest)}"
+    return str(value)
+
+
+def _es_spoken_number(match: "re.Match[str]") -> str:
+    """Un número con coma decimal se dice "dos coma cuatro"."""
+
+    whole, decimals = match.group(1), match.group(2)
+    spoken = spanish_number(int(whole))
+    if decimals:
+        digits = " ".join(spanish_number(int(d)) for d in decimals)
+        spoken = f"{spoken} coma {digits}"
+    return spoken
+
+
+def normalize_spanish(text: str) -> str:
+    """Deja el texto listo para que una voz española lo lea con naturalidad."""
+
+    text = re.sub(r"\s+", " ", str(text or "")).strip()
+    for pattern, replacement in _ES_ABBREVIATIONS.items():
+        text = re.sub(pattern, replacement, text)
+
+    # Porcentajes antes que nada: "10 %" y "10%" se dicen igual.
+    text = re.sub(
+        r"(\d+)(?:,(\d+))?\s*%",
+        lambda m: _es_spoken_number(m) + " por ciento",
+        text,
+    )
+    # Unidades pegadas a un número: "60 cm", "2,4 m", "90 €".
+    for unit, spoken in _ES_UNITS.items():
+        text = re.sub(
+            # No absorbe el punto: "60 cm." termina una frase, y comerse ese
+            # punto deja a la voz sin la pausa que separa dos ideas.
+            rf"(\d+)(?:,(\d+))?\s*{re.escape(unit)}(?![a-zA-ZáéíóúñÁÉÍÓÚÑ0-9])",
+            lambda m, spoken=spoken: f"{_es_spoken_number(m)} {spoken}",
+            text,
+        )
+    # Rangos: "de 8 a 15" ya se lee bien una vez los números son palabras.
+    text = re.sub(r"(\d+),(\d+)", _es_spoken_number, text)
+    text = re.sub(r"\b(\d+)\b", lambda m: spanish_number(int(m.group(1))), text)
+
+    text = text.replace("&", " y ")
+    text = re.sub(r"[\"“”„«»]", "", text)
+    text = re.sub(r"\s*[—–]\s*", ", ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    text = re.sub(r"\s+([,.;:!?])", r"\1", text)
+    return text
+
+
+def normalize_for_speech(text: str, language: Any = None) -> str:
     """Make text safe and natural to speak, and keep subtitles matching it."""
+
+    from .languages import resolve_language
+
+    if not resolve_language(language).is_english:
+        return normalize_spanish(text)
 
     text = re.sub(r"\s+", " ", str(text or "")).strip()
     for pattern, replacement in _ABBREVIATIONS.items():
@@ -321,6 +470,17 @@ class PiperEngine(TTSEngine):
         return destination
 
 
+def _sounds_female(voice: str) -> bool:
+    """Whether a Piper voice name is one of the documented female voices."""
+
+    name = str(voice or "").lower()
+    return (
+        "female" in name
+        or any(marker in name for marker in ("amy", "hfc_f", "kristin", "kathleen"))
+        or any(marker in name for marker in ("sharvard", "claude", "mls_9972"))
+    )
+
+
 class EspeakEngine(TTSEngine):
     """eSpeak NG fallback: always available, intelligible, not natural."""
 
@@ -334,8 +494,14 @@ class EspeakEngine(TTSEngine):
         self.binary = shutil.which("espeak-ng") or shutil.which("espeak")
         if not self.binary:
             raise TTSUnavailable("espeak-ng is not installed")
-        # Map a Piper-style voice name onto an eSpeak voice.
-        self.espeak_voice = "en-us+f3" if "female" in voice or "amy" in voice or "hfc_f" in voice else "en-us"
+        # Map a Piper-style voice name onto an eSpeak voice. The language part
+        # matters more than the timbre: an English fallback reading Spanish is
+        # not a degraded video, it is an unusable one.
+        name = str(voice or "")
+        if name.startswith("es_") or name.startswith("es-"):
+            self.espeak_voice = "es+f3" if _sounds_female(name) else "es"
+        else:
+            self.espeak_voice = "en-us+f3" if _sounds_female(name) else "en-us"
 
     def synthesize(self, text: str, destination: Path) -> Path:
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -377,14 +543,48 @@ class SilentEngine(TTSEngine):
         return make_silence(destination, seconds, self.sample_rate)
 
 
+def voices_for_language(language: Any, requested: str = "") -> tuple[str, list[str]]:
+    """Pick the voice and its fallbacks for a language.
+
+    A beginner should never have to choose a voice. Selecting Spanish selects
+    the Spanish voice; an explicitly requested voice always wins, but if it
+    belongs to a different language than the script it is ignored with a
+    warning rather than used, because narrating Spanish with an English voice
+    produces something nobody can listen to.
+    """
+
+    from .languages import resolve_language
+
+    resolved = resolve_language(language)
+    prefix = "en_" if resolved.is_english else "es_"
+    wanted = str(requested or "").strip()
+    if wanted and wanted.startswith(prefix):
+        rest = [v for v in resolved.voices if v != wanted]
+        return wanted, rest
+    if wanted:
+        log.warning(
+            "Requested voice %r is not a %s voice; using %s instead",
+            wanted, resolved.label, resolved.voices[0],
+        )
+    return resolved.voices[0], list(resolved.voices[1:])
+
+
 def build_engine(
     engine: str = "auto",
     voice: str = "en_US-hfc_female-medium",
     speed: float = 1.0,
     sample_rate: int = 48000,
     fallback_voices: Sequence[str] = (),
+    language: Any = None,
 ) -> TTSEngine:
     """Return the best available engine, honoring an explicit request first."""
+
+    if language is not None:
+        voice, derived = voices_for_language(language, voice)
+        fallback_voices = list(dict.fromkeys([*fallback_voices, *derived]))
+        # A fallback in the wrong language is worse than no fallback.
+        prefix = voice.split("_")[0] + "_"
+        fallback_voices = [v for v in fallback_voices if v.startswith(prefix)]
 
     order: list[str]
     if engine in ("piper", "espeak", "silent"):
@@ -466,7 +666,11 @@ class NarrationBuilder:
         max_chunk_chars: int = 320,
         loudness_lufs: float = -16.0,
         sample_rate: int = 48000,
+        language: Any = None,
     ) -> None:
+        from .languages import resolve_language
+
+        self.language = resolve_language(language)
         self.engine = engine
         self.workdir = Path(workdir)
         self.workdir.mkdir(parents=True, exist_ok=True)
@@ -497,7 +701,9 @@ class NarrationBuilder:
 
         for scene_number, scene in enumerate(scenes):
             scene_id = getattr(scene, "scene_id", f"scene-{scene_number:03d}")
-            narration_text = normalize_for_speech(getattr(scene, "narration", "") or "")
+            narration_text = normalize_for_speech(
+                getattr(scene, "narration", "") or "", self.language
+            )
             if not narration_text:
                 continue
             scene_start = timeline

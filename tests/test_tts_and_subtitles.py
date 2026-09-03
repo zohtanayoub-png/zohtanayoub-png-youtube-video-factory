@@ -35,7 +35,11 @@ class FakeScene:
 # ----------------------------------------------------------------- text prep
 
 def test_normalize_expands_abbreviations():
-    text = normalize_for_speech("Use LED strips, e.g. warm white, on the TV wall.")
+    # The channel's default language is Spanish now, so an English
+    # expectation has to say which language it means.
+    text = normalize_for_speech(
+        "Use LED strips, e.g. warm white, on the TV wall.", language="en"
+    )
     assert "LED" not in text
     assert "e.g." not in text
     assert "L E D" in text

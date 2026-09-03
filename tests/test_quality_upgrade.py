@@ -4,6 +4,11 @@ Each test here corresponds to a specific defect found in the first production
 video, so a future change that reintroduces one of them fails loudly.
 """
 
+# These tests are about the ENGLISH pipeline. The channel's default language
+# is Spanish now, so every generation here says which language it means
+# rather than relying on the default staying what it was when they were
+# written. The Spanish equivalents live in test_spanish_and_subtitles.py.
+
 from __future__ import annotations
 
 import random
@@ -243,18 +248,18 @@ def test_queries_include_both_wide_and_detail_framings():
 
 
 def test_every_scene_gets_enough_specific_queries():
-    topic = TopicEngine().from_user_input(
+    topic = TopicEngine(language="en").from_user_input(
         "5 Small Living Room Tricks That Make Your Space Look Bigger"
     )
-    scenes = plan_scenes(generate_script(topic, 2.0))
+    scenes = plan_scenes(generate_script(topic, 2.0, language="en"))
     for scene in scenes:
         assert len(scene.specific_queries) >= 5, scene.scene_id
     assert generic_ratio([q for s in scenes for q in s.visual_queries]) < 0.4
 
 
 def test_query_diversity_across_a_video():
-    topic = TopicEngine().from_user_input("20 Cozy Bedroom Ideas For A Warmer Home")
-    scenes = plan_scenes(generate_script(topic, 5.0))
+    topic = TopicEngine(language="en").from_user_input("20 Cozy Bedroom Ideas For A Warmer Home")
+    scenes = plan_scenes(generate_script(topic, 5.0, language="en"))
     primaries = [s.visual_queries[0].text for s in scenes]
     assert len(set(primaries)) / len(primaries) > 0.4
 
@@ -412,10 +417,10 @@ def test_a_space_trick_does_belong():
 
 
 def test_generated_scripts_only_contain_aligned_ideas():
-    topic = TopicEngine().from_user_input(
+    topic = TopicEngine(language="en").from_user_input(
         "25 Small Living Room Ideas That Make Any Space Look Bigger"
     )
-    script = generate_script(topic, 20.0)
+    script = generate_script(topic, 20.0, language="en")
     assert script.promise_key == "bigger"
     assert script.title_idea_alignment >= 0.9
     assert script.rejected_ideas, "nothing was rejected, so nothing was validated"
@@ -424,8 +429,8 @@ def test_generated_scripts_only_contain_aligned_ideas():
 
 
 def test_a_general_title_accepts_every_idea():
-    topic = TopicEngine().from_user_input("30 Modern Living Room Ideas")
-    script = generate_script(topic, 10.0)
+    topic = TopicEngine(language="en").from_user_input("30 Modern Living Room Ideas")
+    script = generate_script(topic, 10.0, language="en")
     assert script.promise_key == "general"
     assert script.title_idea_alignment == 1.0
 
@@ -547,26 +552,26 @@ BANNED_PHRASES = (
 
 
 def test_the_formulaic_connectives_are_gone():
-    topic = TopicEngine().from_user_input(
+    topic = TopicEngine(language="en").from_user_input(
         "25 Small Living Room Ideas That Make Any Space Look Bigger"
     )
-    text = generate_script(topic, 20.0).text
+    text = generate_script(topic, 20.0, language="en").text
     for phrase in BANNED_PHRASES:
         assert phrase not in text, phrase
 
 
 def test_items_do_not_all_follow_one_sentence_shape():
-    topic = TopicEngine().from_user_input("20 Cozy Bedroom Ideas For A Warmer Home")
-    items = generate_script(topic, 15.0).items()
+    topic = TopicEngine(language="en").from_user_input("20 Cozy Bedroom Ideas For A Warmer Home")
+    items = generate_script(topic, 15.0, language="en").items()
     openings = {" ".join(s.text.split()[:3]) for s in items}
     assert len(openings) > len(items) * 0.5
 
 
 def test_the_hook_creates_curiosity_without_channel_boilerplate():
-    topic = TopicEngine().from_user_input(
+    topic = TopicEngine(language="en").from_user_input(
         "5 Small Living Room Tricks That Make Your Space Look Bigger"
     )
-    intro = generate_script(topic, 2.0).sections[0].text.lower()
+    intro = generate_script(topic, 2.0, language="en").sections[0].text.lower()
     for boilerplate in ("welcome to", "subscribe", "hit the like", "my channel"):
         assert boilerplate not in intro
     assert len(intro.split()) >= 20
@@ -574,9 +579,7 @@ def test_the_hook_creates_curiosity_without_channel_boilerplate():
 
 def test_the_hook_is_promise_aware():
     bigger = generate_script(
-        TopicEngine().from_user_input("25 Ideas That Make Any Space Look Bigger"), 5.0
-    ).sections[0].text
+        TopicEngine(language="en").from_user_input("25 Ideas That Make Any Space Look Bigger"), 5.0, language="en").sections[0].text
     expensive = generate_script(
-        TopicEngine().from_user_input("25 Ways To Make Your Home Look More Expensive"), 5.0
-    ).sections[0].text
+        TopicEngine(language="en").from_user_input("25 Ways To Make Your Home Look More Expensive"), 5.0, language="en").sections[0].text
     assert bigger != expensive

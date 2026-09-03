@@ -8,6 +8,12 @@ name: Generate Video
 on:
   workflow_dispatch:
     inputs:
+      language:
+        description: "Language of the video (narration, subtitles and metadata)"
+        required: false
+        type: choice
+        default: "Spanish"
+        options: [Spanish, English]
       topic:
         description: "Video topic (leave empty to pick one automatically)"
         required: false
@@ -20,22 +26,29 @@ on:
         default: "20"
         options: ["2", "5", "10", "15", "20", "30"]
       voice:
-        description: "Narration voice"
+        description: "Narration voice (leave on Automatic - the language picks it)"
         required: false
         type: choice
-        default: "en_US-hfc_female-medium"
+        default: "Automatic"
         options:
+          - Automatic
+          - es_ES-sharvard-medium
+          - es_MX-claude-high
+          - es_ES-davefx-medium
           - en_US-hfc_female-medium
           - en_US-amy-medium
           - en_US-lessac-medium
-          - en_US-kristin-medium
-          - en_US-ryan-medium
-          - en_US-hfc_male-medium
       subtitles:
         description: "Generate an .srt subtitle file"
         required: false
         type: boolean
         default: true
+      subtitle_style:
+        description: "Styled captions burned into the picture"
+        required: false
+        type: choice
+        default: "premium"
+        options: [premium, clean, none]
       burn_in_subtitles:
         description: "Burn the subtitles into the picture (usually leave off)"
         required: false
@@ -56,6 +69,14 @@ on:
   # Lets autopilot.yml reuse this exact job instead of duplicating it.
   workflow_call:
     inputs:
+      language:
+        required: false
+        type: string
+        default: "Spanish"
+      subtitle_style:
+        required: false
+        type: string
+        default: "premium"
       topic:
         required: false
         type: string
@@ -139,6 +160,20 @@ jobs:
       - name: Install eSpeak NG (narration fallback)
         run: sudo apt-get install -y --no-install-recommends espeak-ng
 
+      - name: Install caption fonts
+        # libass renders whatever family the .ass asks for, and substitutes
+        # silently when it is missing. These are all open licences (OFL) and
+        # come from the Ubuntu archive, so the premium style never depends on
+        # a font anybody has to buy. DejaVu is already present and is the
+        # last-resort fallback.
+        continue-on-error: true
+        run: |
+          sudo apt-get install -y --no-install-recommends \
+            fonts-inter fonts-noto-core fonts-liberation2 || \
+            sudo apt-get install -y --no-install-recommends fonts-liberation2
+          fc-cache -f >/dev/null 2>&1 || true
+          fc-list : family | sort -u | head -20
+
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
@@ -184,6 +219,8 @@ jobs:
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          INPUT_LANGUAGE: ${{ inputs.language }}
+          INPUT_SUBTITLE_STYLE: ${{ inputs.subtitle_style }}
           INPUT_TOPIC: ${{ inputs.topic }}
           INPUT_DURATION: ${{ inputs.duration_minutes }}
           INPUT_VOICE: ${{ inputs.voice }}
@@ -198,6 +235,8 @@ jobs:
             pip install -r requirements-youtube.txt
           fi
           python -m vidfactory generate \
+            --language "${INPUT_LANGUAGE}" \
+            --subtitle-style "${INPUT_SUBTITLE_STYLE}" \
             --topic "${INPUT_TOPIC}" \
             --duration "${INPUT_DURATION}" \
             --voice "${INPUT_VOICE}" \

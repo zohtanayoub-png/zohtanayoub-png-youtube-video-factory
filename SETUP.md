@@ -319,6 +319,35 @@ If it fails, leave it off. The videos are produced exactly as before.
 
 ---
 
+## Idioma y subtítulos
+
+Los vídeos salen **en español** por defecto. No hay nada que configurar.
+
+Si quieres uno en inglés, en la pantalla de *Generate Video* elige
+`language: English`. El resto es automático: la voz, el guion, los subtítulos
+y los metadatos cambian de idioma solos. **No hace falta tocar la voz**: el
+desplegable `voice` puede quedarse en `Automatic`.
+
+Los subtítulos salen de dos formas y las dos van en el artefacto:
+
+| Archivo | Para qué |
+|---|---|
+| `subtitles.srt` | subirlo a YouTube; texto limpio, sin estilo |
+| `subtitles.ass` | el estilo premium, que ya va grabado en el vídeo |
+
+El vídeo final lleva los subtítulos **grabados en la imagen** con el estilo
+premium: dos líneas como máximo, frases cortas, una palabra clave en ámbar de
+vez en cuando, y un margen inferior amplio para que no los tape el reproductor.
+Si prefieres subtítulos blancos sin más, elige `subtitle_style: clean`. Si no
+los quieres en la imagen, elige `none` (el `.srt` se sigue generando).
+
+> Un detalle que quizá te sorprenda: las **búsquedas de imágenes siguen en
+> inglés** aunque el vídeo sea en español. Es a propósito. Pexels está
+> indexado en inglés y devuelve mucho mejor material para
+> `floor to ceiling curtains living room` que para su traducción.
+
+---
+
 ## Frequently hit problems
 
 **"No stock footage provider is usable"**

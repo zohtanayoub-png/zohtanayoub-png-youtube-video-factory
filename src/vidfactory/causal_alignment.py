@@ -60,6 +60,33 @@ CAUSAL_CONNECTIVES: tuple[str, ...] = (
     "keeps the", "stops the", "and that ", "ends up", "so you", "so your",
 )
 
+#: Los mismos enlaces en español. "hace que" es el conector causal central del
+#: idioma, así que aparece en varias formas; "en lugar de" y "en vez de" no
+#: están, porque comparan en vez de explicar.
+CAUSAL_CONNECTIVES_ES: tuple[str, ...] = (
+    "porque", " así que ", "de modo que", "de manera que", "de forma que",
+    "lo que hace", "hace que", "hacen que", "haciendo que", "por eso",
+    "por tanto", "por lo tanto", "de ahí que", "con lo que", "ya que",
+    "puesto que", "dado que", "de ese modo", "y eso ", "lo que deja",
+    "deja ", "dejando", "permite", "consigue", "logra", "se lee como",
+    "se lee más", "se lea como", "se lea más", "se percibe", "y por eso",
+    "lo que da", "lo que hacen",
+)
+
+#: Conectores por idioma. La clave viene del propio Promise.
+CONNECTIVES_BY_LANGUAGE: dict[str, tuple[str, ...]] = {
+    "en": CAUSAL_CONNECTIVES,
+    "es": CAUSAL_CONNECTIVES_ES,
+}
+
+
+def connectives_for(promise: Promise) -> tuple[str, ...]:
+    """The causal vocabulary of the language this promise is written in."""
+
+    return CONNECTIVES_BY_LANGUAGE.get(
+        getattr(promise, "language", "en"), CAUSAL_CONNECTIVES
+    )
+
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
 
 
@@ -157,16 +184,19 @@ def score_paragraph(text: str, promise: Promise) -> CausalResult:
         result.evidence = "the title makes no causal promise"
         return result
 
-    body = f" {re.sub(r'[^a-z0-9 ]+', ' ', str(text or '').lower())} "
+    connectives = connectives_for(promise)
+    # Spanish keeps its accents and its ñ: stripping them would destroy
+    # "más", "salón" and "pequeño", which is most of the vocabulary here.
+    body = f" {re.sub(r'[^a-z0-9áéíóúüñ ]+', ' ', str(text or '').lower())} "
     sentences = [s for s in _SENTENCE_SPLIT.split(str(text or "")) if s.strip()]
 
     best = 0.0
     for sentence in sentences:
-        padded = f" {re.sub(r'[^a-z0-9 ]+', ' ', sentence.lower())} "
+        padded = f" {re.sub(r'[^a-z0-9áéíóúüñ ]+', ' ', sentence.lower())} "
         found_outcomes = _hits(padded, outcomes)
         if not found_outcomes:
             continue
-        found_connectives = _hits(padded, CAUSAL_CONNECTIVES)
+        found_connectives = _hits(padded, connectives)
         found_mechanisms = [m.name for m in mechanisms_for(promise, padded)]
 
         if found_connectives and found_mechanisms:

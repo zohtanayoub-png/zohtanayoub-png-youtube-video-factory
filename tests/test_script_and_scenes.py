@@ -1,5 +1,10 @@
 """Script generation (fallback engine) and scene planning."""
 
+# These tests are about the ENGLISH pipeline. The channel's default language
+# is Spanish now, so every generation here says which language it means
+# rather than relying on the default staying what it was when they were
+# written. The Spanish equivalents live in test_spanish_and_subtitles.py.
+
 from __future__ import annotations
 
 import re
@@ -41,7 +46,7 @@ def test_every_tip_is_complete():
 
 
 def test_template_engine_never_needs_a_network(topic):
-    script = generate_script(topic, duration_minutes=10.0, engine="template")
+    script = generate_script(topic, duration_minutes=10.0, engine="template", language="en")
     assert script.engine == "template"
     assert script.word_count > 500
 
@@ -59,7 +64,7 @@ def test_fallback_used_when_llm_unavailable(topic, monkeypatch):
         topic,
         duration_minutes=5.0,
         engine="auto",
-        llm_settings={"enabled": True, "model_repo": "does/not-exist", "model_file": "nope.gguf"},
+        llm_settings={"enabled": True, "model_repo": "does/not-exist", "model_file": "nope.gguf"}, language="en",
     )
     assert script.word_count > 200
     assert script.sections
@@ -87,7 +92,7 @@ def test_no_duplicate_ideas_in_one_script(script):
 
 @pytest.mark.parametrize("minutes", [5.0, 10.0, 20.0])
 def test_script_length_tracks_the_requested_duration(topic, minutes):
-    script = generate_script(topic, duration_minutes=minutes, engine="template")
+    script = generate_script(topic, duration_minutes=minutes, engine="template", language="en")
     estimated = script.estimated_seconds / 60.0
     assert estimated <= minutes * 1.35
     assert estimated >= minutes * 0.6
@@ -100,14 +105,14 @@ def test_very_short_videos_have_a_floor(topic):
     one-minute request slightly. Anything longer is sized accurately.
     """
 
-    script = generate_script(topic, duration_minutes=1.0, engine="template")
+    script = generate_script(topic, duration_minutes=1.0, engine="template", language="en")
     assert len(script.items()) == 1
     assert script.estimated_seconds / 60.0 <= 1.6
 
 
 def test_longer_videos_produce_longer_scripts(topic):
-    short = generate_script(topic, duration_minutes=5.0, engine="template")
-    long = generate_script(topic, duration_minutes=20.0, engine="template")
+    short = generate_script(topic, duration_minutes=5.0, engine="template", language="en")
+    long = generate_script(topic, duration_minutes=20.0, engine="template", language="en")
     assert long.word_count > short.word_count * 1.8
 
 
@@ -118,9 +123,9 @@ def test_script_is_original_prose_not_a_bullet_list(script):
 
 
 def test_two_topics_do_not_produce_identical_scripts():
-    engine = TopicEngine()
-    a = generate_script(engine.from_user_input("25 Small Living Room Ideas"), 10.0)
-    b = generate_script(engine.from_user_input("25 Cozy Bedroom Ideas"), 10.0)
+    engine = TopicEngine(language="en")
+    a = generate_script(engine.from_user_input("25 Small Living Room Ideas"), 10.0, language="en")
+    b = generate_script(engine.from_user_input("25 Cozy Bedroom Ideas"), 10.0, language="en")
     assert a.text != b.text
     assert a.sections[0].text != b.sections[0].text
 
@@ -146,8 +151,8 @@ def test_retitle_for_count(title, count, expected):
 
 
 def test_no_ungrammatical_one_item_phrasing():
-    topic = TopicEngine().from_user_input("5 Small Living Room Ideas")
-    script = generate_script(topic, duration_minutes=0.8, engine="template")
+    topic = TopicEngine(language="en").from_user_input("5 Small Living Room Ideas")
+    script = generate_script(topic, duration_minutes=0.8, engine="template", language="en")
     assert " 1 ideas" not in script.text
     assert " 1 minutes" not in script.text
     assert not script.title.startswith("1 ")
@@ -155,7 +160,7 @@ def test_no_ungrammatical_one_item_phrasing():
 
 def test_item_count_is_capped_by_available_material():
     engine = TemplateScriptEngine()
-    topic = TopicEngine().from_user_input("500 Bathroom Ideas")
+    topic = TopicEngine(language="en").from_user_input("500 Bathroom Ideas")
     count = engine.plan_item_count(topic, 20.0, pool_size=len(tips_for("bathrooms")))
     assert count <= len(tips_for("bathrooms"))
 

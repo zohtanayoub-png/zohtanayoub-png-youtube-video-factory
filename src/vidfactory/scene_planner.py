@@ -235,6 +235,11 @@ class Scene:
     primary_visual_query: str
     alternative_visual_queries: list[str] = field(default_factory=list)
     keywords: list[str] = field(default_factory=list)
+    #: English description of what this scene should show. Built from the
+    #: idea's canonical English metadata, never from the narration, so a
+    #: Spanish script still searches Pexels in the language Pexels is
+    #: indexed in. See :mod:`vidfactory.languages`.
+    search_text: str = ""
     visual_category: str = ""
     section_kind: str = "item"
     section_index: int = 0
@@ -341,6 +346,7 @@ def derive_queries(
     tip_queries: Sequence[str] = (),
     limit: int = 12,
     want: int = 8,
+    search_text: str = "",
 ) -> list[VisualQuery]:
     """Build the ranked query ladder for one scene, most specific first.
 
@@ -350,14 +356,24 @@ def derive_queries(
     actually needed.
     """
 
+    # Everything that feeds a search term reads the English search text when
+    # there is one. Passing Spanish narration to an English object matcher
+    # produces nothing useful and quietly pushes every scene onto the generic
+    # category fallback.
+    searchable = search_text or narration
     ladder = expand_queries(
         tip_queries=list(tip_queries),
-        narration=narration,
+        narration=searchable,
         category_queries=CATEGORY_QUERIES.get(category, []) + _GENERIC_QUERIES,
-        object_queries=_matched_terms(narration),
+        object_queries=_matched_terms(searchable),
         want=want,
     )
-    return order_by_specificity(ladder)[:limit]
+    # The search language is English by contract. Anything that arrived here
+    # carrying accents came from narration keyword extraction rather than from
+    # an idea's canonical metadata, and a Spanish phrase is a worse Pexels
+    # query than the generic category fallback it would displace.
+    english_only = [q for q in ladder if q.text.isascii()]
+    return order_by_specificity(english_only or ladder)[:limit]
 
 
 def _keywords(text: str) -> list[str]:
@@ -388,11 +404,26 @@ class ScenePlanner:
         scenes: list[Scene] = []
 
         for section in script.sections:
-            tip_queries = list((section.tip or {}).get("queries", []))
+            tip = section.tip or {}
+            tip_queries = list(tip.get("queries", []))
+            # The canonical English description of the idea. Spanish tips
+            # carry it explicitly; English ones are already in English.
+            search_text = " ".join(
+                str(part)
+                for part in (
+                    tip.get("search", ""),
+                    tip.get("title", "") if not tip.get("search") else "",
+                    " ".join(str(x) for x in tip.get("tags", [])),
+                )
+                if part
+            ).strip()
             if not tip_queries:
                 # Intro and outro have no idea attached; give them deliberate
-                # establishing shots rather than the generic category fallback.
+                # establishing shots rather than the generic category fallback,
+                # and an English search text so keyword extraction has
+                # something in the right language to work with.
                 tip_queries = establishing_queries(category)
+                search_text = f"{category} interior styled bright"
             groups = group_sentences(
                 split_sentences(section.text), max_words=self.max_words_per_scene
             )
@@ -407,7 +438,9 @@ class ScenePlanner:
                     else tip_queries[order % max(1, len(tip_queries)) :]
                     + tip_queries[: order % max(1, len(tip_queries))]
                 )
-                queries = derive_queries(narration, category, rotated)
+                queries = derive_queries(
+                    narration, category, rotated, search_text=search_text
+                )
                 scene_id = f"{section.kind}-{section.index:03d}-{order:02d}"
                 scenes.append(
                     Scene(
@@ -417,7 +450,8 @@ class ScenePlanner:
                         primary_visual_query=queries[0].text if queries else "",
                         alternative_visual_queries=[q.text for q in queries[1:]],
                         visual_queries=queries,
-                        keywords=_keywords(narration),
+                        keywords=_keywords(search_text or narration),
+                        search_text=search_text,
                         visual_category=category,
                         section_kind=section.kind,
                         section_index=section.index,

@@ -27,6 +27,10 @@ These are requirements, not preferences. Do not relax them.
    committed.
 6. **The pipeline degrades, it does not crash.** A failed clip, a failed TTS
    chunk, a missing LLM, an unreachable provider - each has a fallback.
+7. **Content language and search language are different things.** The channel
+   narrates in Spanish by default; Pexels is always queried in English. A
+   Spanish string must never reach a stock provider, and an English string
+   must never reach the viewer. See `languages.py`.
 
 ## Layout
 
@@ -41,6 +45,10 @@ src/vidfactory/
   llm.py             optional local llama.cpp engine, always optional
   scene_planner.py   narration -> scenes -> per-scene visual queries
   queries.py         specific -> variant -> broad -> generic query ladder
+  languages.py       content language vs search language; the registry
+  knowledge_es.py    ~150 ideas written natively in Spanish
+  phrases_es.py      Spanish hooks, frames, transitions, elaborations
+  ass_subtitles.py   premium burned-in captions (ASS + libass)
   visual_analysis.py FFmpeg frame sampling + pixel statistics + flags
   visual_model.py    optional ONNX CLIP backend, always optional
   causal_alignment.py does the written paragraph explain the title's promise
@@ -88,6 +96,19 @@ src/vidfactory/
   `visual_analysis` decodes three frames of every shortlisted candidate and
   measures them. `premium_visual_ratio` now requires the caption *and* the
   frames to agree.
+* **Spanish is the default, and it is written rather than translated.**
+  `knowledge_es` and `phrases_es` are original Spanish, not a pass over the
+  English modules. Promise alignment, the causal check, the topic grammar and
+  the metadata all have Spanish vocabulary of their own, because a translated
+  keyword list matches almost nothing in a natural Spanish script.
+* **Captions are burned in, and the SRT stays plain.** `subtitles.srt` is
+  what YouTube ingests; `subtitles.ass` is what goes into the picture.
+  Three-to-seven-word phrases, never ending on an article or preposition,
+  one warm accent tone on measurements and outcome words, a 120 ms fade, and
+  a 118 px bottom margin at 1080p.
+* **ASS alpha is inverted.** `00` is opaque, `FF` is invisible. The first
+  burned-in captions used `&HC8` for the outline - 78% *transparent* - and
+  white text on a pale wall had almost nothing holding it.
 * **Relevance outranks beauty.** The second ranking stage weights
   scene-to-clip semantic match (45) above interior subject (30), visual
   quality (18), novelty (12) and technical quality (8). A beautiful unrelated
@@ -143,9 +164,10 @@ src/vidfactory/
 ## Testing
 
 ```bash
-python -m pytest -q -m "not integration"   # ~250 fast tests
+python -m pytest -q -m "not integration"   # ~400 fast tests
 python -m pytest -q -m integration         # a genuine ~60 s 1080p render
 python -m vidfactory llm-check             # is the optional local model viable here
+python -m vidfactory visual-check          # is the CLIP backend viable here
 ```
 
 The integration test uses FFmpeg-generated synthetic footage and the offline TTS

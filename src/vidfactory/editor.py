@@ -295,6 +295,30 @@ def estimate_shot_count(
     return total
 
 
+def subtitle_filter(subtitles: str | Path) -> str:
+    """The libass filter chain that burns captions into the picture.
+
+    An ``.ass`` file carries its own styling - font, size, colours, margins,
+    fades, per-word emphasis - so it is passed through untouched. A plain
+    ``.srt`` has none of that, so it gets a readable default rather than
+    libass's, which is small and hard to read at 1080p on a phone.
+
+    The path is escaped rather than quoted casually: FFmpeg parses filter
+    arguments before the shell does, and a Windows drive letter or a colon in
+    a generation id would otherwise split the argument in half.
+    """
+
+    path = Path(subtitles)
+    escaped = str(path.resolve()).replace("\\", "/").replace(":", r"\:")
+    if path.suffix.lower() == ".ass":
+        return f"ass='{escaped}'"
+    return (
+        f"subtitles='{escaped}':force_style='"
+        "FontName=DejaVu Sans,Fontsize=22,PrimaryColour=&H00FFFFFF,"
+        "OutlineColour=&H90000000,BorderStyle=3,Outline=1,Shadow=0,MarginV=48'"
+    )
+
+
 class VideoEditor:
     """Renders planned shots into a finished 1080p MP4 with narration."""
 
@@ -600,12 +624,7 @@ class VideoEditor:
         video_filters.append("format=yuv420p")
 
         if subtitles is not None and Path(subtitles).exists():
-            escaped = str(Path(subtitles).resolve()).replace("\\", "/").replace(":", r"\:")
-            video_filters.append(
-                f"subtitles='{escaped}':force_style='"
-                "FontName=DejaVu Sans,Fontsize=22,PrimaryColour=&H00FFFFFF,"
-                "OutlineColour=&H90000000,BorderStyle=3,Outline=1,Shadow=0,MarginV=48'"
-            )
+            video_filters.append(subtitle_filter(subtitles))
 
         args.extend(
             [

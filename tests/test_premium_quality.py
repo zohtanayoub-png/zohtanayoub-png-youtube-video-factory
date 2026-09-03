@@ -5,6 +5,11 @@ title, and some selected footage was of people, dark rooms or empty spaces
 rather than of interiors worth looking at.
 """
 
+# These tests are about the ENGLISH pipeline. The channel's default language
+# is Spanish now, so every generation here says which language it means
+# rather than relying on the default staying what it was when they were
+# written. The Spanish equivalents live in test_spanish_and_subtitles.py.
+
 from __future__ import annotations
 
 import pytest
@@ -63,10 +68,10 @@ def test_it_stays_out_of_a_generated_script():
     score_alignment.
     """
 
-    topic = TopicEngine().from_user_input(
+    topic = TopicEngine(language="en").from_user_input(
         "Small Living Room Tricks That Make Your Space Look Bigger"
     )
-    script = generate_script(topic, duration_minutes=20.0)
+    script = generate_script(topic, duration_minutes=20.0, language="en")
 
     headings = " ".join(s.heading.lower() for s in script.items())
     assert "sixty thirty ten" not in headings

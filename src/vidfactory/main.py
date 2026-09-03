@@ -27,9 +27,19 @@ log = get_logger("MAIN")
 
 def _overrides_from_args(args: argparse.Namespace) -> dict[str, object]:
     overrides: dict[str, object] = {}
+    if getattr(args, "language", None):
+        from .languages import resolve_language
+
+        overrides["channel.language"] = resolve_language(args.language).code
+    if getattr(args, "subtitle_style", None):
+        overrides["subtitles.style"] = str(args.subtitle_style).strip().lower()
     if getattr(args, "duration", None):
         overrides["video.duration_minutes"] = float(args.duration)
-    if getattr(args, "voice", None):
+    # "Automatic" is the dropdown's way of saying "no explicit voice", which
+    # lets the content language choose one.
+    if getattr(args, "voice", None) and str(args.voice).strip().lower() not in (
+        "automatic", "auto",
+    ):
         overrides["tts.voice"] = str(args.voice)
     if getattr(args, "tts_engine", None):
         overrides["tts.engine"] = str(args.tts_engine)
@@ -322,7 +332,18 @@ def build_parser() -> argparse.ArgumentParser:
         sub.add_argument("--topic", default="", help="video topic; empty means generate one")
         sub.add_argument("--auto-topic", action="store_true", help="always generate the topic")
         sub.add_argument("--duration", type=float, default=None, help="target minutes")
-        sub.add_argument("--voice", default=None, help="TTS voice name")
+        sub.add_argument(
+            "--language", default=None,
+            help='content language: "Spanish" (default) or "English"',
+        )
+        sub.add_argument(
+            "--voice", default=None,
+            help='TTS voice name, or "Automatic" to let the language choose',
+        )
+        sub.add_argument(
+            "--subtitle-style", default=None, choices=["premium", "clean", "none"],
+            help="styled captions burned into the picture",
+        )
         sub.add_argument("--tts-engine", default=None, choices=["auto", "piper", "espeak", "silent"])
         sub.add_argument("--script-engine", default=None, choices=["auto", "llm", "template"])
         sub.add_argument("--subtitles", default=None, help="true/false")

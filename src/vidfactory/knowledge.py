@@ -1964,15 +1964,35 @@ def normalize_category(name: str | None) -> str | None:
     return _match_aliases(key, ROOM_CATEGORIES) or _match_aliases(key, None)
 
 
-def tips_for(category: str | None, include_related: bool = True) -> list[Tip]:
-    """Return the tip pool for a category, optionally widened with related ones."""
+def tips_for(
+    category: str | None,
+    include_related: bool = True,
+    language: str = "en",
+) -> list[Tip]:
+    """Return the tip pool for a category, optionally widened with related ones.
+
+    ``language`` selects which body of writing is used. The Spanish pool is
+    written natively in :mod:`vidfactory.knowledge_es` rather than translated,
+    and it carries its own English ``queries``/``tags``/``search`` so the stock
+    searches stay in English regardless of what the viewer hears.
+    """
+
+    from .languages import resolve_language
+
+    resolved = resolve_language(language)
+    if not resolved.is_english:
+        from .knowledge_es import KNOWLEDGE_ES
+
+        source: dict[str, list[Tip]] = KNOWLEDGE_ES
+    else:
+        source = KNOWLEDGE
 
     canonical = normalize_category(category)
     pool: list[Tip] = []
     seen: set[str] = set()
 
     def extend(name: str) -> None:
-        for tip in KNOWLEDGE.get(name, []):
+        for tip in source.get(name, []):
             key = tip["title"]
             if key not in seen:
                 seen.add(key)
@@ -1984,7 +2004,7 @@ def tips_for(category: str | None, include_related: bool = True) -> list[Tip]:
             for related in RELATED_CATEGORIES.get(canonical, []):
                 extend(related)
     else:
-        for name in ALL_CATEGORIES:
+        for name in sorted(source):
             extend(name)
     return pool
 

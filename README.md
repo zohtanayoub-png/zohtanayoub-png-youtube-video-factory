@@ -11,6 +11,22 @@ rendering service.
 
 ---
 
+## Language
+
+Videos are produced in **Spanish (es-ES)** by default - title, hook, script,
+narration, subtitles, chapters, description, tags and summary. English is one
+dropdown away and loses nothing.
+
+The Spanish is written, not translated: `knowledge_es.py` and `phrases_es.py`
+are original Spanish writing, and the promise checks, topic grammar and
+metadata all carry their own Spanish vocabulary.
+
+One thing deliberately stays in English: **the stock footage queries.** Pexels
+is indexed in English and returns far better interiors for `floor to ceiling
+curtains living room` than for a translation of the narration, so each idea
+carries canonical English search metadata alongside its Spanish text. The
+viewer never sees it and the provider never sees Spanish.
+
 ## What it produces
 
 For every run you get:
@@ -67,7 +83,8 @@ open-source ONNX export that runs on a CPU runner.
 |---|---|---|
 | Topic selection | built-in generator with similarity rejection | free |
 | Script writing | curated knowledge base + variation engine (optional local LLM) | free |
-| Narration | [Piper](https://github.com/OHF-Voice/piper1-gpl) neural TTS, eSpeak NG fallback | free |
+| Narration | [Piper](https://github.com/OHF-Voice/piper1-gpl) neural TTS (`es_ES-sharvard-medium`), eSpeak NG fallback | free |
+| Captions | ASS + libass burned in by FFmpeg, open-licence fonts | free |
 | Footage | Pexels and Pixabay APIs | free |
 | Frame inspection | FFmpeg decode + pixel statistics, optional CPU CLIP (ONNX) | free |
 | Editing and rendering | FFmpeg | free |
@@ -226,6 +243,18 @@ inspection is deliberately **relevance first**: semantic match (45) above
 interior subject (30), visual quality (18), novelty (12) and technical quality
 (8). A beautiful unrelated luxury interior loses to a plainer clip that
 demonstrates the advice.
+
+### Captions and language
+
+Also in `editorial_quality_report.json`:
+
+* `language`, `tts_voice`, `tts_engine`
+* `subtitle_style`, `burn_in_subtitles`, `subtitles_srt_exported`,
+  `subtitles_ass_exported`, `subtitle_font`
+* `subtitle_event_count`, `average_subtitle_words`, `max_subtitle_lines`
+* `subtitle_safe_area_passed` - captions inside the player's safe area, at
+  most two lines
+* `subtitle_timing_passed` - no overlaps, no sub-half-second flashes
 
 ### Technical
 

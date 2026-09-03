@@ -112,6 +112,17 @@ class EditorialReport:
             self.metrics.get("promise_alignment_failures", 0),
         )
         log.info(
+            "Production: %s narrated by %s (%s), %s captions%s, %d events at "
+            "%.1f words each",
+            self.metrics.get("language", "?"),
+            self.metrics.get("tts_voice", "?"),
+            self.metrics.get("tts_engine", "?"),
+            self.metrics.get("subtitle_style", "none"),
+            " burned in" if self.metrics.get("burn_in_subtitles") else "",
+            self.metrics.get("subtitle_event_count", 0),
+            self.metrics.get("average_subtitle_words", 0.0),
+        )
+        log.info(
             "Visual: %s inspected %d clips over %d frames; semantic match %.2f, "
             "%d low-relevance; causal promise alignment %.2f",
             self.metrics.get("visual_analysis_model", "nothing"),
@@ -171,6 +182,7 @@ def build_report(
     promise_alignment_failures: int = 0,
     visual_stats: Mapping[str, Any] | None = None,
     causal: Any | None = None,
+    production: Mapping[str, Any] | None = None,
 ) -> EditorialReport:
     """Measure the editorial quality of a finished edit."""
 
@@ -325,6 +337,8 @@ def build_report(
         ),
         "causal_rewrites": int(getattr(causal, "rewrites", 0)),
         "causal_replacements": int(getattr(causal, "replacements", 0)),
+        # ---- language, voice and captions --------------------------------
+        **dict(production or {}),
         "search": stats,
         **diversity,
     }
@@ -418,6 +432,22 @@ def build_report(
             f"{causal_score:.2f} on average "
             f"(minimum {limits['min_causal_promise_alignment']}); "
             f"{min(section_scores) if section_scores else 1.0} is the weakest",
+        ),
+        EditorialCheck(
+            "subtitle_safe_area",
+            bool(metrics.get("subtitle_safe_area_passed", True)),
+            f"captions sit {metrics.get('subtitle_bottom_margin_px', 0)}px above "
+            f"the bottom edge in at most "
+            f"{metrics.get('max_subtitle_lines', 0)} lines",
+        ),
+        EditorialCheck(
+            "subtitle_timing",
+            bool(metrics.get("subtitle_timing_passed", True)),
+            f"{metrics.get('subtitle_event_count', 0)} caption events, "
+            f"{metrics.get('average_subtitle_words', 0)} words and "
+            f"{metrics.get('average_subtitle_seconds', 0)}s each, "
+            f"{metrics.get('subtitle_overlap_count', 0)} overlapping, "
+            f"{metrics.get('subtitle_flash_count', 0)} too brief",
         ),
         EditorialCheck(
             "sections_visually_supported",

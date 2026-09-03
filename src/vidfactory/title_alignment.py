@@ -83,6 +83,8 @@ class Promise:
     deny_signals: tuple[str, ...] = ()
     #: ...unless the idea explicitly claims the outcome in its own words.
     rescue_signals: tuple[str, ...] = ()
+    #: Which language this promise's vocabulary is written in.
+    language: str = "en"
 
     def describe(self) -> str:
         return f"{self.label} ({self.key})"
@@ -571,11 +573,24 @@ GENERAL = Promise(
 )
 
 
-def detect_promise(title: str, angle: str = "") -> Promise:
-    """Work out what a title actually commits the video to."""
+def detect_promise(title: str, angle: str = "", language: str = "en") -> Promise:
+    """Work out what a title actually commits the video to.
 
-    text = f" {re.sub(r'[^a-z ]+', ' ', str(title or '').lower())} "
-    for promise in PROMISES:
+    The promise carries its own language's vocabulary, so everything
+    downstream - the idea filter, the causal check on the written paragraph,
+    the repair sentences - works in whatever language the script is written
+    in without any of them testing a locale code.
+    """
+
+    from .languages import resolve_language
+
+    resolved = resolve_language(language)
+    catalogue = PROMISES if resolved.is_english else PROMISES_ES
+    general = GENERAL if resolved.is_english else GENERAL_ES
+
+    # Spanish keeps its accents: stripping them would break "salón" and "más".
+    text = f" {re.sub(r'[^a-záéíóúüñ ]+', ' ', str(title or '').lower())} "
+    for promise in catalogue:
         for signal in promise.title_signals:
             if signal in text:
                 return promise
@@ -591,10 +606,10 @@ def detect_promise(title: str, angle: str = "") -> Promise:
     }
     key = angle_map.get(str(angle or "").lower())
     if key:
-        for promise in PROMISES:
+        for promise in catalogue:
             if promise.key == key:
                 return promise
-    return GENERAL
+    return general
 
 
 def _tip_text(tip: Tip) -> str:
@@ -824,3 +839,373 @@ def mechanism_by_name(promise: Promise, name: str) -> Mechanism | None:
         if family.name == name:
             return family
     return None
+
+
+# ---------------------------------------------------------------------------
+# Spanish promises
+#
+# Written in Spanish rather than translated from the English table above,
+# because the vocabulary that signals a mechanism is idiomatic: "se lee más
+# alta", "se come el paso", "queda despejado". A word-for-word translation of
+# the English keyword list would match almost nothing in a natural Spanish
+# script.
+# ---------------------------------------------------------------------------
+
+#: Frases que declaran directamente un resultado de espacio percibido.
+SPACE_OUTCOMES_ES: tuple[str, ...] = (
+    "parece más grande", "parezca más grande", "parecer más grande",
+    "se ve más grande", "se vea más grande", "se lee como más grande",
+    "más grande de lo que", "más pequeño de lo que", "más pequeña de lo que",
+    "más amplio", "más amplia", "más espacioso", "más espaciosa",
+    "se sienta más grande", "se siente más grande", "sienta más amplia",
+    "sienta más amplio", "se sienta más amplia", "se sienta más amplio",
+    "sensación de amplitud", "sensación de espacio", "amplitud",
+    "parece más alto", "parezca más alto", "parece más alta", "más alta de lo que",
+    "más alto de lo que", "se lee más alta", "se lee más alto",
+    "estira", "agranda", "ensancha", "abre el espacio", "abre la habitación",
+    "encoge", "empequeñece", "cierra visualmente", "cierran visualmente",
+    "agobiante", "apretado", "apretada", "metros cuadrados",
+    "visualmente", "percibe", "percibida", "profundidad",
+)
+
+#: Principios genéricos de decoración: buenos consejos que por sí solos no
+#: hacen que una habitación se vea más grande.
+GENERIC_DESIGN_PRINCIPLES_ES: tuple[str, ...] = (
+    "sesenta treinta diez", "60 30 10", "regla del color", "regla de color",
+    "paleta de color", "tono dominante", "color de acento", "tres colores",
+    "subtono", "gama cromática", "círculo cromático", "combinación de colores",
+)
+
+
+def _m(name: str, words: tuple[str, ...], because: str, *alt: str) -> Mechanism:
+    return Mechanism(name, words, because, tuple(alt))
+
+
+PROMISES_ES: tuple[Promise, ...] = (
+    Promise(
+        key="bigger",
+        label="hacer que el espacio parezca o se sienta más grande",
+        language="es",
+        title_signals=(
+            "parezca más grande", "parece más grande", "más grande",
+            "más amplio", "más amplia", "más espacioso", "amplitud",
+            "aprovechar el espacio", "ganar espacio", "espacio pequeño",
+            "salón pequeño", "piso pequeño", "habitación pequeña",
+        ),
+        mechanisms=(
+            _m("vertical_emphasis",
+               ("techo", "más alto", "altura", "vertical", "hacia arriba",
+                "del suelo al techo", "a ras de techo", "toda la altura", "arriba"),
+               "Llevar la mirada hacia arriba hace que la pared se lea más alta, "
+               "y una pared más alta hace que la habitación entera parezca más "
+               "grande de lo que dicen sus metros.",
+               "El ojo sigue la línea más alta de la habitación, así que subirla "
+               "hace que el techo se lea más alto y el espacio se sienta más amplio.",
+               "La altura es la dimensión que casi siempre le sobra a una "
+               "habitación pequeña, y usarla hace que se vea más grande sin tocar "
+               "un solo tabique."),
+            _m("clear_sightlines",
+               ("línea de visión", "líneas de visión", "despejado", "despejada",
+                "ininterrumpid", "sin obstáculos", "paso", "recorrido",
+                "circulación", "camino", "continuo", "continua"),
+               "Cuando nada interrumpe la vista, el ojo llega de una vez hasta la "
+               "pared del fondo, así que el espacio se lee como más grande de lo "
+               "que dice el plano.",
+               "Un recorrido despejado deja que la mirada termine el viaje sin "
+               "pararse, lo que hace que hasta una habitación estrecha parezca "
+               "más amplia."),
+            _m("furniture_scale",
+               ("escala", "sobredimensionad", "demasiado grande", "demasiado pequeñ",
+                "peso visual", "voluminos", "medir", "medida", "medidas",
+                "dimensiones", "fondo del sofá", "piezas grandes", "tamaño"),
+               "Los muebles que se pasan de tamaño se comen el suelo visible y "
+               "estrechan el paso, así que lo que queda se siente agobiante aunque "
+               "la habitación no haya cambiado ni un centímetro.",
+               "Acertar con la escala deja sitio para andar y sitio para mirar, lo "
+               "que hace que un espacio pequeño se lea como más grande de lo que mide."),
+            _m("less_clutter",
+               ("desorden", "superficies", "vacío", "quitar", "editar",
+                "menos objetos", "despejar", "recoger"),
+               "Las superficies despejadas le dan al ojo dónde descansar, así que "
+               "una habitación con menos cosas compitiendo se lee como más amplia.",
+               "El vacío es lo que el ojo interpreta como espacio, así que dejar "
+               "algo libre hace que la habitación parezca más grande sin sacar un "
+               "solo mueble."),
+            _m("visible_floor",
+               ("patas", "suelo visible", "ver suelo", "se ve suelo", "volad",
+                "colgad", "elevad", "levantad", "apoya en el suelo"),
+               "Cada metro de suelo que se ve es un metro que el ojo cuenta, así "
+               "que dejar el suelo a la vista bajo los muebles hace que la "
+               "habitación parezca más grande.",
+               "Un suelo continuo y visible le dice al ojo hasta dónde llega la "
+               "habitación, lo que hace que el espacio se sienta más amplio que "
+               "con muebles que apoyan a ras."),
+            _m("mirrors_and_reflection",
+               ("espejo", "reflej", "cristal", "vidrio", "transparente"),
+               "Un reflejo añade una profundidad que el ojo lee como real, así que "
+               "la pared deja de comportarse como el final de la habitación y el "
+               "espacio parece más grande.",
+               "La luz reflejada y la profundidad reflejada se leen las dos como "
+               "espacio real, lo que hace que una habitación pequeña se vea más "
+               "grande de lo que es."),
+            _m("light_distribution",
+               ("luz natural", "luz del día", "claridad", "lámpara", "aplique",
+                "iluminar", "iluminación", "perímetro", "esquinas", "luz cálida",
+                "punto de luz", "fuentes de luz", "luz cenital"),
+               "La luz que llega a las paredes y a las esquinas le enseña al ojo "
+               "dónde termina la habitación, y una habitación con los límites "
+               "visibles se lee como más grande que otra que se apaga a dos metros.",
+               "Iluminar el perímetro hace visibles los límites del espacio, lo "
+               "que hace que la habitación entera se perciba más amplia que con un "
+               "único foco en el centro."),
+            _m("window_geometry",
+               ("cortina", "cortinas", "barra", "estor", "persiana", "visillo"),
+               "Colgar la tela alta y ancha deja el cristal despejado, así que "
+               "entra más luz y la pared se lee más alta de lo que mide.",
+               "Sacar las cortinas fuera del vano deja la ventana entera libre, lo "
+               "que hace que el hueco parezca más grande y la habitación más amplia."),
+            _m("furniture_placement",
+               ("contra la pared", "separa", "colocación", "distribución",
+                "reparto", "perímetro", "orienta", "coloca"),
+               "Una distribución pensada abre los recorridos, así que los pasos "
+               "libres hacen que una habitación pequeña se sienta más grande al "
+               "moverte por ella.",
+               "Dónde se coloca cada mueble decide por dónde se puede andar, y una "
+               "habitación que se cruza sin esquivar nada se percibe más amplia."),
+            _m("continuous_flooring",
+               ("mismo suelo", "suelo continuo", "tarima", "pavimento",
+                "un solo suelo", "flooring"),
+               "Un único suelo continuo evita que el ojo cuente zonas pequeñas por "
+               "separado, así que el conjunto se lee como más grande que un suelo "
+               "partido en tramos.",
+               "Cambiar de material parte la superficie en trozos, y mantenerlo "
+               "igual hace que toda la vivienda se perciba más amplia."),
+            _m("low_contrast_edges",
+               ("contraste", "borde", "bordes", "rodapié", "carpintería", "marco",
+                "mismo color que la pared", "línea dura", "trocea", "parte la pared"),
+               "Los bordes de bajo contraste dejan de trocear la pared, así que la "
+               "superficie se lee como un solo plano grande y la habitación parece "
+               "más amplia.",
+               "Cuando la carpintería desaparece en la pared, el ojo deja de contar "
+               "bordes y el muro entero se percibe más grande."),
+            _m("vertical_storage",
+               ("almacenaje vertical", "hasta el techo", "hasta arriba",
+                "estantería alta", "armario alto", "sube el almacenaje"),
+               "Subir el almacenaje hasta el techo usa la altura en lugar del "
+               "suelo, así que las mismas cosas dejan más suelo visible y la "
+               "habitación se siente más amplia.",
+               "Guardar en vertical deja el suelo libre, lo que hace que una "
+               "habitación pequeña se lea como bastante más espaciosa."),
+        ),
+        concepts=(
+            ("techo", "alto", "altura", "vertical", "arriba"),
+            ("espejo", "reflej", "cristal", "transparente"),
+            ("luz", "claridad", "ventana", "clar", "día"),
+            ("patas", "suelo", "volad", "elevad"),
+            ("escala", "tamaño", "grande", "proporción", "medida"),
+            ("desorden", "despejad", "superficies", "vacío"),
+            ("línea de visión", "continuo", "paso", "recorrido", "abierto"),
+            ("contraste", "borde", "rodapié", "mismo color"),
+            ("almacenaje", "guardar", "ocultar"),
+            ("peso visual", "el ojo", "la mirada", "percib", "se lee"),
+        ),
+        required_groups=1,
+        deny_signals=GENERIC_DESIGN_PRINCIPLES_ES,
+        rescue_signals=SPACE_OUTCOMES_ES,
+        counter_signals=(
+            "conversación", "acústic", "olor", "aroma", "estacional",
+            "mantenimiento", "toalla", "presión del agua", "al alcance",
+        ),
+    ),
+    Promise(
+        key="expensive",
+        label="hacer que la casa parezca más cara",
+        language="es",
+        title_signals=(
+            "más cara", "parezca cara", "parecer caro", "de lujo", "lujoso",
+            "gama alta", "parece barato", "aspecto caro", "más lujosa",
+        ),
+        mechanisms=(
+            _m("materials", ("material", "piedra", "mármol", "latón", "madera maciza",
+                             "cuero", "lana", "lino", "roble", "nogal"),
+               "Los materiales de verdad envejecen en lugar de estropearse, y esa "
+               "diferencia es lo que hace que la habitación se lea como cara."),
+            _m("finishes", ("acabado", "mate", "satinado", "brillo", "cepillado", "pulido"),
+               "Un acabado bien elegido recoge la luz como lo hacen las superficies "
+               "caras, así que la pieza entera se lee como más cara de lo que costó."),
+            _m("hardware", ("tirador", "tiradores", "manilla", "pomo", "grifo",
+                            "grifería", "interruptor", "herraje"),
+               "Los herrajes son lo que toca la mano todos los días, así que "
+               "cambiarlos hace que la habitación se perciba más cara sin tocar "
+               "nada más."),
+            _m("generous_scale", ("sobredimensionad", "generos", "más grande",
+                                  "más ancho", "escala", "amplio"),
+               "Las proporciones generosas se leen como elegidas para la casa y no "
+               "para el presupuesto, lo que hace que el conjunto parezca más caro."),
+            _m("layered_light", ("regulador", "aplique", "capas de luz", "luz cálida",
+                                 "lámpara", "luz indirecta"),
+               "La luz repartida y regulable modela la habitación como lo hace un "
+               "escaparate, así que el espacio se percibe bastante más caro."),
+            _m("architectural_detail", ("moldura", "panelado", "zócalo", "rodapié",
+                                        "arquitectónico", "detalle", "junta", "remate"),
+               "Un detalle arquitectónico limpio es la señal de un trabajo bien "
+               "terminado, lo que hace que la habitación se lea como de gama alta."),
+            _m("concealment", ("cable", "cables", "ocultar", "esconder", "plástico", "recoger"),
+               "Los cables y el plástico a la vista son lo que abarata una "
+               "habitación por lo demás correcta, así que esconderlos sube todo lo "
+               "que hay alrededor."),
+            _m("upholstery", ("tapiza", "tapicería", "cabecero", "acolchad", "terciopelo"),
+               "La tapicería aporta el fondo y el peso que le faltan al mueble "
+               "barato, de modo que la pieza se lee como mucho más cara."),
+            _m("framing", ("marco", "enmarca", "paspartú", "galería", "cuadro"),
+               "Un buen marco convierte una lámina corriente en algo que parece "
+               "comprado en una galería, lo que hace que el arte barato se lea "
+               "como elegido con criterio."),
+            _m("greenery", ("flores", "ramas", "planta", "verde"),
+               "Las ramas frescas son lo más barato de la habitación y lo que más "
+               "fiablemente se lee como cuidado, así que la casa entera parece más cara."),
+            _m("window_dressing", ("cortina", "cortinas", "dobladillo", "bajo", "tela"),
+               "Unas cortinas que rozan el suelo parecen hechas a medida, de modo "
+               "que la ventana entera se lee como cara en lugar de barata."),
+            _m("restraint", ("quitar", "editar", "vacío", "contención", "menos"),
+               "Editar deja sitio para que se vean las piezas buenas, y por eso la "
+               "contención se lee como cara."),
+        ),
+        concepts=(
+            ("material", "piedra", "mármol", "latón", "madera", "cuero", "lino"),
+            ("acabado", "mate", "tirador", "herraje", "remate"),
+            ("escala", "generos", "grande", "amplio"),
+            ("luz", "lámpara", "aplique", "regulador", "cálida"),
+            ("detalle", "moldura", "panelado", "arquitectónico"),
+            ("cable", "plástico", "ocultar", "recoger"),
+            ("cortina", "tela", "tapiza"),
+            ("marco", "cuadro", "galería"),
+            ("flores", "ramas", "planta"),
+        ),
+        deny_signals=("acústic", "presión del agua", "olor"),
+        rescue_signals=(
+            "más cara", "más caro", "cara", "caro", "de lujo", "lujoso",
+            "barato", "barata", "gama alta", "a medida", "cuidado", "elegido",
+        ),
+        counter_signals=("estacional", "cuota"),
+    ),
+    Promise(
+        key="cozy",
+        label="hacer que la casa se sienta más cálida y acogedora",
+        language="es",
+        title_signals=("acogedor", "acogedora", "más cálido", "más cálida",
+                       "calidez", "cómodo", "hogareño"),
+        mechanisms=(
+            _m("warm_low_light", ("cálida", "cálido", "luz baja", "lámpara", "vela",
+                                  "regulador", "kelvin", "2700", "2200", "tarde", "noche"),
+               "La luz cálida y baja se lee como final del día, y eso es lo que el "
+               "cuerpo entiende como acogedor."),
+            _m("soft_texture", ("suave", "lana", "manta", "cojín", "lino", "textura",
+                                "tapiza", "borreguito"),
+               "La textura suave invita a tocar, y eso hace que una habitación se "
+               "sienta cálida en lugar de solo amueblada."),
+            _m("natural_material", ("madera", "roble", "material natural", "fibra"),
+               "Los materiales naturales llevan el color cálido en el propio "
+               "material, así que la habitación entera se siente menos fría."),
+            _m("enclosure", ("rincón", "esquina", "resguard", "respaldo", "íntimo",
+                             "a la espalda", "refugio"),
+               "Tener algo sólido a la espalda es lo que hace que un asiento se "
+               "sienta seguro, y un asiento seguro se siente acogedor."),
+            _m("acoustics", ("acústic", "sonido", "eco", "absorb", "alfombra", "libros"),
+               "Las superficies blandas absorben el eco, así que una habitación "
+               "silenciosa se siente más cálida que una que resuena."),
+            _m("personal_traces", ("vivid", "personal", "uso", "vela", "libro"),
+               "Las señales de uso son lo que separa una casa de un piso piloto, y "
+               "eso es buena parte de lo que significa acogedor."),
+        ),
+        concepts=(
+            ("cálida", "luz baja", "vela", "lámpara", "tarde"),
+            ("suave", "lana", "manta", "cojín", "textura", "lino"),
+            ("madera", "natural", "fibra"),
+            ("rincón", "esquina", "resguard", "íntimo"),
+            ("acústic", "sonido", "alfombra", "libros"),
+            ("personal", "vivid", "uso"),
+        ),
+        deny_signals=("reventa", "sesenta treinta diez"),
+        rescue_signals=("acogedor", "acogedora", "cálida", "cálido", "calidez",
+                        "cómodo", "relaj", "hogar"),
+        counter_signals=("reventa",),
+    ),
+    Promise(
+        key="brighter",
+        label="traer más luz a la habitación",
+        language="es",
+        title_signals=("más luz", "más luminoso", "más luminosa", "iluminar",
+                       "habitación oscura", "luminosidad"),
+        mechanisms=(
+            _m("more_light_sources", ("punto de luz", "fuentes de luz", "lámpara",
+                                      "bombilla", "aplique", "regulador", "led"),
+               "Más puntos de luz separados rellenan los huecos que deja una sola "
+               "lámpara de techo, así que la habitación queda más luminosa en todas "
+               "partes en vez de bajo un único foco."),
+            _m("daylight", ("luz natural", "luz del día", "ventana", "cristal", "sol"),
+               "Todo lo que deja entrar más luz natural sube el nivel de luz de la "
+               "habitación entera sin gastar nada."),
+            _m("reflection", ("espejo", "reflej", "brillo", "satinado"),
+               "Las superficies reflectantes devuelven a la habitación la luz que "
+               "ya tienes, de modo que las mismas bombillas dejan el espacio "
+               "notablemente más luminoso."),
+            _m("pale_surfaces", ("clar", "pálid", "blanco", "luminos"),
+               "Las superficies claras reflejan mucha más luz de la que reciben, "
+               "así que la habitación se ve más luminosa con la misma instalación."),
+            _m("colour_temperature", ("kelvin", "temperatura de color", "cálida",
+                                      "pantalla", "difus", "capas"),
+               "Acertar con la temperatura de color y con la pantalla evita que la "
+               "luz se pierda antes de llegar a la habitación, que es lo que la "
+               "deja oscura."),
+            _m("unobstructed_windows", ("cortina", "estor", "alféizar", "despejar",
+                                        "sin obstáculos"),
+               "Despejar la propia ventana es el cambio que más luz devuelve, de "
+               "modo que la habitación deja de estar oscura a media tarde."),
+        ),
+        concepts=(
+            ("luz", "lámpara", "bombilla", "aplique", "led"),
+            ("ventana", "natural", "día", "sol", "cortina"),
+            ("espejo", "reflej", "clar", "blanco"),
+            ("kelvin", "cálida", "pantalla", "capas"),
+        ),
+        deny_signals=GENERIC_DESIGN_PRINCIPLES_ES,
+        rescue_signals=("luminos", "más luz", "oscura", "oscuro", "clar", "sombra"),
+    ),
+    Promise(
+        key="storage",
+        label="ganar almacenaje o reducir el desorden",
+        language="es",
+        title_signals=("almacenaje", "organiza", "orden", "desorden", "guardar"),
+        concepts=(
+            ("almacenaje", "guardar", "guardado"),
+            ("estante", "balda", "armario", "cajón", "mueble"),
+            ("cesta", "caja", "recipiente", "etiqueta"),
+            ("oculto", "esconder", "banco", "puf"),
+            ("vertical", "techo", "altura", "pared"),
+            ("desorden", "recoger", "sistema", "salida"),
+        ),
+        counter_signals=("color de pared", "largo de cortina", "olor"),
+    ),
+    Promise(
+        key="mistakes",
+        label="identificar un error que merece la pena corregir",
+        language="es",
+        title_signals=("error", "errores", "fallo", "fallos", "evitar", "nunca"),
+        concepts=(
+            ("demasiado", "error", "mal", "evitar", "falla"),
+            ("en lugar de", "en vez de", "mejor", "nunca", "deja de"),
+            ("tamaño", "escala", "altura", "proporción", "colocación"),
+            ("luz", "color", "alfombra", "cortina", "arte", "mueble"),
+        ),
+    ),
+)
+
+GENERAL_ES = Promise(
+    key="general",
+    label="ideas útiles para esta estancia",
+    language="es",
+    title_signals=(),
+    concepts=(),
+    required_groups=0,
+)

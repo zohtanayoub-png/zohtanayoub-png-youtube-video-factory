@@ -28,6 +28,7 @@ from .downloader import ClipDownloader
 from .editor import ShotPlan, VideoEditor, estimate_shot_count, plan_shots
 from .editorial_qc import EditorialReport, build_report
 from .ffmpeg_utils import ffmpeg_available, probe_media
+from .languages import language_from_config
 from .logging_utils import get_logger
 from .metadata import build_metadata, safe_filename
 from .provenance import (
@@ -51,6 +52,7 @@ from .scene_planner import Scene, plan_scenes
 from .script_generator import Script, generate_script
 from .stock import StockClip, build_providers
 from .visual_analysis import VisualAnalyzer
+from .ass_subtitles import report as subtitle_report, style_for, write_ass
 from .subtitles import generate_subtitles
 from .title_alignment import detect_promise, score_alignment
 from .topic_engine import Topic, TopicEngine
@@ -113,6 +115,10 @@ class VideoPipeline:
         state_dir: str | Path = "data/state",
     ) -> None:
         self.config = config
+        # One decision, read once, used everywhere: topic grammar, knowledge
+        # pool, phrase pack, promise vocabulary, voice, pronunciation,
+        # subtitle chunking and metadata all follow from it.
+        self.language = language_from_config(config)
         self.state_dir = Path(state_dir)
         # A run label may repeat (a re-run reuses the workflow run number), so
         # the generation id adds a timestamp and a random suffix. Every path
@@ -208,6 +214,7 @@ class VideoPipeline:
         engine = TopicEngine(
             history=history,
             similarity_threshold=float(self.config.get("topics.similarity_threshold", 0.62)),
+            language=self.language,
         )
         topic = (
             engine.from_user_input(topic_text)
@@ -224,7 +231,9 @@ class VideoPipeline:
         return topic
 
     def _write_script(self, topic: Topic, speech_rate_wpm: float | None = None) -> Script:
-        configured = float(self.config.get("script.words_per_minute", 150))
+        configured = float(
+            self.config.get("script.words_per_minute", 0) or self.language.words_per_minute
+        )
         rate = float(speech_rate_wpm or configured)
         if speech_rate_wpm and abs(rate - configured) > 5:
             log.info(
@@ -239,6 +248,7 @@ class VideoPipeline:
             engine=str(self.config.get("script.engine", "auto")),
             words_per_minute=rate,
             llm_settings=dict(self.config.get("script.llm", {}) or {}),
+            language=self.language,
         )
 
     def _plan_scenes(self, script: Script) -> list[Scene]:
@@ -247,10 +257,11 @@ class VideoPipeline:
     def _build_tts(self):
         return build_engine(
             engine=str(self.config.get("tts.engine", "auto")),
-            voice=str(self.config.get("tts.voice", "en_US-hfc_female-medium")),
+            voice=str(self.config.get("tts.voice", "") or ""),
             speed=float(self.config.get("tts.speed", 1.0)),
             sample_rate=int(self.config.get("audio.sample_rate", 48000)),
             fallback_voices=list(self.config.get("tts.fallback_voices", []) or []),
+            language=self.language,
         )
 
     def _narrate(self, scenes: Sequence[Scene], engine=None):
@@ -263,6 +274,7 @@ class VideoPipeline:
             max_chunk_chars=int(self.config.get("tts.max_chunk_chars", 320)),
             loudness_lufs=float(self.config.get("audio.loudness_lufs", -16.0)),
             sample_rate=int(self.config.get("audio.sample_rate", 48000)),
+            language=self.language,
         )
         return builder.build(scenes, self.workdir / "narration.wav")
 
@@ -885,16 +897,48 @@ class VideoPipeline:
                 max_lines=int(self.config.get("subtitles.max_lines", 2)),
             )
 
+        # The clean SRT is what YouTube ingests; the ASS is what gets burned
+        # into the picture. Both are exported, always, because they are for
+        # two different audiences.
+        style_name = str(self.config.get("subtitles.style", "premium"))
+        style = style_for(style_name)
+        ass_path: Path | None = None
+        subtitle_metrics: dict[str, Any] = {}
+        if subtitles_path is not None and style_name.lower() != "none":
+            ass_path, events, subtitle_font = write_ass(
+                narration.chunks,
+                output_dir / "subtitles.ass",
+                style=style,
+                language=self.language,
+                width=self.config.width,
+                height=self.config.height,
+            )
+            subtitle_metrics = subtitle_report(events, style, self.config.height)
+            subtitle_metrics["subtitle_font"] = subtitle_font
+
         burn_in = bool(self.config.get("subtitles.burn_in", False))
+        burned: Path | None = None
+        if burn_in and subtitles_path:
+            # Prefer the styled file. Falling back to the SRT keeps burn-in
+            # working if styling was switched off rather than silently
+            # producing a video with no captions in it.
+            burned = ass_path or subtitles_path
+
         final_path = output_dir / "final_video.mp4"
         editor.mux(
             video_track,
             narration.audio_path,
             final_path,
             tail_seconds=tail_seconds,
-            subtitles=subtitles_path if (burn_in and subtitles_path) else None,
+            subtitles=burned,
             video_bitrate=str(self.config.get("video.video_bitrate", "")) or None,
         )
+        subtitle_metrics.update({
+            "subtitle_style": style_name.lower(),
+            "burn_in_subtitles": bool(burned),
+            "subtitles_srt_exported": subtitles_path is not None,
+            "subtitles_ass_exported": ass_path is not None,
+        })
 
         info = probe_media(final_path)
 
@@ -935,7 +979,7 @@ class VideoPipeline:
             duration_seconds=info.duration,
             sources=sources_payload["clips"],
             channel_name=str(self.config.get("channel.name", "")),
-            language=str(self.config.get("channel.language", "en-US")),
+            language=self.language.code,
             category_id=str(self.config.get("youtube.category_id", "26")),
             privacy_status=str(self.config.get("youtube.privacy_status", "private")),
             made_for_kids=bool(self.config.get("youtube.made_for_kids", False)),
@@ -948,7 +992,7 @@ class VideoPipeline:
         # How many chosen ideas fail the title promise. Should be zero: the
         # script generator filters them out, so a non-zero count means a
         # filter regression rather than a content problem.
-        promise = detect_promise(topic.title, topic.angle)
+        promise = detect_promise(topic.title, topic.angle, language=self.language)
         alignment_failures = sum(
             1
             for section in script.items()
@@ -968,6 +1012,12 @@ class VideoPipeline:
                 promise_alignment_failures=alignment_failures,
                 visual_stats=dict((search_stats or {}).get("visual", {}) or {}),
                 causal=getattr(script, "causal", None),
+                production={
+                    "language": self.language.code,
+                    "tts_voice": getattr(narration, "voice", ""),
+                    "tts_engine": getattr(narration, "engine", ""),
+                    **subtitle_metrics,
+                },
             )
             report.save(output_dir / "editorial_quality_report.json")
             return report
