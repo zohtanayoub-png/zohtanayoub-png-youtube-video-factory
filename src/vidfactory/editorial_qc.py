@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from .entities import summarise as summarise_grounding
 from .logging_utils import get_logger
 
 log = get_logger("EDITQC")
@@ -200,6 +201,8 @@ def build_report(
         "min_final_shot_semantic_match": 0.50,
         "max_final_shot_low_relevance": 0.15,
         "min_causal_promise_alignment": 0.90,
+        "max_entity_grounding_failures": 0,
+        "min_final_shot_premium_ratio": 0.60,
         **dict(thresholds or {}),
     }
 
@@ -327,6 +330,17 @@ def build_report(
         round(final_premium_clips / len(final_premium), 3) if final_premium else 0.0
     )
 
+    # ---- required visual entities ---------------------------------------
+    # Relevance says how well the frames match the sentence; grounding says
+    # whether the object the sentence is about is in them. Run 25 averaged
+    # 0.569 with 0% low relevance while showing ribbons for painted trim and
+    # plants for an undersized rug, so the second question needs asking
+    # separately. Only shots that were actually inspected can fail it.
+    grounding_summary = summarise_grounding(final_visual)
+    entity_failures = int(grounding_summary["failed"])
+    entity_pass_pct = float(grounding_summary["pass_percentage"])
+
+    is_production = str(dict(production or {}).get("generation_mode", "")) == "production"
     visual_meta = dict(visual_stats or {})
     causal_score = float(getattr(causal, "overall", 1.0)) if causal is not None else 1.0
     contradiction_report = getattr(causal, "contradiction", None)
@@ -338,6 +352,12 @@ def build_report(
         c.to_dict() for c in getattr(causal, "contamination", []) or []
     ]
     contamination_count = len(contamination)
+    principle_contamination = [
+        c.to_dict() for c in getattr(causal, "principle_contamination", []) or []
+    ]
+    principle_contamination_count = len(principle_contamination)
+    leakage = [l.to_dict() for l in getattr(causal, "leakage", []) or []]
+    leakage_count = len(leakage)
     section_scores = (
         [round(float(r.score), 3) for r in getattr(causal, "results", [])]
         if causal is not None
@@ -380,6 +400,15 @@ def build_report(
         "final_shot_low_relevance_count": final_low_relevance,
         "final_shot_low_relevance_percentage": final_low_relevance_pct,
         "final_shot_premium_visual_ratio": final_premium_ratio,
+        # ---- required visual entity grounding ---------------------------
+        "entity_grounding_failure_count": entity_failures,
+        "entity_grounding_pass_percentage": entity_pass_pct,
+        "final_shot_entity_grounding": grounding_summary,
+        # ---- editorial logic the causal score cannot see -----------------
+        "primary_concept_contamination_count": principle_contamination_count,
+        "primary_concept_contamination": principle_contamination,
+        "optional_example_leakage_count": leakage_count,
+        "optional_example_leakage": leakage,
         "visual_analysis_model": visual_meta.get("model", "not run"),
         "visual_analysis_frame_count": int(visual_meta.get("frames", 0)) or sum(
             int(v.get("frame_count", 0)) for v in inspected
@@ -440,6 +469,80 @@ def build_report(
                 else "every section explains itself in its own terms"
             ),
             severity="error",
+        ),
+        # ---- required visual entities ------------------------------------
+        # An additional gate, not a replacement: relevance, low-relevance and
+        # every other threshold stay exactly where they were. This one asks
+        # the question none of them ask - is the object on screen at all - and
+        # a high generic score is not allowed to answer it. Run 25 shipped
+        # ribbons for painted trim at a 0.569 average and 0% low relevance.
+        EditorialCheck(
+            "no_entity_grounding_failures",
+            entity_failures <= int(limits["max_entity_grounding_failures"]),
+            (
+                f"{entity_failures} of {grounding_summary['checked']} shots that "
+                f"require a specific object do not show it: "
+                + "; ".join(
+                    f"{f['entity']} ({f['score']})"
+                    for f in grounding_summary["failures"][:3]
+                )
+                if entity_failures
+                else (
+                    f"all {grounding_summary['checked']} shots requiring a "
+                    f"specific object show it"
+                    if grounding_summary["checked"]
+                    else "no frames were inspected, so grounding is unmeasured"
+                )
+            ),
+            severity="error",
+        ),
+        # A general recommendation explained through one of its own options
+        # leaves most readers with no reason at all, and a causal sentence
+        # about a different principle is not an explanation of this one.
+        # Neither is visible to the causal score, which was 1.00 for both.
+        EditorialCheck(
+            "primary_concept_alignment",
+            principle_contamination_count == 0,
+            (
+                f"{principle_contamination_count} causal sentence(s) explain a "
+                "different principle than their heading: "
+                + "; ".join(c.get("why", "") for c in principle_contamination[:2])
+                if principle_contamination_count
+                else "every causal sentence explains its own section's idea"
+            ),
+            severity="error",
+        ),
+        EditorialCheck(
+            "no_optional_example_leakage",
+            leakage_count == 0,
+            (
+                f"{leakage_count} section(s) justify a general recommendation "
+                "through one optional example: "
+                + "; ".join(l.get("why", "") for l in leakage[:2])
+                if leakage_count
+                else "no section rests on one of its own alternatives"
+            ),
+            severity="error",
+        ),
+        # Long-form quality drifts down as duration grows: run 22 finished at
+        # 0.638 and run 25, three times longer, at 0.493. The definition of
+        # premium does not move; the answer to a weak pool is more pages and
+        # more query variants, not a lower bar. A warning while the search is
+        # being tuned, a gate for anything published.
+        EditorialCheck(
+            "final_shot_premium_ratio",
+            (
+                not final_premium
+                or final_premium_ratio >= float(limits["min_final_shot_premium_ratio"])
+            ),
+            (
+                f"{final_premium_ratio:.0%} of the clips on screen are premium "
+                f"interior footage (target "
+                f"{float(limits['min_final_shot_premium_ratio']):.0%})"
+                if final_premium
+                else "no clips were inspected, so premium quality is unmeasured"
+            ),
+            severity="error" if is_production else "warning",
         ),
         EditorialCheck(
             "no_source_video_reuse",

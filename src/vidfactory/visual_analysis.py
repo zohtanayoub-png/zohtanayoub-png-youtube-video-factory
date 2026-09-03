@@ -37,6 +37,12 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
 from .ffmpeg_utils import ffmpeg_path
+from .entities import (
+    EntityGrounding,
+    grounding_prompts,
+    required_entity,
+    score_from_similarities,
+)
 from .logging_utils import get_logger
 
 log = get_logger("VISUAL")
@@ -913,6 +919,10 @@ class VisualAnalysis:
     reject_reason: str = ""
     frames: list[dict[str, Any]] = field(default_factory=list)
     expectations: list[str] = field(default_factory=list)
+    #: The object this shot's narration promised, and whether it is on screen.
+    #: A high ``semantic_match`` cannot stand in for it: run 25 averaged 0.569
+    #: while showing ribbons for painted trim and plants for an undersized rug.
+    grounding: EntityGrounding = field(default_factory=EntityGrounding)
 
     @property
     def penalised_flags(self) -> dict[str, float]:
@@ -934,6 +944,7 @@ class VisualAnalysis:
             "expectations": list(self.expectations),
             "flags": {k: round(v, 3) for k, v in sorted(self.flags.items()) if v > 0},
             "evidence": {k: v[:3] for k, v in self.evidence.items() if v},
+            **self.grounding.to_dict(),
         }
 
 
@@ -1055,6 +1066,14 @@ class VisualAnalyzer:
             )
             analysis.premium_visual_score = self._premium(0.5, analysis.flags)
             analysis.is_premium_visual = False
+            entity = required_entity(f"{query} {narration}")
+            if entity is not None:
+                # Required, but nothing was ever opened to look for it. Named
+                # in the report, not counted as a failure: an unchecked shot
+                # is not a measured absence.
+                analysis.grounding = EntityGrounding(
+                    entity=entity.name, labels=entity.labels
+                )
             return analysis
 
         stat_frames = [downsample(f, STAT_SIZE) for f in usable]
@@ -1102,6 +1121,7 @@ class VisualAnalyzer:
 
         likeness = round(_mean([interior_likeness(s) for s in stats]), 3)
         expectations = match_expectations(f"{query} {narration}")
+        grounding = self._entity_grounding(image_vectors, query, narration)
         if semantic_source == "pixel-expectations":
             semantic = self._expectation_semantic(stats, expectations, likeness)
 
@@ -1116,6 +1136,7 @@ class VisualAnalyzer:
             interior_likeness=likeness,
             brightness=round(_mean([s.mean_luma for s in stats]), 1),
             expectations=[e.name for e in expectations],
+            grounding=grounding,
             frames=[
                 {
                     "source": f.source[-72:],
@@ -1250,6 +1271,48 @@ class VisualAnalyzer:
             merged[flag] = round(values[len(values) // 2], 3)
         return {k: v for k, v in merged.items() if v >= 0.12}
 
+    def _entity_grounding(
+        self,
+        image_vectors: Sequence[Sequence[float]],
+        query: str,
+        narration: str,
+    ) -> EntityGrounding:
+        """Is the object the narration is about actually in the picture?
+
+        Asked separately from ``_clip_semantic`` on purpose. That measures how
+        well the frames match a *sentence*, and a styled living room matches a
+        sentence about the rug in it whether or not the rug is there - same
+        palette, same furniture, same vocabulary. Run 25 scored 0.569 on
+        average doing exactly that.
+
+        This asks a narrower question with short prompts: does the frame look
+        more like "an area rug on the floor" than like the best of "a floor
+        with no rug", "indoor potted plants", "a close-up of furniture"? The
+        competitors are the failures actually observed, so the comparison is
+        against what the search keeps returning rather than against noise.
+        """
+
+        entity = required_entity(f"{query} {narration}")
+        if entity is None:
+            return EntityGrounding()          # abstract advice; nothing to find
+        if not image_vectors:
+            return EntityGrounding(entity=entity.name, labels=entity.labels)
+
+        prompts, _ = grounding_prompts(entity)
+        try:
+            text_vectors = self._encode_texts(
+                [PROMPT_TEMPLATE.format(p) for p in prompts]
+            )
+        except Exception as exc:                          # pragma: no cover
+            log.warning("visual model failed on entity prompts: %s", exc)
+            return EntityGrounding(entity=entity.name, labels=entity.labels)
+
+        per_frame = [
+            [_cosine(image, t) for t in text_vectors] for image in image_vectors
+        ]
+        return score_from_similarities(entity, per_frame, _ramp)
+
+    # ------------------------------------------------------------------
     def _clip_semantic(
         self, image_vectors: Sequence[Sequence[float]], query: str, narration: str
     ) -> float | None:

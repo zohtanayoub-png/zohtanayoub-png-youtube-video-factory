@@ -40,6 +40,13 @@ from .concepts import (
     explanation_fits,
     find_contamination,
 )
+from .principles import (
+    OptionalExampleLeakage,
+    PrincipleContamination,
+    condition_sentence,
+    find_optional_example_leakage,
+    find_principle_contamination,
+)
 from .contradiction import (
     AdviceDirection,
     Contradiction,
@@ -141,6 +148,8 @@ class CausalResult:
     contradictions: list[Contradiction] = field(default_factory=list)
     #: Sentences that are about something the section is not.
     contamination: list[Contamination] = field(default_factory=list)
+    principle_contamination: list[PrincipleContamination] = field(default_factory=list)
+    leakage: list[OptionalExampleLeakage] = field(default_factory=list)
     #: What the heading tells the viewer to do, and to avoid.
     direction: AdviceDirection | None = None
 
@@ -150,6 +159,8 @@ class CausalResult:
             self.score >= PASS_THRESHOLD
             and not self.contradictions
             and not self.contamination
+            and not self.principle_contamination
+            and not self.leakage
         )
 
     def explain(self) -> str:
@@ -191,6 +202,12 @@ class CausalResult:
             "contradictions": [c.to_dict() for c in self.contradictions],
             "cross_concept_contamination_count": len(self.contamination),
             "cross_concept_contamination": [c.to_dict() for c in self.contamination],
+            "primary_concept_contamination_count": len(self.principle_contamination),
+            "primary_concept_contamination": [
+                c.to_dict() for c in self.principle_contamination
+            ],
+            "optional_example_leakage_count": len(self.leakage),
+            "optional_example_leakage": [l.to_dict() for l in self.leakage],
             "direction": self.direction.to_dict() if self.direction else {},
         }
 
@@ -318,6 +335,18 @@ def repair_text(
                     "the section is not", family.name, heading,
                 )
                 continue
+            # A principle is not an object either. "Balance visual weight"
+            # names no physical thing, so explanation_fits has nothing to
+            # compare and the furniture-footprint sentence sailed through it
+            # in run 25. This asks the other half of the question.
+            if heading and find_principle_contamination(
+                heading, repaired, tip, connectives=connectives_for(promise)
+            ):
+                log.debug(
+                    "Skipped the %s explanation for %r: it explains a "
+                    "different principle", family.name, heading,
+                )
+                continue
             counters[family.name] = start + offset + 1
             return repaired
     return None
@@ -351,6 +380,9 @@ class CausalReport:
     #: Sentences transplanted from another subject. Production requires none.
     contamination: list[Contamination] = field(default_factory=list)
     contamination_rewrites: int = 0
+    principle_contamination: list[PrincipleContamination] = field(default_factory=list)
+    leakage: list[OptionalExampleLeakage] = field(default_factory=list)
+    leakage_rewrites: int = 0
 
     @property
     def overall(self) -> float:
@@ -370,6 +402,14 @@ class CausalReport:
     def cross_concept_contamination_count(self) -> int:
         return len(self.contamination)
 
+    @property
+    def primary_concept_contamination_count(self) -> int:
+        return len(self.principle_contamination)
+
+    @property
+    def optional_example_leakage_count(self) -> int:
+        return len(self.leakage)
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "promise": self.promise_key,
@@ -383,6 +423,13 @@ class CausalReport:
             "cross_concept_contamination_count": len(self.contamination),
             "cross_concept_contamination": [c.to_dict() for c in self.contamination],
             "contamination_rewrites": self.contamination_rewrites,
+            "primary_concept_contamination_count": len(self.principle_contamination),
+            "primary_concept_contamination": [
+                c.to_dict() for c in self.principle_contamination
+            ],
+            "optional_example_leakage_count": len(self.leakage),
+            "optional_example_leakage": [l.to_dict() for l in self.leakage],
+            "leakage_rewrites": self.leakage_rewrites,
         }
 
 
@@ -536,6 +583,113 @@ def validate_sections(
             log.error(
                 "Item %s (%s) is contaminated: %s",
                 result.index, heading, intruders[0].explain(),
+            )
+
+        # ------------------------------------------------------------------
+        # A principle is not an object. "Balance visual weight across the
+        # room" names nothing physical, so the check above has no subject to
+        # compare against and run 25's furniture-footprint explanation landed
+        # on it at cross_concept_contamination_count = 0. This asks whether
+        # the causal sentence explains the idea the heading actually teaches.
+        # ------------------------------------------------------------------
+        connectives = connectives_for(promise)
+        foreign = find_principle_contamination(
+            heading, section.text, tip, connectives=connectives
+        )
+        if foreign and rewrite:
+            offending = {c.sentence for c in foreign}
+            trimmed = " ".join(
+                s.strip()
+                for s in _SENTENCE_SPLIT.split(str(section.text or ""))
+                if s.strip() and s.strip() not in offending
+            )
+            candidate = repair_text(
+                trimmed, promise, tip, used=counters, heading=heading
+            ) or trimmed
+            if (
+                score_paragraph(candidate, promise).score >= PASS_THRESHOLD
+                and not find_principle_contamination(
+                    heading, candidate, tip, connectives=connectives
+                )
+                and not find_contamination(heading, candidate, tip)
+                and not find_contradictions(
+                    heading, candidate, language=language, direction=direction
+                )
+            ):
+                section.text = candidate
+                result = rescore(section)
+                result.direction = direction
+                result.repaired = True
+                report.contamination_rewrites += 1
+                log.info(
+                    "Item %s (%s) explained a different principle; rewrote it "
+                    "in its own", result.index, heading,
+                )
+                foreign = []
+            else:
+                foreign = find_principle_contamination(
+                    heading, section.text, tip, connectives=connectives
+                )
+
+        if foreign:
+            for item in foreign:
+                item.index = result.index
+            result.principle_contamination = list(foreign)
+            report.principle_contamination.extend(foreign)
+            log.error(
+                "Item %s (%s): %s", result.index, heading, foreign[0].explain()
+            )
+
+        # ------------------------------------------------------------------
+        # An optional example is not the principle. A section that offers a
+        # plant, a lamp, a mirror or a chair and then explains itself through
+        # the mirror's reflection has given three readers in four no reason at
+        # all. Condition the sentence rather than delete it: the reason is
+        # true, it just does not cover the whole recommendation.
+        # ------------------------------------------------------------------
+        leaks = find_optional_example_leakage(
+            heading, section.text, tip, connectives=connectives, language=language
+        )
+        if leaks and rewrite:
+            candidate = section.text
+            for leak in leaks:
+                candidate = candidate.replace(
+                    leak.sentence,
+                    condition_sentence(leak.sentence, leak.used, language=language),
+                )
+            if (
+                candidate != section.text
+                and score_paragraph(candidate, promise).score >= PASS_THRESHOLD
+                and not find_optional_example_leakage(
+                    heading, candidate, tip, connectives=connectives, language=language
+                )
+                and not find_contradictions(
+                    heading, candidate, language=language, direction=direction
+                )
+            ):
+                section.text = candidate
+                result = rescore(section)
+                result.direction = direction
+                result.repaired = True
+                report.leakage_rewrites += 1
+                log.info(
+                    "Item %s (%s) rested on one of its own options; said so",
+                    result.index, heading,
+                )
+                leaks = []
+            else:
+                leaks = find_optional_example_leakage(
+                    heading, section.text, tip,
+                    connectives=connectives, language=language,
+                )
+
+        if leaks:
+            for item in leaks:
+                item.index = result.index
+            result.leakage = list(leaks)
+            report.leakage.extend(leaks)
+            log.error(
+                "Item %s (%s): %s", result.index, heading, leaks[0].explain()
             )
 
         report.contradiction.directions.append(direction)

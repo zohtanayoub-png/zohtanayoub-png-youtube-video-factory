@@ -11,6 +11,7 @@ from pathlib import Path
 
 from .ffmpeg_utils import run_ffmpeg
 from .logging_utils import get_logger
+from .entities import EntityGrounding, required_entity
 from .visual_analysis import VisualAnalyzer
 
 log = get_logger("ASSETS")
@@ -254,6 +255,7 @@ class ScriptedVisualAnalyzer(VisualAnalyzer):
         low: float = 0.60,
         high: float = 0.75,
         frames_per_clip: int = 3,
+        grounding: bool | None = True,
         **kwargs: object,
     ) -> None:
         super().__init__(model=None, frames_per_clip=frames_per_clip, **kwargs)  # type: ignore[arg-type]
@@ -261,6 +263,11 @@ class ScriptedVisualAnalyzer(VisualAnalyzer):
             low, high = high, low
         self.low = float(low)
         self.high = float(high)
+        #: Whether a synthetic clip is deemed to contain the object its
+        #: narration names: ``True`` grounded, ``False`` missing, ``None``
+        #: never looked at. A gradient contains no rug either way, so this is
+        #: decided for the same reason the score is.
+        self.grounding = grounding
 
     def scripted_score(self, clip: object) -> float:
         """A stable score in ``[low, high]``, decided by the clip's identity."""
@@ -287,4 +294,17 @@ class ScriptedVisualAnalyzer(VisualAnalyzer):
         # deterministic rather than falling back to "unmeasured".
         analysis.analyzed = True
         analysis.model = f"scripted[{self.low:.2f}-{self.high:.2f}]"
+        entity = required_entity(f"{query} {narration}")
+        if entity is not None and self.grounding is not None:
+            analysis.grounding = EntityGrounding(
+                entity=entity.name,
+                labels=entity.labels,
+                checked=True,
+                score=0.72 if self.grounding else 0.18,
+                passed=bool(self.grounding),
+                detail=(
+                    f"scripted {entity.labels[0]} "
+                    f"{'present' if self.grounding else 'absent'}"
+                ),
+            )
         return analysis

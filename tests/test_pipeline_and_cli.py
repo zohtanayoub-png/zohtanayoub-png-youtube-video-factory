@@ -77,7 +77,7 @@ def test_request_json_gives_up_and_hides_the_url(monkeypatch):
 
 # ------------------------------------------------------------------ pipeline
 
-def _local_pipeline(tmp_path, repo_root, semantic=(0.60, 0.75)):
+def _local_pipeline(tmp_path, repo_root, semantic=(0.60, 0.75), grounding=True):
     """An offline pipeline over synthetic footage, with a decided semantic score.
 
     ``semantic`` is the range the scripted analyzer returns. The default sits
@@ -123,6 +123,7 @@ def _local_pipeline(tmp_path, repo_root, semantic=(0.60, 0.75)):
         visual_analyzer=ScriptedVisualAnalyzer(
             low=semantic[0],
             high=semantic[1],
+            grounding=grounding,
             frames_per_clip=int(config.get("visual.frames_per_clip", 3)),
         ),
     )
@@ -192,6 +193,9 @@ def test_pipeline_runs_end_to_end_with_local_clips(local_pipeline):
     # run is reproducible; the gate it was measured against is production's.
     metrics = result.editorial.metrics
     assert 0.60 <= metrics["final_shot_visual_semantic_match_average"] <= 0.75
+    assert metrics["entity_grounding_failure_count"] == 0
+    assert metrics["primary_concept_contamination_count"] == 0
+    assert metrics["optional_example_leakage_count"] == 0
     assert metrics["final_shot_low_relevance_percentage"] == 0.0
     assert metrics["contradiction_count"] == 0
     assert metrics["source_video_reuse_count"] == 0
@@ -304,6 +308,46 @@ def test_state_command_syncs(tmp_path, capsys):
     assert code == 0
     assert (tmp_path / "s" / "topics.json").exists()
     assert "topics" in capsys.readouterr().out
+
+
+@pytest.mark.integration
+def test_footage_that_relevance_likes_but_does_not_contain_the_object_fails(
+    tmp_path, has_ffmpeg, repo_root
+):
+    """The failure run 25 shipped, reproduced and now refused.
+
+    Every clip is scripted *above* the production relevance floor - a 0.60 to
+    0.75 semantic match, the same range the passing test uses - and every clip
+    is scripted as not containing the object its narration names. That is run
+    25 exactly: a 0.569 average, no clip below the floor, and ribbons on
+    screen for painted trim.
+
+    Nothing here lowers a threshold to produce the failure. Relevance passes
+    on its own terms; grounding is the additional question, and it is the one
+    that refuses the render.
+    """
+
+    if not has_ffmpeg:
+        pytest.skip("ffmpeg required")
+    pipeline = _local_pipeline(tmp_path, repo_root, grounding=False)
+
+    with pytest.raises(PipelineError) as failure:
+        pipeline.run(topic_text="Small Living Room Ideas")
+    assert "entity_grounding" in str(failure.value)
+
+    report = json.loads(
+        (pipeline.output_dir / "editorial_quality_report.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    # Relevance was never the problem, and was never relaxed to find one.
+    assert report["final_shot_visual_semantic_match_average"] >= 0.50
+    assert report["final_shot_low_relevance_percentage"] == 0.0
+    assert report["entity_grounding_failure_count"] > 0
+    # The repair pass tried before the gate refused.
+    assert report["repair_rounds_used"] >= 1
+    assert report["entity_grounding_failures_before_repair"] > 0
+
 
 
 def _dummy_topic():
