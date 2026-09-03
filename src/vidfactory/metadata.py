@@ -159,9 +159,87 @@ def build_chapters(
     return chapters
 
 
-def build_tags(topic: Any, extra: Iterable[str] = ()) -> list[str]:
+#: Etiquetas en español. Las que un espectador escribiría en el buscador de
+#: YouTube, no la traducción de las inglesas.
+BASE_TAGS_ES = (
+    "decoración",
+    "interiorismo",
+    "ideas de decoración",
+    "decorar casa",
+    "diseño de interiores",
+)
+
+CATEGORY_TAGS_ES: dict[str, tuple[str, ...]] = {
+    "living rooms": ("decorar el salón", "ideas para el salón", "salón pequeño"),
+    "bedrooms": ("decorar el dormitorio", "ideas dormitorio", "dormitorio pequeño"),
+    "kitchens": ("decorar la cocina", "ideas cocina", "cocina pequeña"),
+    "small spaces": ("espacios pequeños", "piso pequeño", "aprovechar el espacio"),
+    "lighting": ("iluminación del hogar", "ideas de iluminación", "luz cálida"),
+    "colors": ("colores para paredes", "paleta de colores", "pintar la casa"),
+    "furniture placement": ("distribución de muebles", "colocar los muebles"),
+    "storage": ("ideas de almacenaje", "orden en casa", "organizar la casa"),
+    "expensive look": ("casa que parece cara", "decoración low cost", "lujo asequible"),
+    "interior design mistakes": ("errores de decoración", "consejos de interiorismo"),
+    "cozy homes": ("casa acogedora", "decoración acogedora", "hygge"),
+    "apartment decorating": ("decorar un piso", "piso de alquiler", "decoración piso"),
+}
+
+#: Las cadenas fijas de la descripción, por idioma.
+_DESCRIPTION_STRINGS: dict[str, dict[str, str]] = {
+    "en": {
+        "video_intro": (
+            "In this video we go through {quantity} {noun}, with the reasoning "
+            "behind each one and how to actually apply it at home."
+        ),
+        "idea": "idea", "ideas": "ideas",
+        "chapters": "Chapters:",
+        "covered": "What is covered:",
+        "credit": (
+            "Footage credit: supporting video clips are licensed stock footage "
+            "from {providers}. All narration and editorial content is original."
+        ),
+        "channel": "{name} - practical home decor and interior design ideas.",
+        "summary_lead_many": "{count} practical ",
+        "summary_lead_one": "Practical ",
+        "summary_body": "{lead}home decor ideas covering {body}",
+        "summary_empty": "Practical home decor and interior design ideas.",
+    },
+    "es": {
+        "video_intro": (
+            "En este vídeo repasamos {quantity} {noun}, con el motivo que hay "
+            "detrás de cada una y cómo aplicarla de verdad en casa."
+        ),
+        "idea": "idea", "ideas": "ideas",
+        "chapters": "Capítulos:",
+        "covered": "Lo que vemos:",
+        "credit": (
+            "Créditos de imagen: las imágenes de apoyo son vídeo de stock con "
+            "licencia de {providers}. La narración y el contenido editorial son "
+            "originales."
+        ),
+        "channel": "{name} - ideas prácticas de decoración e interiorismo.",
+        "summary_lead_many": "{count} ideas prácticas de decoración sobre ",
+        "summary_lead_one": "Ideas prácticas de decoración sobre ",
+        "summary_body": "{lead}{body}",
+        "summary_empty": "Ideas prácticas de decoración e interiorismo.",
+    },
+}
+
+
+def _strings(language: Any) -> dict[str, str]:
+    from .languages import resolve_language
+
+    return _DESCRIPTION_STRINGS["en" if resolve_language(language).is_english else "es"]
+
+
+def build_tags(topic: Any, extra: Iterable[str] = (), language: Any = None) -> list[str]:
     """Assemble a modest, relevant tag list that fits YouTube's limits."""
 
+    from .languages import resolve_language
+
+    english = resolve_language(language).is_english
+    category_tags = CATEGORY_TAGS if english else CATEGORY_TAGS_ES
+    base_tags = BASE_TAGS if english else BASE_TAGS_ES
     category = getattr(topic, "category", "")
     candidates: list[str] = []
 
@@ -170,9 +248,9 @@ def build_tags(topic: Any, extra: Iterable[str] = ()) -> list[str]:
         if cleaned and cleaned not in candidates and len(cleaned) <= 40:
             candidates.append(cleaned)
 
-    for tag in CATEGORY_TAGS.get(category, ()):
+    for tag in category_tags.get(category, ()):
         push(tag)
-    for tag in BASE_TAGS:
+    for tag in base_tags:
         push(tag)
     for tag in extra:
         push(tag)
@@ -189,16 +267,21 @@ def build_tags(topic: Any, extra: Iterable[str] = ()) -> list[str]:
     return selected
 
 
-def build_summary(script: Any, limit: int = 320) -> str:
+def build_summary(script: Any, limit: int = 320, language: Any = None) -> str:
     """A short plain-language summary for metadata.json and social use."""
 
+    words = _strings(language or getattr(script, "language", None))
     items = [s.heading.split(". ", 1)[-1] for s in getattr(script, "items", lambda: [])()]
-    lead = f"{len(items)} practical " if len(items) > 1 else "Practical "
+    lead = (
+        words["summary_lead_many"].format(count=len(items))
+        if len(items) > 1
+        else words["summary_lead_one"]
+    )
     body = "; ".join(items[:3])
     text = (
-        f"{lead}home decor ideas covering {body}"
+        words["summary_body"].format(lead=lead, body=body)
         if body
-        else "Practical home decor and interior design ideas."
+        else words["summary_empty"]
     )
     if len(text) > limit:
         text = text[: limit - 3].rstrip(" ,;") + "..."
@@ -210,9 +293,11 @@ def build_description(
     chapters: Sequence[Chapter],
     sources: Sequence[Mapping[str, Any]] = (),
     channel_name: str = "",
+    language: Any = None,
 ) -> str:
     """Compose the YouTube description: hook, chapters, credits, disclosure."""
 
+    words = _strings(language or getattr(script, "language", None))
     items = getattr(script, "items", lambda: [])()
     opening = getattr(script, "sections", [])
     intro_text = opening[0].text if opening else ""
@@ -222,30 +307,25 @@ def build_description(
     if first_sentences:
         parts.append(first_sentences)
     if items:
-        noun = "idea" if len(items) == 1 else "ideas"
-        quantity = "one" if len(items) == 1 else str(len(items))
-        parts.append(
-            f"In this video we go through {quantity} {noun}, with the reasoning "
-            "behind each one and how to actually apply it at home."
-        )
+        noun = words["idea"] if len(items) == 1 else words["ideas"]
+        quantity = str(len(items))
+        parts.append(words["video_intro"].format(quantity=quantity, noun=noun))
 
     if len(chapters) >= 3:
-        parts.append("Chapters:\n" + "\n".join(chapter.line() for chapter in chapters))
+        parts.append(words["chapters"] + "\n" + "\n".join(c.line() for c in chapters))
 
     if items:
         listed = "\n".join(f"- {section.heading.split('. ', 1)[-1]}" for section in items[:30])
-        parts.append("What is covered:\n" + listed)
+        parts.append(words["covered"] + "\n" + listed)
 
     providers = sorted({str(s.get("provider", "")) for s in sources if s.get("provider")})
     if providers:
         parts.append(
-            "Footage credit: supporting video clips are licensed stock footage from "
-            + ", ".join(p.title() for p in providers)
-            + ". All narration and editorial content is original."
+            words["credit"].format(providers=", ".join(p.title() for p in providers))
         )
 
     if channel_name:
-        parts.append(f"{channel_name} - practical home decor and interior design ideas.")
+        parts.append(words["channel"].format(name=channel_name))
 
     description = "\n\n".join(part for part in parts if part).strip()
     if len(description) > YOUTUBE_DESCRIPTION_LIMIT:
@@ -274,10 +354,14 @@ def build_metadata(
     chapters = build_chapters(script, scene_timings, scenes)
     metadata = VideoMetadata(
         title=title,
-        description=build_description(script, chapters, sources, channel_name),
-        tags=build_tags(getattr(script, "topic", None), extra=getattr(getattr(script, "topic", None), "keywords", [])),
+        description=build_description(script, chapters, sources, channel_name, language),
+        tags=build_tags(
+            getattr(script, "topic", None),
+            extra=getattr(getattr(script, "topic", None), "keywords", []),
+            language=language,
+        ),
         chapters=chapters,
-        summary=build_summary(script),
+        summary=build_summary(script, language=language),
         filename=safe_filename(title),
         category_id=str(category_id),
         privacy_status=str(privacy_status),

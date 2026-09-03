@@ -42,6 +42,16 @@ REQUIRED_ARTIFACTS: tuple[str, ...] = (
     "editorial_quality_report.json",
 )
 
+#: Produced by most runs but not by all: styled captions are skipped when
+#: ``subtitles.style`` is ``none``, so their absence is a configuration
+#: choice rather than a missing artifact.
+OPTIONAL_ARTIFACTS: tuple[str, ...] = (
+    "subtitles.ass",
+    "script.json",
+    "scenes.json",
+    "quality_report.json",
+)
+
 
 def new_generation_id(prefix: str = "") -> str:
     """A generation id that cannot collide with a previous run.
@@ -206,9 +216,8 @@ def verify(
     strays = [
         p.name
         for p in out.iterdir()
-        if p.is_file() and p.name not in {*REQUIRED_ARTIFACTS, MANIFEST_NAME,
-                                          "script.json", "scenes.json",
-                                          "quality_report.json"}
+        if p.is_file()
+        and p.name not in {*REQUIRED_ARTIFACTS, *OPTIONAL_ARTIFACTS, MANIFEST_NAME}
     ]
     add("no_foreign_files", not strays, f"unexpected: {strays}" if strays else "clean")
 
@@ -220,11 +229,21 @@ def verify(
     metadata = json.loads((out / "metadata.json").read_text(encoding="utf-8"))
     sources = json.loads((out / "video_sources.json").read_text(encoding="utf-8"))
 
-    # 3. The shipped script is what was actually narrated. The script file
-    #    carries a title line that is never spoken, so the spoken text must be
-    #    a subset of the script rather than identical to it.
+    # 3. The shipped script is what was actually narrated. Two adjustments,
+    #    both because the comparison is of meaning rather than of bytes:
+    #    the script file carries a title line that is never spoken, so the
+    #    spoken text has to be a subset rather than identical; and the text
+    #    handed to the voice has been through speech normalisation, which
+    #    deliberately rewrites "2,4 m" as "dos coma cuatro metros". Comparing
+    #    the normalised script against the normalised narration keeps the
+    #    guarantee - every spoken word traces back to the shipped script -
+    #    without failing on a transformation the pipeline performed on purpose.
+    from .tts import normalize_for_speech
+
     spoken_words = set(words(spoken_text))
     script_words = set(words(script_text))
+    for language in ("es", "en"):
+        script_words |= set(words(normalize_for_speech(script_text, language)))
     unspoken = spoken_words - script_words
     add(
         "script_matches_narration",

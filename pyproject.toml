@@ -22,6 +22,9 @@ youtube = [
     "google-auth-oauthlib>=1.2",
     "google-auth-httplib2>=0.2",
 ]
+# Optional: enables the CLIP concept scoring inside frame inspection. The
+# pixel statistics run without it.
+visual = ["onnxruntime>=1.17"]
 dev = ["pytest>=8.0", "pytest-timeout>=2.3"]
 
 [project.scripts]

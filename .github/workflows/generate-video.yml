@@ -8,6 +8,12 @@ name: Generate Video
 on:
   workflow_dispatch:
     inputs:
+      language:
+        description: "Language of the video (narration, subtitles and metadata)"
+        required: false
+        type: choice
+        default: "English"
+        options: [English, Spanish]
       topic:
         description: "Video topic (leave empty to pick one automatically)"
         required: false
@@ -20,27 +26,43 @@ on:
         default: "20"
         options: ["2", "5", "10", "15", "20", "30"]
       voice:
-        description: "Narration voice"
+        description: "Narration voice (leave on Automatic - the language picks it)"
         required: false
         type: choice
-        default: "en_US-hfc_female-medium"
+        default: "Automatic"
         options:
+          # Automatic maps English -> en_US-hfc_female-medium and
+          # Spanish -> es_ES-sharvard-medium. Both are female. There is
+          # normally no reason to change this.
+          - Automatic
           - en_US-hfc_female-medium
           - en_US-amy-medium
           - en_US-lessac-medium
-          - en_US-kristin-medium
-          - en_US-ryan-medium
-          - en_US-hfc_male-medium
+          - es_ES-sharvard-medium
+          - es_MX-claude-high
+          - es_ES-davefx-medium
       subtitles:
         description: "Generate an .srt subtitle file"
         required: false
         type: boolean
         default: true
+      subtitle_style:
+        description: "Styled captions burned into the picture"
+        required: false
+        type: choice
+        default: "premium"
+        options: [premium, clean, none]
       burn_in_subtitles:
-        description: "Burn the subtitles into the picture (usually leave off)"
+        description: "Burn the premium captions into the picture"
         required: false
         type: boolean
-        default: false
+        default: true
+      generation_mode:
+        description: "Production claims its footage for 45 days; test does not"
+        required: false
+        type: choice
+        default: "test"
+        options: [test, production]
       upload_to_youtube:
         description: "Upload to YouTube when it is finished"
         required: false
@@ -56,6 +78,14 @@ on:
   # Lets autopilot.yml reuse this exact job instead of duplicating it.
   workflow_call:
     inputs:
+      language:
+        required: false
+        type: string
+        default: "English"
+      subtitle_style:
+        required: false
+        type: string
+        default: "premium"
       topic:
         required: false
         type: string
@@ -76,7 +106,11 @@ on:
       burn_in_subtitles:
         required: false
         type: boolean
-        default: false
+        default: true
+      generation_mode:
+        required: false
+        type: string
+        default: "production"
       upload_to_youtube:
         required: false
         type: boolean
@@ -139,17 +173,38 @@ jobs:
       - name: Install eSpeak NG (narration fallback)
         run: sudo apt-get install -y --no-install-recommends espeak-ng
 
+      - name: Install caption fonts
+        # libass renders whatever family the .ass asks for, and substitutes
+        # silently when it is missing. These are all open licences (OFL) and
+        # come from the Ubuntu archive, so the premium style never depends on
+        # a font anybody has to buy. DejaVu is already present and is the
+        # last-resort fallback.
+        continue-on-error: true
+        run: |
+          sudo apt-get install -y --no-install-recommends \
+            fonts-inter fonts-noto-core fonts-liberation2 || \
+            sudo apt-get install -y --no-install-recommends fonts-liberation2
+          fc-cache -f >/dev/null 2>&1 || true
+          fc-list : family | sort -u | head -20
+
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install -e .
 
+      - name: Install the optional visual model runtime
+        # Frame inspection always runs. ONNX Runtime is what additionally
+        # enables the CLIP concept scoring; without it the pipeline falls back
+        # to pixel statistics and records that in the editorial report.
+        continue-on-error: true
+        run: pip install "onnxruntime>=1.17"
+
       - name: Restore the cached voice and model files
         uses: actions/cache@v4
         with:
           path: .cache
-          key: vidfactory-cache-${{ inputs.voice }}-v1
+          key: vidfactory-cache-${{ inputs.voice }}-visual-v2
           restore-keys: |
             vidfactory-cache-
 
@@ -177,11 +232,14 @@ jobs:
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          INPUT_LANGUAGE: ${{ inputs.language }}
+          INPUT_SUBTITLE_STYLE: ${{ inputs.subtitle_style }}
           INPUT_TOPIC: ${{ inputs.topic }}
           INPUT_DURATION: ${{ inputs.duration_minutes }}
           INPUT_VOICE: ${{ inputs.voice }}
           INPUT_SUBTITLES: ${{ inputs.subtitles }}
           INPUT_BURN_IN: ${{ inputs.burn_in_subtitles }}
+          INPUT_MODE: ${{ inputs.generation_mode }}
           INPUT_UPLOAD: ${{ inputs.upload_to_youtube }}
           INPUT_PRIVACY: ${{ inputs.privacy_status }}
           RUN_NUMBER: ${{ github.run_number }}
@@ -191,11 +249,14 @@ jobs:
             pip install -r requirements-youtube.txt
           fi
           python -m vidfactory generate \
+            --language "${INPUT_LANGUAGE}" \
+            --subtitle-style "${INPUT_SUBTITLE_STYLE}" \
             --topic "${INPUT_TOPIC}" \
             --duration "${INPUT_DURATION}" \
             --voice "${INPUT_VOICE}" \
             --subtitles "${INPUT_SUBTITLES}" \
             --burn-in "${INPUT_BURN_IN}" \
+            --mode "${INPUT_MODE}" \
             --upload "${INPUT_UPLOAD}" \
             --privacy "${INPUT_PRIVACY}" \
             --run-id "run-${RUN_NUMBER}" \
@@ -228,6 +289,199 @@ jobs:
               echo "Generation did not complete. Check the log above."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Report the editorial and visual quality measurements
+        # The artifact is not always convenient to open, and these numbers are
+        # the point of the run. Printing them into the job summary means the
+        # quality of a render can be reviewed from the run page alone.
+        if: always()
+        env:
+          OUTPUT_DIR: ${{ steps.generate.outputs.output_dir }}
+        run: |
+          # tee, not a plain redirect: the same table in the job log makes a
+          # render reviewable without downloading the artifact.
+          python - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
+          import json, os, pathlib
+
+          directory = pathlib.Path(os.environ.get("OUTPUT_DIR") or "")
+          report = directory / "editorial_quality_report.json"
+          if not report.exists():
+              print("\n_No editorial quality report was produced._")
+              raise SystemExit(0)
+          data = json.loads(report.read_text())
+
+          print("\n### Editorial and visual quality\n")
+          print("| Measurement | Value |")
+          print("| --- | --- |")
+          for key in (
+              "language",
+              "tts_voice",
+              "tts_engine",
+              "subtitle_style",
+              "burn_in_subtitles",
+              "subtitles_srt_exported",
+              "subtitles_ass_exported",
+              "subtitle_font",
+              "subtitle_event_count",
+              "average_subtitle_words",
+              "max_subtitle_lines",
+              "subtitle_safe_area_passed",
+              "subtitle_timing_passed",
+              "visual_analysis_model",
+              "visual_analysis_frame_count",
+              "visually_inspected_clip_count",
+              "candidate_visual_semantic_match_average",
+              "candidate_low_relevance_count",
+              "candidate_inspected_count",
+              "final_shot_count",
+              "final_shot_inspected_count",
+              "final_shot_visual_semantic_match_average",
+              "final_shot_low_relevance_count",
+              "final_shot_low_relevance_percentage",
+              "final_shot_premium_visual_ratio",
+              "premium_visual_ratio",
+              "premium_visual_ratio_caption_only",
+              "empty_room_clip_count",
+              "plastic_covered_clip_count",
+              "floor_plan_clip_count",
+              "renovation_clip_count",
+              "people_dominant_clip_count",
+              "dark_clip_count",
+              "causal_promise_alignment_score",
+              "contradiction_count",
+              "weak_shots_before_repair",
+              "weak_shots_after_repair",
+              "repair_rounds_used",
+              "repaired_shot_count",
+              "average_relevance_before_repair",
+              "average_relevance_after_repair",
+              "generation_mode",
+              "footage_claimed_for_cooldown",
+              "unique_source_videos",
+              "source_video_reuse_count",
+              "shot_count",
+              "creator_diversity",
+              "visual_analysis_seconds",
+              "artifact_provenance_passed",
+          ):
+              if key in data:
+                  print(f"| `{key}` | {data[key]} |")
+
+          print("\n**Per-section causal alignment**\n")
+          print("| # | Heading | Score | Why it passed |")
+          print("| --- | --- | --- | --- |")
+          for section in data.get("section_alignment", [])[:30]:
+              print(
+                  f"| {section['index']} | {section['heading'][:48]} | "
+                  f"{section['causal_promise_alignment_score']} | {section['why'][:90]} |"
+              )
+
+          sources = directory / "video_sources.json"
+          if sources.exists():
+              clips = json.loads(sources.read_text()).get("clips", [])
+              print("\n**Selected footage, judged on its own frames**\n")
+              print("| Source | Semantic | Premium | Frames | Flags |")
+              print("| --- | --- | --- | --- | --- |")
+              for clip in clips[:40]:
+                  visual = clip.get("visual") or {}
+                  flags = ", ".join(
+                      f"{k} {v}" for k, v in (visual.get("flags") or {}).items()
+                  ) or "-"
+                  print(
+                      f"| {clip['provider']}:{clip['provider_id']} | "
+                      f"{visual.get('semantic_match', '-')} | "
+                      f"{visual.get('premium_visual_score', '-')} | "
+                      f"{visual.get('frame_count', 0)} | {flags[:70]} |"
+                  )
+
+          failed = [c for c in data.get("checks", []) if not c["passed"]]
+          if failed:
+              print("\n**Checks not passed**\n")
+              for check in failed:
+                  print(f"- `{check['name']}` ({check['severity']}): {check['detail']}")
+          PY
+
+      - name: Verify the caption file renders
+        # Two separate facts, checked two separate ways, because guessing at
+        # one of them from the other is how the previous version of this step
+        # managed to report captions on a video that had none.
+        #
+        #   1. Does the .ass file actually render text through libass? Proven
+        #      here, deterministically, by burning it onto a flat grey clip
+        #      where any changed pixel can only have come from the captions.
+        #   2. Is it in final_video.mp4? That is burn_in_subtitles in the
+        #      report below, written by the code that ran the mux.
+        #
+        # A brightness or contrast heuristic on real footage cannot separate a
+        # caption from a bright window, so there is not one here.
+        if: always()
+        continue-on-error: true
+        env:
+          OUTPUT_DIR: ${{ steps.generate.outputs.output_dir }}
+        run: |
+          python - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
+          import os, pathlib, subprocess, sys
+          sys.path.insert(0, "src")
+          from vidfactory.ffmpeg_utils import ffmpeg_path
+          from vidfactory.visual_analysis import decode_frame
+
+          directory = pathlib.Path(os.environ.get("OUTPUT_DIR") or "")
+          ass = directory / "subtitles.ass"
+          print("\n### Caption rendering check\n")
+          if not ass.exists():
+              print("- `subtitles.ass` was not produced (subtitle_style: none?)")
+              raise SystemExit(0)
+
+          events = [l for l in ass.read_text(encoding="utf-8").splitlines()
+                    if l.startswith("Dialogue:")]
+          print(f"- `subtitles.ass`: {len(events)} dialogue events")
+          if not events:
+              raise SystemExit(0)
+
+          grey, burned = pathlib.Path("/tmp/flat.mp4"), pathlib.Path("/tmp/flat_burned.mp4")
+          subprocess.run(
+              [ffmpeg_path(), "-nostdin", "-v", "error", "-f", "lavfi",
+               "-i", "color=c=0x808080:s=640x360:r=10", "-t", "4",
+               "-pix_fmt", "yuv420p", str(grey), "-y"], check=True, timeout=120,
+          )
+          escaped = str(ass.resolve()).replace(":", r"\:")
+          subprocess.run(
+              [ffmpeg_path(), "-nostdin", "-v", "error", "-i", str(grey),
+               "-vf", f"ass='{escaped}'", "-c:v", "libx264", "-preset", "ultrafast",
+               "-pix_fmt", "yuv420p", str(burned), "-y"], check=True, timeout=300,
+          )
+
+          before = decode_frame(grey, 1.5, size=(640, 360))
+          after = decode_frame(burned, 1.5, size=(640, 360))
+          if before is None or after is None:
+              print("- could not decode the control frames")
+              raise SystemExit(0)
+
+          # Flat grey in, so every differing pixel is a caption pixel.
+          changed_rows = {}
+          for y in range(360):
+              count = sum(
+                  1 for x in range(640)
+                  if abs(before.pixels[(y * 640 + x) * 3] - after.pixels[(y * 640 + x) * 3]) > 18
+              )
+              if count:
+                  changed_rows[y] = count
+          total = sum(changed_rows.values())
+          rows = sorted(changed_rows)
+          print(f"- pixels the captions painted on a flat control: **{total}**")
+          if rows:
+              top, bottom = min(rows) / 360, max(rows) / 360
+              print(f"- vertical extent: {top:.0%} to {bottom:.0%} of frame height")
+              print(f"- lines of text: {'two' if (max(rows) - min(rows)) > 20 else 'one'}")
+              inside = bottom < 0.95 and top > 0.60
+              print(f"- inside the lower-third safe area: **{inside}**")
+          print(
+              "\n**The caption file renders.** Whether it is in final_video.mp4 "
+              "is `burn_in_subtitles` below."
+              if total > 200 else
+              "\n**The caption file produced no visible text.**"
+          )
+          PY
 
       # The artifact is scoped to this generation's own directory. The
       # previous "output/**" wildcard would sweep up every generation present
@@ -287,3 +541,50 @@ jobs:
         run: |
           rm -rf work
           df -h / | tail -1
+
+      - name: Report the narration and caption settings that were used
+        # Deliberately near the end of the job and deliberately short: the
+        # full quality table is hundreds of lines up, and "which voice
+        # actually spoke" is the one fact worth being able to read at a
+        # glance from the run page.
+        if: always()
+        continue-on-error: true
+        env:
+          OUTPUT_DIR: ${{ steps.generate.outputs.output_dir }}
+        run: |
+          python - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
+          import json, os, pathlib
+
+          report = pathlib.Path(os.environ.get("OUTPUT_DIR") or "") / "editorial_quality_report.json"
+          if not report.exists():
+              print("\n_No report to read._")
+              raise SystemExit(0)
+          data = json.loads(report.read_text())
+          print("\n### Narration and captions\n")
+          for key in (
+              "language", "tts_engine", "tts_voice",
+              "subtitle_style", "burn_in_subtitles", "subtitle_font",
+              "subtitles_srt_exported", "subtitles_ass_exported",
+              "subtitle_event_count", "average_subtitle_words",
+              "max_subtitle_lines", "subtitle_safe_area_passed",
+              "subtitle_timing_passed",
+              "generation_mode",
+              "footage_claimed_for_cooldown",
+              "contradiction_count",
+              "weak_shots_before_repair",
+              "weak_shots_after_repair",
+              "repair_rounds_used",
+              "final_shot_visual_semantic_match_average",
+              "final_shot_low_relevance_percentage",
+          ):
+              if key in data:
+                  print(f"- **{key}**: `{data[key]}`")
+          engine = str(data.get("tts_engine", ""))
+          if engine == "piper":
+              print(f"\nPiper ran: narrated by `{data.get('tts_voice')}`.")
+          elif engine:
+              print(
+                  f"\n**Piper did not run** - narration fell back to `{engine}`, "
+                  f"which is intelligible but not natural."
+              )
+          PY

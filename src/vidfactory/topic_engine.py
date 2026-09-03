@@ -12,7 +12,7 @@ import random
 import re
 import unicodedata
 from dataclasses import dataclass, field
-from typing import Iterable, Sequence
+from typing import Any, Iterable, Sequence
 
 from .knowledge import ALL_CATEGORIES, normalize_category, tips_for
 from .logging_utils import get_logger
@@ -215,10 +215,14 @@ class TopicEngine:
         history: Sequence[str] | None = None,
         similarity_threshold: float = 0.62,
         rng: random.Random | None = None,
+        language: Any = None,
     ) -> None:
+        from .languages import resolve_language
+
         self.history = list(history or [])
         self.similarity_threshold = float(similarity_threshold)
         self.rng = rng or random.Random()
+        self.language = resolve_language(language)
 
     # ------------------------------------------------------------------
     def category_usage(self) -> dict[str, int]:
@@ -229,12 +233,25 @@ class TopicEngine:
                 counts[category] = counts.get(category, 0) + 1
         return counts
 
+    def available_categories(self) -> list[str]:
+        """Categories this language actually has enough writing for."""
+
+        if self.language.is_english:
+            return list(ALL_CATEGORIES)
+        from .knowledge_es import KNOWLEDGE_ES
+
+        return sorted(KNOWLEDGE_ES)
+
     def _least_used_categories(self) -> list[str]:
         counts = self.category_usage()
-        ordered = sorted(ALL_CATEGORIES, key=lambda name: (counts.get(name, 0), self.rng.random()))
-        return ordered
+        return sorted(
+            self.available_categories(),
+            key=lambda name: (counts.get(name, 0), self.rng.random()),
+        )
 
     def _candidate(self, category: str) -> Topic:
+        if not self.language.is_english:
+            return self._candidate_es(category)
         subject, kind = self.rng.choice(SUBJECTS.get(category, [("Home Decor", CONCEPT)]))
         usable = [t for t in TEMPLATES if kind in t.kinds]
         template = self.rng.choice(usable or list(TEMPLATES))
@@ -248,6 +265,25 @@ class TopicEngine:
         title = template.pattern.format(count=count, subject=subject)
         return Topic(title=title, category=category, angle=template.angle, item_count=count)
 
+    def _candidate_es(self, category: str) -> Topic:
+        """Un título en español, con el artículo que pide cada plantilla."""
+
+        subject, kind = self.rng.choice(
+            SUBJECTS_ES.get(category, [("la decoración de casa", CONCEPT)])
+        )
+        usable = [t for t in TEMPLATES_ES if kind in t.kinds]
+        template = self.rng.choice(usable or list(TEMPLATES_ES))
+        feminine = _es_is_feminine(subject)
+        # Every Spanish pattern reads "... para {subject}", so the subject
+        # always needs a determiner unless it already carries one.
+        subject = _es_with_article(subject)
+        pattern = template.pattern
+        if feminine:
+            pattern = _ES_FEMININE_PATTERNS.get(pattern, pattern)
+        count = self.rng.choice(template.counts)
+        title = pattern.format(count=count, subject=subject)
+        return Topic(title=title, category=category, angle=template.angle, item_count=count)
+
     # ------------------------------------------------------------------
     def generate(self, category: str | None = None, attempts: int = 400) -> Topic:
         """Produce a topic that is not too similar to anything in the history."""
@@ -259,7 +295,7 @@ class TopicEngine:
         for attempt in range(attempts):
             chosen = categories[attempt % len(categories)] if categories else None
             if chosen is None:
-                chosen = self.rng.choice(ALL_CATEGORIES)
+                chosen = self.rng.choice(self.available_categories())
             topic = self._candidate(chosen)
             too_similar, closest, score = is_too_similar(
                 topic.title, self.history, self.similarity_threshold
@@ -270,7 +306,7 @@ class TopicEngine:
                     "Rejected %r (%.2f similar to %r)", topic.title, score, closest
                 )
                 continue
-            available = len(tips_for(topic.category))
+            available = len(tips_for(topic.category, language=self.language.key))
             if available < 8:
                 rejected += 1
                 continue
@@ -281,13 +317,17 @@ class TopicEngine:
             return topic
 
         # Every template collided: fall back to a guaranteed-unique variation.
-        fallback_category = preferred or self.rng.choice(ALL_CATEGORIES)
+        fallback_category = preferred or self.rng.choice(self.available_categories())
         topic = self._candidate(fallback_category)
         suffix = 2
         base_title = topic.title
         while any(similarity(topic.title, t) >= 0.95 for t in self.history):
             topic = Topic(
-                title=f"{base_title} (Part {suffix})",
+                title=(
+                    f"{base_title} (parte {suffix})"
+                    if not self.language.is_english
+                    else f"{base_title} (Part {suffix})"
+                ),
                 category=fallback_category,
                 angle=topic.angle,
                 item_count=topic.item_count,
@@ -317,7 +357,7 @@ class TopicEngine:
         elif "storage" in lowered:
             angle = "storage"
 
-        available = len(tips_for(category))
+        available = len(tips_for(category, language=self.language.key))
         if not item_count:
             item_count = min(25, available)
         item_count = max(5, min(item_count, available))
@@ -341,3 +381,87 @@ class TopicEngine:
         )
         log.info("Selected: %s", topic.title)
         return topic
+
+
+# ---------------------------------------------------------------------------
+# Gramática de títulos en español
+#
+# No son traducciones de las plantillas inglesas: un título de YouTube en
+# español que funciona no dice "5 Ideas de Salón Que Realmente Funcionan",
+# dice "5 trucos para que un salón pequeño parezca mucho más grande". Cambia
+# la construcción, no solo el idioma.
+# ---------------------------------------------------------------------------
+
+SUBJECTS_ES: dict[str, list[tuple[str, str]]] = {
+    "living rooms": [("salón", PLACE), ("salón pequeño", PLACE),
+                     ("salón moderno", PLACE), ("salón acogedor", PLACE)],
+    "bedrooms": [("dormitorio", PLACE), ("dormitorio pequeño", PLACE),
+                 ("dormitorio moderno", PLACE)],
+    "kitchens": [("cocina", PLACE), ("cocina pequeña", PLACE), ("cocina moderna", PLACE)],
+    "small spaces": [("espacio pequeño", PLACE), ("piso pequeño", PLACE),
+                     ("estudio", PLACE)],
+    "apartment decorating": [("piso", PLACE), ("piso de alquiler", PLACE)],
+    "lighting": [("la iluminación de casa", CONCEPT), ("la luz del salón", CONCEPT)],
+    "colors": [("el color en casa", CONCEPT), ("la paleta de tu casa", CONCEPT)],
+    "storage": [("el almacenaje", CONCEPT), ("el orden en casa", CONCEPT)],
+    "furniture placement": [("la distribución de los muebles", CONCEPT)],
+    "expensive look": [("tu casa", PLACE), ("tu salón", PLACE)],
+    "cozy homes": [("tu casa", PLACE), ("tu salón", PLACE)],
+    "interior design mistakes": [("la decoración", CONCEPT), ("tu casa", PLACE)],
+}
+
+TEMPLATES_ES: tuple[TopicTemplate, ...] = (
+    TopicTemplate("{count} trucos para que {subject} parezca mucho más grande", "space", kinds=(PLACE,)),
+    TopicTemplate("{count} ideas para que {subject} parezca más amplio", "space", kinds=(PLACE,)),
+    TopicTemplate("{count} ideas para aprovechar mejor {subject}", "space", kinds=(PLACE,)),
+    TopicTemplate("{count} formas de ganar espacio en {subject}", "space", kinds=(PLACE,)),
+    TopicTemplate("{count} trucos para que {subject} parezca más caro", "expensive", kinds=(PLACE,)),
+    TopicTemplate("{count} detalles que hacen que {subject} parezca de lujo", "expensive", kinds=(PLACE,)),
+    TopicTemplate("{count} errores de decoración que abaratan {subject}", "mistakes", kinds=(PLACE,)),
+    TopicTemplate("{count} errores que casi todo el mundo comete con {subject}", "mistakes", kinds=(PLACE, CONCEPT)),
+    TopicTemplate("{count} ideas para {subject} que sí funcionan", "ideas", kinds=(PLACE, CONCEPT)),
+    TopicTemplate("{count} ideas para {subject} con poco presupuesto", "budget", kinds=(PLACE, CONCEPT)),
+    TopicTemplate("{count} reglas de interiorismo para {subject}", "rules", kinds=(PLACE, CONCEPT)),
+    TopicTemplate("{count} ideas para que {subject} se sienta más acogedor", "cozy", kinds=(PLACE,)),
+    TopicTemplate("{count} formas de dar más luz a {subject}", "brighter", kinds=(PLACE,)),
+    TopicTemplate("{count} ideas de almacenaje para {subject}", "storage", kinds=(PLACE,)),
+    TopicTemplate("{count} cosas que un interiorista nota al entrar en {subject}", "observation", kinds=(PLACE,)),
+)
+
+#: Concordancia de género. El español no perdona "tu casa parezca más
+#: amplio", así que las plantillas con adjetivo variable llevan su forma
+#: femenina y se elige según el sujeto.
+_ES_FEMININE_PATTERNS: dict[str, str] = {
+    "{count} ideas para que {subject} parezca más amplio":
+        "{count} ideas para que {subject} parezca más amplia",
+    "{count} trucos para que {subject} parezca más caro":
+        "{count} trucos para que {subject} parezca más cara",
+    "{count} ideas para que {subject} se sienta más acogedor":
+        "{count} ideas para que {subject} se sienta más acogedora",
+}
+
+#: Sujetos que ya traen su propio determinante.
+_ES_HAS_DETERMINER = ("tu ", "la ", "el ", "los ", "las ")
+_ES_HAS_DETERMINER_WORDS = {"tu", "la", "el", "los", "las"}
+
+_ES_FEMININE_ENDINGS = ("a", "ción", "sión", "dad")
+
+
+def _es_is_feminine(subject: str) -> bool:
+    """Género del núcleo del sintagma, que es lo que rige la concordancia."""
+
+    head = subject.split(" ")[0]
+    if head in _ES_HAS_DETERMINER_WORDS:
+        parts = subject.split(" ")
+        head = parts[1] if len(parts) > 1 else head
+        if head in ("casa", "cocina", "luz"):
+            return True
+    return head.endswith(_ES_FEMININE_ENDINGS)
+
+
+def _es_with_article(subject: str) -> str:
+    """Añade el artículo indefinido correcto, si el sujeto no trae ya uno."""
+
+    if subject.startswith(_ES_HAS_DETERMINER):
+        return subject
+    return f"{'una' if _es_is_feminine(subject) else 'un'} {subject}"

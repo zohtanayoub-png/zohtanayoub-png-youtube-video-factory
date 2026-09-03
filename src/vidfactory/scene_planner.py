@@ -226,6 +226,39 @@ _GENERIC_QUERIES = [
 
 
 @dataclass
+class ShotIntent:
+    """What one 3-6 second shot should actually show.
+
+    A scene is a paragraph's worth of narration and used to carry a single
+    query for all of it, so "an undersized rug leaves the seating floating"
+    and "choose one large enough for the front legs" were searched, scored and
+    illustrated identically. They are different pictures.
+
+    ``search_text`` is what CLIP is asked to match the frames against, so it is
+    always English regardless of the narration language - the same rule the
+    scene-level ``search_text`` follows.
+    """
+
+    shot_id: str
+    #: The narration this shot sits under, for the log and the report.
+    narration: str
+    #: The English description of what should be on screen for it.
+    search_text: str
+    #: The search string that should find it.
+    query: str
+    estimated_duration: float = 0.0
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "shot_id": self.shot_id,
+            "narration": self.narration,
+            "search_text": self.search_text,
+            "query": self.query,
+            "estimated_duration": round(self.estimated_duration, 2),
+        }
+
+
+@dataclass
 class Scene:
     """One narration unit and the visuals that should accompany it."""
 
@@ -235,11 +268,18 @@ class Scene:
     primary_visual_query: str
     alternative_visual_queries: list[str] = field(default_factory=list)
     keywords: list[str] = field(default_factory=list)
+    #: English description of what this scene should show. Built from the
+    #: idea's canonical English metadata, never from the narration, so a
+    #: Spanish script still searches Pexels in the language Pexels is
+    #: indexed in. See :mod:`vidfactory.languages`.
+    search_text: str = ""
     visual_category: str = ""
     section_kind: str = "item"
     section_index: int = 0
     #: The full ranked ladder, specific first, generic last.
     visual_queries: list[VisualQuery] = field(default_factory=list)
+    #: One intent per shot-length chunk of this scene's narration.
+    shot_intents: list[ShotIntent] = field(default_factory=list)
 
     @property
     def queries(self) -> list[str]:
@@ -264,6 +304,7 @@ class Scene:
             "visual_category": self.visual_category,
             "section_kind": self.section_kind,
             "section_index": self.section_index,
+            "shot_intents": [s.to_dict() for s in self.shot_intents],
         }
 
 
@@ -341,6 +382,7 @@ def derive_queries(
     tip_queries: Sequence[str] = (),
     limit: int = 12,
     want: int = 8,
+    search_text: str = "",
 ) -> list[VisualQuery]:
     """Build the ranked query ladder for one scene, most specific first.
 
@@ -350,14 +392,24 @@ def derive_queries(
     actually needed.
     """
 
+    # Everything that feeds a search term reads the English search text when
+    # there is one. Passing Spanish narration to an English object matcher
+    # produces nothing useful and quietly pushes every scene onto the generic
+    # category fallback.
+    searchable = search_text or narration
     ladder = expand_queries(
         tip_queries=list(tip_queries),
-        narration=narration,
+        narration=searchable,
         category_queries=CATEGORY_QUERIES.get(category, []) + _GENERIC_QUERIES,
-        object_queries=_matched_terms(narration),
+        object_queries=_matched_terms(searchable),
         want=want,
     )
-    return order_by_specificity(ladder)[:limit]
+    # The search language is English by contract. Anything that arrived here
+    # carrying accents came from narration keyword extraction rather than from
+    # an idea's canonical metadata, and a Spanish phrase is a worse Pexels
+    # query than the generic category fallback it would displace.
+    english_only = [q for q in ladder if q.text.isascii()]
+    return order_by_specificity(english_only or ladder)[:limit]
 
 
 def _keywords(text: str) -> list[str]:
@@ -376,6 +428,79 @@ def _keywords(text: str) -> list[str]:
 # Planner
 # ---------------------------------------------------------------------------
 
+def shot_chunks(
+    narration: str, seconds: float = 4.5, words_per_second: float = WORDS_PER_SECOND
+) -> list[str]:
+    """Split a scene's narration into shot-length pieces.
+
+    Sentence boundaries first, because a shot that changes mid-sentence reads
+    as a mistake; a long sentence is then split at a comma or a conjunction if
+    it runs past roughly two shots' worth of words.
+    """
+
+    budget = max(4, int(round(seconds * max(words_per_second, 0.5))))
+    pieces: list[str] = []
+    for sentence in split_sentences(narration):
+        words = sentence.split()
+        if len(words) <= budget * 2:
+            pieces.append(sentence)
+            continue
+        # Prefer a natural break near the middle of an over-long sentence.
+        current: list[str] = []
+        for word in words:
+            current.append(word)
+            long_enough = len(current) >= budget
+            breakable = word.endswith(",") or word in ("and", "but", "so", "which")
+            if long_enough and breakable:
+                pieces.append(" ".join(current))
+                current = []
+        if current:
+            if pieces and len(current) < 4:
+                pieces[-1] = f"{pieces[-1]} {' '.join(current)}"
+            else:
+                pieces.append(" ".join(current))
+    return pieces or ([narration] if narration.strip() else [])
+
+
+def build_shot_intents(
+    scene_id: str,
+    narration: str,
+    search_text: str,
+    queries: Sequence[VisualQuery],
+    words_per_second: float = WORDS_PER_SECOND,
+) -> list[ShotIntent]:
+    """One visual intent per shot-length chunk of a scene.
+
+    The English search text stays the backbone - it is what makes the shot
+    about *this idea* - and each chunk adds whatever concrete object its own
+    words mention. In a Spanish script the chunk contributes nothing, because
+    its words are Spanish and the prompt must not be; the scene then falls
+    back to distributing its own English queries across the shots, which is
+    still more specific than giving every shot the same one.
+    """
+
+    specific = [q for q in queries if not q.is_generic] or list(queries)
+    intents: list[ShotIntent] = []
+    chunks = shot_chunks(narration, words_per_second=words_per_second)
+    for order, chunk in enumerate(chunks):
+        query = specific[order % len(specific)].text if specific else search_text
+        terms = [t for t in _matched_terms(chunk) if t.isascii()]
+        # The objects this sentence actually names, ahead of the idea's
+        # general subject, so "front legs of every seat" searches for the rug
+        # under the seating rather than for the idea in the abstract.
+        intent_text = " ".join(dict.fromkeys((" ".join(terms[:2]), search_text)).keys()).strip()
+        intents.append(
+            ShotIntent(
+                shot_id=f"{scene_id}-s{order:02d}",
+                narration=chunk,
+                search_text=intent_text or search_text,
+                query=query,
+                estimated_duration=estimate_duration(chunk, words_per_second),
+            )
+        )
+    return intents
+
+
 class ScenePlanner:
     """Breaks a :class:`Script` into :class:`Scene` objects."""
 
@@ -388,11 +513,26 @@ class ScenePlanner:
         scenes: list[Scene] = []
 
         for section in script.sections:
-            tip_queries = list((section.tip or {}).get("queries", []))
+            tip = section.tip or {}
+            tip_queries = list(tip.get("queries", []))
+            # The canonical English description of the idea. Spanish tips
+            # carry it explicitly; English ones are already in English.
+            search_text = " ".join(
+                str(part)
+                for part in (
+                    tip.get("search", ""),
+                    tip.get("title", "") if not tip.get("search") else "",
+                    " ".join(str(x) for x in tip.get("tags", [])),
+                )
+                if part
+            ).strip()
             if not tip_queries:
                 # Intro and outro have no idea attached; give them deliberate
-                # establishing shots rather than the generic category fallback.
+                # establishing shots rather than the generic category fallback,
+                # and an English search text so keyword extraction has
+                # something in the right language to work with.
                 tip_queries = establishing_queries(category)
+                search_text = f"{category} interior styled bright"
             groups = group_sentences(
                 split_sentences(section.text), max_words=self.max_words_per_scene
             )
@@ -407,8 +547,13 @@ class ScenePlanner:
                     else tip_queries[order % max(1, len(tip_queries)) :]
                     + tip_queries[: order % max(1, len(tip_queries))]
                 )
-                queries = derive_queries(narration, category, rotated)
+                queries = derive_queries(
+                    narration, category, rotated, search_text=search_text
+                )
                 scene_id = f"{section.kind}-{section.index:03d}-{order:02d}"
+                intents = build_shot_intents(
+                    scene_id, narration, search_text, queries, self.words_per_second
+                )
                 scenes.append(
                     Scene(
                         scene_id=scene_id,
@@ -417,10 +562,12 @@ class ScenePlanner:
                         primary_visual_query=queries[0].text if queries else "",
                         alternative_visual_queries=[q.text for q in queries[1:]],
                         visual_queries=queries,
-                        keywords=_keywords(narration),
+                        keywords=_keywords(search_text or narration),
+                        search_text=search_text,
                         visual_category=category,
                         section_kind=section.kind,
                         section_index=section.index,
+                        shot_intents=intents,
                     )
                 )
 

@@ -4,3 +4,9 @@ PyYAML>=6.0
 requests>=2.31
 # Local, offline, open-source neural TTS (CPU friendly).
 piper-tts>=1.7.0 ; platform_machine == "x86_64" and sys_platform == "linux"
+
+# Optional: enables the CLIP concept scoring inside frame inspection. Frames
+# are still decoded and measured without it, so this is a quality upgrade
+# rather than a dependency. The workflows install it in a step that is allowed
+# to fail.
+#   pip install onnxruntime

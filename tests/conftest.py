@@ -46,13 +46,17 @@ def database(tmp_path) -> Database:
 
 @pytest.fixture
 def topic():
-    engine = TopicEngine(history=[])
+    # The shared fixtures are English: the Spanish pipeline has its own
+    # module. The channel default is Spanish, so this says so explicitly.
+    engine = TopicEngine(history=[], language="en")
     return engine.from_user_input("25 Small Living Room Ideas That Make Any Space Look Bigger")
 
 
 @pytest.fixture
 def script(topic):
-    return generate_script(topic, duration_minutes=5.0, engine="template", seed=7)
+    return generate_script(
+        topic, duration_minutes=5.0, engine="template", seed=7, language="en"
+    )
 
 
 @pytest.fixture(scope="session")

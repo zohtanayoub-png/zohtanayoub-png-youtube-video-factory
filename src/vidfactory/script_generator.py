@@ -26,6 +26,14 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Sequence
 
+from .contradiction import find_contradictions
+from .causal_alignment import (
+    PASS_THRESHOLD,
+    CausalReport,
+    repair_text,
+    score_paragraph,
+    validate_sections,
+)
 from .knowledge import ALL_CATEGORIES, Tip, tips_for
 from .title_alignment import (
     AlignmentResult,
@@ -81,6 +89,20 @@ class Script:
     rejected_ideas: list[dict[str, Any]] = field(default_factory=list)
     #: Share of the chosen ideas that support the promise (0.0 - 1.0).
     title_idea_alignment: float = 1.0
+    #: The language this script is written in ("es", "en").
+    language: str = "es"
+    #: Second-stage validation: does the *written paragraph* explain how the
+    #: idea produces the outcome the title promised? See
+    #: :mod:`vidfactory.causal_alignment`.
+    causal: CausalReport = field(default_factory=CausalReport)
+
+    @property
+    def causal_promise_alignment_score(self) -> float:
+        return self.causal.overall
+
+    @property
+    def section_alignment_scores(self) -> list[float]:
+        return [round(r.score, 3) for r in self.causal.results]
 
     @property
     def text(self) -> str:
@@ -102,8 +124,10 @@ class Script:
             "title": self.title,
             "engine": self.engine,
             "word_count": self.word_count,
+            "language": self.language,
             "promise": {"key": self.promise_key, "label": self.promise_label},
             "title_idea_alignment": self.title_idea_alignment,
+            "causal_promise_alignment": self.causal.to_dict(),
             "rejected_ideas": list(self.rejected_ideas),
             "topic": self.topic.to_dict(),
             "sections": [
@@ -501,8 +525,124 @@ INTRO_CONTEXT = {
 
 
 # ---------------------------------------------------------------------------
-# Template engine
+# Phrase packs
+#
+# The engine is language-agnostic; the writing is not. Everything the engine
+# reaches for - hooks, frames, transitions, elaborations, the words for
+# numbers - comes out of a pack chosen by language, so adding a language is a
+# module of phrases rather than a branch in the generator.
 # ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class PhrasePack:
+    """One language's worth of writing material."""
+
+    key: str
+    promise_hooks: dict[str, list[str]]
+    general_hooks: list[str]
+    intro_context: dict[str, str]
+    promises: list[str]
+    promise_tails: list[str]
+    statement_frames: list[str]
+    question_frames: list[str]
+    warning_frames: list[str]
+    scenario_frames: list[str]
+    number_frames: list[str]
+    transitions: list[str]
+    item_closers: list[str]
+    why_leads: list[str]
+    how_leads: list[str]
+    mistake_leads: list[str]
+    conclusion_leads: list[str]
+    conclusion_bodies: list[str]
+    ctas: list[str]
+    elaborations: dict[str, list[str]]
+    generic_elaborations: list[str]
+    room_words: dict[str, str]
+    default_room: str
+    intro_heading: str
+    conclusion_heading: str
+    number_forms: Any
+    minute_word: Any
+
+    def room_word(self, category: str) -> str:
+        return self.room_words.get(str(category or ""), self.default_room)
+
+
+def _english_pack() -> PhrasePack:
+    return PhrasePack(
+        key="en",
+        promise_hooks=PROMISE_HOOKS,
+        general_hooks=GENERAL_HOOKS,
+        intro_context=INTRO_CONTEXT,
+        promises=PROMISES,
+        promise_tails=PROMISE_TAILS,
+        statement_frames=STATEMENT_FRAMES,
+        question_frames=QUESTION_FRAMES,
+        warning_frames=WARNING_FRAMES,
+        scenario_frames=SCENARIO_FRAMES,
+        number_frames=NUMBER_FRAMES,
+        transitions=TRANSITIONS_V2,
+        item_closers=ITEM_CLOSERS,
+        why_leads=WHY_LEADS,
+        how_leads=HOW_LEADS,
+        mistake_leads=MISTAKE_LEADS,
+        conclusion_leads=CONCLUSION_LEADS,
+        conclusion_bodies=CONCLUSION_BODIES,
+        ctas=CTAS,
+        elaborations=ELABORATIONS,
+        generic_elaborations=GENERIC_ELABORATIONS,
+        room_words=_ROOM_WORDS,
+        default_room="home",
+        intro_heading="Introduction",
+        conclusion_heading="Final thoughts",
+        number_forms=count_words,
+        minute_word=lambda n: "minute" if n == 1 else "minutes",
+    )
+
+
+def _spanish_pack() -> PhrasePack:
+    from . import phrases_es as es
+
+    return PhrasePack(
+        key="es",
+        promise_hooks=es.PROMISE_HOOKS,
+        general_hooks=es.GENERAL_HOOKS,
+        intro_context=es.INTRO_CONTEXT,
+        promises=es.PROMISES,
+        promise_tails=es.PROMISE_TAILS,
+        statement_frames=es.STATEMENT_FRAMES,
+        question_frames=es.QUESTION_FRAMES,
+        warning_frames=es.WARNING_FRAMES,
+        scenario_frames=es.SCENARIO_FRAMES,
+        number_frames=es.NUMBER_FRAMES,
+        transitions=es.TRANSITIONS,
+        item_closers=es.ITEM_CLOSERS,
+        why_leads=es.WHY_LEADS,
+        how_leads=es.HOW_LEADS,
+        mistake_leads=es.MISTAKE_LEADS,
+        conclusion_leads=es.CONCLUSION_LEADS,
+        conclusion_bodies=es.CONCLUSION_BODIES,
+        ctas=es.CTAS,
+        elaborations=es.ELABORATIONS,
+        generic_elaborations=es.GENERIC_ELABORATIONS,
+        room_words=es.ROOM_WORDS,
+        default_room=es.DEFAULT_ROOM,
+        intro_heading=es.INTRO_HEADING,
+        conclusion_heading=es.CONCLUSION_HEADING,
+        number_forms=es.count_words,
+        minute_word=lambda n: "minuto" if n == 1 else "minutos",
+    )
+
+
+def pack_for(language: Any) -> PhrasePack:
+    """The phrase pack for a language. Unknown languages fall back sanely."""
+
+    from .languages import resolve_language
+
+    resolved = resolve_language(language)
+    return _english_pack() if resolved.is_english else _spanish_pack()
+
 
 def count_words(count: int) -> dict[str, str]:
     """Grammar helpers so a one-item script never says "1 ideas"."""
@@ -553,11 +693,13 @@ def _join_lead(lead: str, body: str) -> str:
     return f"{lead} {body[0].lower() + body[1:]}"
 
 
-def retitle_for_count(title: str, count: int) -> str:
+def retitle_for_count(title: str, count: int, language: str = "en") -> str:
     """Keep the number in the title honest without producing "1 ... Ideas".
 
     A single-item video drops the leading number entirely, which reads
-    naturally ("Small Living Room Ideas") instead of ungrammatically.
+    naturally ("Small Living Room Ideas", "Trucos para...") instead of
+    ungrammatically. Spanish needs the first word recapitalised once the
+    number in front of it is gone.
     """
 
     promised = re.match(r"^(\d{1,3})\s+", title)
@@ -566,7 +708,8 @@ def retitle_for_count(title: str, count: int) -> str:
     if int(promised.group(1)) == count:
         return title
     if count < 2:
-        return re.sub(r"^\d{1,3}\s+", "", title, count=1)
+        stripped = re.sub(r"^\d{1,3}\s+", "", title, count=1).strip()
+        return stripped[:1].upper() + stripped[1:] if stripped else title
     return re.sub(r"^\d{1,3}\b", str(count), title, count=1)
 
 
@@ -575,9 +718,18 @@ class TemplateScriptEngine:
 
     name = "template"
 
-    def __init__(self, words_per_minute: float = 150.0, seed: int | None = None) -> None:
+    def __init__(
+        self,
+        words_per_minute: float = 150.0,
+        seed: int | None = None,
+        language: Any = None,
+    ) -> None:
+        from .languages import resolve_language
+
+        self.language = resolve_language(language)
         self.words_per_minute = float(words_per_minute)
         self.seed = seed
+        self.phrases = pack_for(self.language)
 
     # ------------------------------------------------------------------
     def plan_item_count(self, topic: Topic, duration_minutes: float, pool_size: int) -> int:
@@ -600,9 +752,12 @@ class TemplateScriptEngine:
     # ------------------------------------------------------------------
     def generate(self, topic: Topic, duration_minutes: float) -> Script:
         rng = random.Random(self.seed if self.seed is not None else hash(topic.slug) & 0xFFFFFFFF)
-        promise = detect_promise(topic.title, topic.angle)
+        promise = detect_promise(topic.title, topic.angle, language=self.language.key)
 
-        pool = tips_for(topic.category) or tips_for(None)
+        pool = (
+            tips_for(topic.category, language=self.language.key)
+            or tips_for(None, language=self.language.key)
+        )
         rng.shuffle(pool)
 
         wanted = self.plan_item_count(topic, duration_minutes, len(pool))
@@ -612,7 +767,9 @@ class TemplateScriptEngine:
         # widen the search across every category before giving up on the
         # promise - a broader pool is always better than a weaker promise.
         if len(aligned) < wanted and promise.key != "general":
-            widened = [t for t in tips_for(None) if t not in pool]
+            widened = [
+                t for t in tips_for(None, language=self.language.key) if t not in pool
+            ]
             rng.shuffle(widened)
             extra, extra_rejected = filter_aligned(
                 widened, promise, minimum=0
@@ -642,7 +799,7 @@ class TemplateScriptEngine:
         chosen = pool[:count]
 
         # Retitle the video honestly when the pool could not fill the promise.
-        title = retitle_for_count(topic.title, count)
+        title = retitle_for_count(topic.title, count, self.language.key)
         if title != topic.title:
             log.info("Adjusted the title to match the %d ideas available", count)
 
@@ -661,6 +818,21 @@ class TemplateScriptEngine:
                 )
             )
 
+        # Second stage: the ideas support the promise, but does the narration
+        # actually say so? Paragraphs that perform the action without ever
+        # explaining the effect are repaired from their own mechanism, and
+        # replaced from the spare pool when they cannot be.
+        causal = self._enforce_causal_promise(
+            sections,
+            promise,
+            spare_tips=pool[count:],
+            rng=rng,
+            total=count,
+            recent_patterns=recent_patterns,
+            used_transitions=used_transitions,
+            used_phrases=used_phrases,
+        )
+
         sections.append(self._outro(count, rng, compact=compact))
 
         script = Script(
@@ -670,23 +842,125 @@ class TemplateScriptEngine:
             engine=self.name,
             promise_key=promise.key,
             promise_label=promise.label,
+            language=self.language.key,
             rejected_ideas=[
                 {"title": r.tip["title"], "score": r.score, "reason": r.explain()}
                 for r in rejected[:25]
             ],
             title_idea_alignment=alignment_ratio(chosen, promise),
+            causal=causal,
         )
         self._fit_to_duration(script, duration_minutes, rng)
+        # Fitting rewrites paragraphs, so the guarantee is re-checked (and
+        # re-repaired) against the text that will actually be spoken.
+        script.causal = self._revalidate_causal(script.sections, promise, causal)
         log.info(
             "%s words across %d sections (%s engine); title promise '%s' "
-            "satisfied by %.0f%% of the ideas",
+            "satisfied by %.0f%% of the ideas, causal alignment %.2f "
+            "(%d rewritten, %d replaced)",
             f"{script.word_count:,}",
             len(sections),
             self.name,
             promise.key,
             script.title_idea_alignment * 100,
+            script.causal.overall,
+            script.causal.rewrites,
+            script.causal.replacements,
         )
+        for result in script.causal.results:
+            log.info(
+                "  item %d %s (%.2f) - %s",
+                result.index,
+                "PASS" if result.passed else "BELOW TARGET",
+                result.score,
+                result.explain(),
+            )
         return script
+
+    # ------------------------------------------------------------------
+    def _enforce_causal_promise(
+        self,
+        sections: list[ScriptSection],
+        promise: Promise,
+        spare_tips: Sequence[Tip],
+        rng: random.Random,
+        total: int,
+        recent_patterns: list[str],
+        used_transitions: set[str],
+        used_phrases: set[str],
+    ) -> CausalReport:
+        """Make every item say why it delivers the title's promise.
+
+        Repair first - the idea is sound, only the writing was silent about
+        the effect. Replacement is the fallback for an idea whose mechanism
+        offers no explanation to borrow.
+        """
+
+        used: dict[str, int] = {}
+        report = validate_sections(sections, promise, rewrite=True, used=used)
+        spares = [t for t in spare_tips]
+        if not report.failures or not spares:
+            return report
+
+        by_index = {
+            int(s.index): position
+            for position, s in enumerate(sections)
+            if s.kind == "item"
+        }
+        replacements = 0
+        for failure in list(report.failures):
+            position = by_index.get(failure.index)
+            if position is None:
+                continue
+            while spares:
+                tip = spares.pop(0)
+                candidate = self._item(
+                    failure.index, total, tip, rng,
+                    recent_patterns, used_transitions, used_phrases,
+                )
+                candidate.text = (
+                    repair_text(
+                        candidate.text, promise, tip,
+                        used=used, heading=candidate.heading,
+                    )
+                    or candidate.text
+                )
+                if score_paragraph(candidate.text, promise).score < PASS_THRESHOLD:
+                    continue
+                # A replacement that argues against its own heading is not a
+                # replacement, it is the same bug with a different idea.
+                if find_contradictions(
+                    candidate.heading, candidate.text,
+                    language=getattr(promise, "language", "en"),
+                ):
+                    log.info(
+                        "Skipped %r as a replacement: its explanation contradicts "
+                        "its own heading",
+                        tip.get("title", ""),
+                    )
+                    continue
+                log.info(
+                    "Replaced item %d (%s) with %r, which explains the "
+                    "'%s' promise in its own words",
+                    failure.index, failure.heading, tip.get("title", ""), promise.key,
+                )
+                sections[position] = candidate
+                replacements += 1
+                break
+
+        final = validate_sections(sections, promise, rewrite=True, used=used)
+        final.rewrites += report.rewrites
+        final.replacements = replacements
+        return final
+
+    @staticmethod
+    def _revalidate_causal(
+        sections: Sequence[ScriptSection], promise: Promise, previous: CausalReport
+    ) -> CausalReport:
+        report = validate_sections(sections, promise, rewrite=True)
+        report.rewrites += previous.rewrites
+        report.replacements += previous.replacements
+        return report
 
     # ------------------------------------------------------------------
     def _intro(
@@ -698,23 +972,26 @@ class TemplateScriptEngine:
         rng: random.Random,
         compact: bool = False,
     ) -> ScriptSection:
-        promise = detect_promise(topic.title, topic.angle)
-        room = _room_word(topic.category)
-        hooks = PROMISE_HOOKS.get(promise.key) or GENERAL_HOOKS
+        phrases = self.phrases
+        promise = detect_promise(topic.title, topic.angle, language=self.language.key)
+        room = phrases.room_word(topic.category)
+        hooks = phrases.promise_hooks.get(promise.key) or phrases.general_hooks
         parts = [rng.choice(hooks).format(room=room)]
-        context = INTRO_CONTEXT.get(topic.category)
+        context = phrases.intro_context.get(topic.category)
         if context and not compact:
             parts.append(context)
         minutes = max(1, int(round(duration_minutes)))
-        promise = rng.choice(PROMISES).format(
+        promise_line = rng.choice(phrases.promises).format(
             duration=minutes,
-            minutes="minute" if minutes == 1 else "minutes",
-            **count_words(count),
+            minutes=phrases.minute_word(minutes),
+            **phrases.number_forms(count),
         )
-        parts.append(promise)
+        parts.append(promise_line)
         if not compact:
-            parts.append(rng.choice(PROMISE_TAILS))
-        return ScriptSection(kind="intro", heading="Introduction", text=_clean(" ".join(parts)))
+            parts.append(rng.choice(phrases.promise_tails))
+        return ScriptSection(
+            kind="intro", heading=phrases.intro_heading, text=_clean(" ".join(parts))
+        )
 
     #: How an idea can be structured. Choosing between these is what stops
     #: every section following the identical sentence pattern.
@@ -787,7 +1064,7 @@ class TemplateScriptEngine:
 
         # A transition, but never the same one twice in one video.
         if index > 1 and rng.random() < 0.4:
-            fresh = [t for t in TRANSITIONS_V2 if t not in used_transitions]
+            fresh = [t for t in self.phrases.transitions if t not in used_transitions]
             if fresh:
                 transition = rng.choice(fresh)
                 used_transitions.add(transition)
@@ -796,24 +1073,24 @@ class TemplateScriptEngine:
         # The number is announced most of the time, but not always - always
         # announcing it is a large part of what makes list videos feel robotic.
         if rng.random() < 0.78:
-            parts.append(self._pick_fresh(NUMBER_FRAMES, used_phrases, rng).format(n=index))
+            parts.append(self._pick_fresh(self.phrases.number_frames, used_phrases, rng).format(n=index))
 
         if pattern == "question":
-            parts.append(self._pick_fresh(QUESTION_FRAMES, used_phrases, rng).format(title=title, title_lower=title_lower))
+            parts.append(self._pick_fresh(self.phrases.question_frames, used_phrases, rng).format(title=title, title_lower=title_lower))
             parts.append(why)
             parts.append(how)
         elif pattern == "warning":
             if mistake:
                 parts.append(mistake)
-                parts.append(self._pick_fresh(WARNING_FRAMES, used_phrases, rng).format(title=title, title_lower=title_lower))
+                parts.append(self._pick_fresh(self.phrases.warning_frames, used_phrases, rng).format(title=title, title_lower=title_lower))
                 parts.append(how)
                 mistake = ""      # already used, do not repeat it below
             else:
-                parts.append(self._pick_fresh(WARNING_FRAMES, used_phrases, rng).format(title=title, title_lower=title_lower))
+                parts.append(self._pick_fresh(self.phrases.warning_frames, used_phrases, rng).format(title=title, title_lower=title_lower))
                 parts.append(why)
                 parts.append(how)
         elif pattern == "scenario":
-            parts.append(self._pick_fresh(SCENARIO_FRAMES, used_phrases, rng).format(title=title, title_lower=title_lower))
+            parts.append(self._pick_fresh(self.phrases.scenario_frames, used_phrases, rng).format(title=title, title_lower=title_lower))
             parts.append(why)
             parts.append(how)
         elif pattern == "how_first":
@@ -825,14 +1102,14 @@ class TemplateScriptEngine:
             parts.append(why)
             parts.append(how)
         else:  # statement
-            parts.append(self._pick_fresh(STATEMENT_FRAMES, used_phrases, rng).format(title=title, title_lower=title_lower))
+            parts.append(self._pick_fresh(self.phrases.statement_frames, used_phrases, rng).format(title=title, title_lower=title_lower))
             parts.append(why)
             parts.append(how)
 
         if mistake and rng.random() < 0.6:
             parts.append(mistake)
         elif rng.random() < 0.3:
-            parts.append(self._pick_fresh(ITEM_CLOSERS, used_phrases, rng))
+            parts.append(self._pick_fresh(self.phrases.item_closers, used_phrases, rng))
 
         heading = title
         if len(heading) > 64:
@@ -851,16 +1128,16 @@ class TemplateScriptEngine:
 
         options: list[str] = []
         for tag in tip.get("tags", []):
-            for key, sentences in ELABORATIONS.items():
+            for key, sentences in self.phrases.elaborations.items():
                 if key in str(tag).lower():
                     options.extend(sentences)
         category = str(tip.get("category", "")).lower()
-        for key, sentences in ELABORATIONS.items():
+        for key, sentences in self.phrases.elaborations.items():
             if key in category:
                 options.extend(sentences)
         deduped = list(dict.fromkeys(options))
         rng.shuffle(deduped)
-        generic = list(GENERIC_ELABORATIONS)
+        generic = list(self.phrases.generic_elaborations)
         rng.shuffle(generic)
         return deduped + generic
 
@@ -917,18 +1194,14 @@ class TemplateScriptEngine:
             )
 
     def _outro(self, count: int, rng: random.Random, compact: bool = False) -> ScriptSection:
-        if compact:
-            parts = [
-                rng.choice(CONCLUSION_LEADS).format(**count_words(count)),
-                rng.choice(CTAS),
-            ]
-        else:
-            parts = [
-                rng.choice(CONCLUSION_LEADS).format(**count_words(count)),
-                rng.choice(CONCLUSION_BODIES),
-                rng.choice(CTAS),
-            ]
-        return ScriptSection(kind="outro", heading="Final thoughts", text=_clean(" ".join(parts)))
+        phrases = self.phrases
+        parts = [rng.choice(phrases.conclusion_leads).format(**phrases.number_forms(count))]
+        if not compact:
+            parts.append(rng.choice(phrases.conclusion_bodies))
+        parts.append(rng.choice(phrases.ctas))
+        return ScriptSection(
+            kind="outro", heading=phrases.conclusion_heading, text=_clean(" ".join(parts))
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -942,6 +1215,7 @@ def generate_script(
     words_per_minute: float = 150.0,
     llm_settings: dict[str, Any] | None = None,
     seed: int | None = None,
+    language: Any = None,
 ) -> Script:
     """Generate a script, preferring the requested engine but never crashing.
 
@@ -950,7 +1224,9 @@ def generate_script(
     ready, and silently falls back to the template engine otherwise.
     """
 
-    template_engine = TemplateScriptEngine(words_per_minute=words_per_minute, seed=seed)
+    template_engine = TemplateScriptEngine(
+        words_per_minute=words_per_minute, seed=seed, language=language
+    )
     settings = llm_settings or {}
     wants_llm = engine == "llm" or (engine == "auto" and bool(settings.get("enabled")))
 
@@ -960,8 +1236,31 @@ def generate_script(
 
             llm_engine = LLMScriptEngine(settings, words_per_minute=words_per_minute)
             script = llm_engine.generate(topic, duration_minutes, fallback=template_engine)
-            return script
+            return _ensure_causal_alignment(script)
         except Exception as exc:  # pragma: no cover - depends on runner capability
             log.warning("Local LLM engine unavailable (%s); using the template engine", exc)
 
     return template_engine.generate(topic, duration_minutes)
+
+
+def _ensure_causal_alignment(script: Script) -> Script:
+    """Apply the second-stage promise check to a script from any engine.
+
+    The template engine runs it during generation, where it can also replace
+    an idea. A model-written script arrives finished, so it gets the same
+    validation and the same repair - a rewritten model paragraph is still far
+    better than one that never explains itself.
+    """
+
+    if script.causal.results:
+        return script
+    promise = detect_promise(
+        script.title, script.topic.angle, language=getattr(script, "language", "en")
+    )
+    script.causal = validate_sections(script.sections, promise, rewrite=True)
+    if script.causal.rewrites:
+        log.info(
+            "Added the missing causal explanation to %d %s-engine item(s)",
+            script.causal.rewrites, script.engine,
+        )
+    return script

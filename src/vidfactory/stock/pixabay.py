@@ -77,6 +77,10 @@ class PixabayProvider(StockProvider):
                     ),
                     license_name=cls.license_name,
                     file_size=int(best.get("size") or 0),
+                    # Pixabay publishes one still per rendition rather than a
+                    # timeline of them, so frame inspection falls back to
+                    # decoding the video itself for these clips.
+                    preview_image=str(best.get("thumbnail", "")),
                     query=query,
                     tags=tags,
                     description=" ".join(tags),

@@ -27,9 +27,19 @@ log = get_logger("MAIN")
 
 def _overrides_from_args(args: argparse.Namespace) -> dict[str, object]:
     overrides: dict[str, object] = {}
+    if getattr(args, "language", None):
+        from .languages import resolve_language
+
+        overrides["channel.language"] = resolve_language(args.language).code
+    if getattr(args, "subtitle_style", None):
+        overrides["subtitles.style"] = str(args.subtitle_style).strip().lower()
     if getattr(args, "duration", None):
         overrides["video.duration_minutes"] = float(args.duration)
-    if getattr(args, "voice", None):
+    # "Automatic" is the dropdown's way of saying "no explicit voice", which
+    # lets the content language choose one.
+    if getattr(args, "voice", None) and str(args.voice).strip().lower() not in (
+        "automatic", "auto",
+    ):
         overrides["tts.voice"] = str(args.voice)
     if getattr(args, "tts_engine", None):
         overrides["tts.engine"] = str(args.tts_engine)
@@ -58,6 +68,8 @@ def _overrides_from_args(args: argparse.Namespace) -> dict[str, object]:
         overrides["sources.local"] = True
     if getattr(args, "upload", None) is not None:
         overrides["youtube.upload_enabled"] = parse_bool(args.upload, False)
+    if getattr(args, "mode", None):
+        overrides["generation.mode"] = str(args.mode).strip().lower()
     if getattr(args, "privacy", None):
         overrides["youtube.privacy_status"] = str(args.privacy)
     return overrides
@@ -195,6 +207,15 @@ def command_doctor(args: argparse.Namespace) -> int:
         print("[ok]   script engine   : template (deterministic, always works)")
         print("       local model     : disabled - run 'vidfactory llm-check' to test it here")
 
+    if bool(config.get("visual.enabled", True)):
+        model = dict(config.get("visual.model", {}) or {})
+        backend = model.get("repo", "?") if model.get("enabled", True) else "off"
+        print(f"[ok]   frame analysis  : on, {config.get('visual.frames_per_clip', 3)} "
+              f"frames per candidate (CLIP backend: {backend})")
+        print("       run 'vidfactory visual-check' to confirm the model loads here")
+    else:
+        print("[warn] frame analysis  : disabled - clips will be judged by caption only")
+
     providers = build_providers(dict(config.get("sources", {}) or {}))
     if providers:
         print(f"[ok]   stock providers : {', '.join(p.name for p in providers)}")
@@ -253,11 +274,87 @@ def command_llm_check(args: argparse.Namespace) -> int:
     return 1
 
 
+def command_visual_check(args: argparse.Namespace) -> int:
+    """Report what frame inspection can actually do on this machine.
+
+    Pixel statistics always work. The CLIP backend has to be downloaded and
+    executed, and whether that succeeds on a given runner is a fact to be
+    measured rather than assumed - the same lesson ``llm-check`` exists for.
+    """
+
+    from .visual_model import benchmark
+
+    config = load_config(args.config)
+    settings = dict(config.get("visual.model", {}) or {})
+    print("Checking frame inspection. The first run downloads the CLIP export.")
+    result = benchmark(settings)
+    print(json.dumps(result, indent=2)[:2000])
+    print()
+    if result.get("model"):
+        print(f"[ok]   CLIP backend works: {result['model']} "
+              f"(provisioned in {result.get('provision_seconds')}s, "
+              f"{result.get('analysis_seconds')}s per frame batch)")
+        print("       concept scoring and scene-to-clip matching are both live")
+        return 0
+    if result.get("ok"):
+        print("[warn] no CLIP backend here, so frames are judged by pixel "
+              "statistics alone.")
+        print("       Empty rooms, dark scenes and floor plans are still "
+              "detected; plastic covers, pets and room types are weaker.")
+        print(f"       reason: {result.get('error', 'model could not be loaded')}")
+        return 3
+    print("[FAIL] frame inspection is not working at all - check FFmpeg")
+    return 1
+
+
 def command_state(args: argparse.Namespace) -> int:
     database = Database(args.database)
     database.import_state(Path(args.state))
     database.export_state(Path(args.state))
     print(json.dumps(database.stats(), indent=2))
+    return 0
+
+
+def command_merge_state(args: argparse.Namespace) -> int:
+    """Union two divergent copies of the persistent history.
+
+    git cannot merge ``data/state/*.json`` - both sides rewrite every line -
+    and picking a side deletes real renders. This unions them on the natural
+    keys the schema already declares, then checks the result for orphans.
+    """
+
+    from .state_merge import find_orphans, merge_state
+
+    report = merge_state(args.base, args.ours, args.theirs, args.out)
+    orphans = find_orphans(args.out)
+    print(json.dumps({**report.to_dict(), "orphans": orphans}, indent=2))
+    return 1 if any(orphans.values()) else 0
+
+
+def command_cooldown(args: argparse.Namespace) -> int:
+    """Inspect, and if asked repair, the long-term footage cooldown.
+
+    Development renders used to record their footage exactly like published
+    ones, so sixteen test videos put their Pexels IDs beyond reach for
+    forty-five days each. ``--release`` moves that usage into development
+    history: the rows and their counts stay, the cooldown stops seeing them.
+    """
+
+    database = Database(args.database)
+    database.import_state(Path(args.state))
+    before = database.clip_mode_stats()
+    if not args.release:
+        print(json.dumps(before, indent=2))
+        return 0
+
+    result = database.reclassify_clip_history(
+        before=args.before, topics=args.topics, dry_run=args.dry_run
+    )
+    if args.dry_run:
+        print(json.dumps({**before, **result}, indent=2))
+        return 0
+    database.export_state(Path(args.state))
+    print(json.dumps({**database.clip_mode_stats(), **result}, indent=2))
     return 0
 
 
@@ -280,7 +377,18 @@ def build_parser() -> argparse.ArgumentParser:
         sub.add_argument("--topic", default="", help="video topic; empty means generate one")
         sub.add_argument("--auto-topic", action="store_true", help="always generate the topic")
         sub.add_argument("--duration", type=float, default=None, help="target minutes")
-        sub.add_argument("--voice", default=None, help="TTS voice name")
+        sub.add_argument(
+            "--language", default=None,
+            help='content language: "Spanish" (default) or "English"',
+        )
+        sub.add_argument(
+            "--voice", default=None,
+            help='TTS voice name, or "Automatic" to let the language choose',
+        )
+        sub.add_argument(
+            "--subtitle-style", default=None, choices=["premium", "clean", "none"],
+            help="styled captions burned into the picture",
+        )
         sub.add_argument("--tts-engine", default=None, choices=["auto", "piper", "espeak", "silent"])
         sub.add_argument("--script-engine", default=None, choices=["auto", "llm", "template"])
         sub.add_argument("--subtitles", default=None, help="true/false")
@@ -297,6 +405,11 @@ def build_parser() -> argparse.ArgumentParser:
         sub.add_argument("--local-clips", default=None, help="use your own clips from this folder")
         sub.add_argument("--only-local", action="store_true", help="disable online providers")
         sub.add_argument("--github-output", action="store_true", help="write GITHUB_OUTPUT values")
+        sub.add_argument(
+            "--mode", default=None, choices=["test", "production"],
+            help="production renders claim their footage for the cooldown; "
+                 "test renders do not (default: whatever config.yaml says)",
+        )
 
     generate = subparsers.add_parser("generate", help="generate one video")
     add_generate_arguments(generate)
@@ -318,6 +431,38 @@ def build_parser() -> argparse.ArgumentParser:
     state = subparsers.add_parser("state", help="sync and report persistent history")
     state.set_defaults(func=command_state)
 
+    cooldown = subparsers.add_parser(
+        "cooldown",
+        help="show or repair the footage cooldown after development renders",
+    )
+    cooldown.add_argument(
+        "--release", action="store_true",
+        help="move recorded production footage usage into development history, "
+             "so the clips become available again",
+    )
+    cooldown.add_argument(
+        "--before", default=None,
+        help="only release usage recorded before this ISO timestamp",
+    )
+    cooldown.add_argument(
+        "--topic", action="append", default=None, dest="topics",
+        help="only release usage recorded for this topic slug (repeatable)",
+    )
+    cooldown.add_argument(
+        "--dry-run", action="store_true", help="report what would move, change nothing"
+    )
+    cooldown.set_defaults(func=command_cooldown)
+
+    merge_state_cmd = subparsers.add_parser(
+        "merge-state",
+        help="resolve a data/state conflict by unioning two histories",
+    )
+    merge_state_cmd.add_argument("--base", required=True, help="merge-base snapshot directory")
+    merge_state_cmd.add_argument("--ours", required=True, help="this branch's snapshot directory")
+    merge_state_cmd.add_argument("--theirs", required=True, help="the other branch's directory")
+    merge_state_cmd.add_argument("--out", required=True, help="where to write the merged files")
+    merge_state_cmd.set_defaults(func=command_merge_state)
+
     llm_check = subparsers.add_parser(
         "llm-check", help="download and benchmark the optional local script model"
     )
@@ -326,6 +471,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="seconds per section the runner can afford (default 120)",
     )
     llm_check.set_defaults(func=command_llm_check)
+
+    visual_check = subparsers.add_parser(
+        "visual-check",
+        help="check whether real frame inspection (and the CLIP backend) works here",
+    )
+    visual_check.set_defaults(func=command_visual_check)
 
     return parser
 

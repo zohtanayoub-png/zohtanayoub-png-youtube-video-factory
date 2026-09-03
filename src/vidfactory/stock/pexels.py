@@ -73,12 +73,29 @@ class PexelsProvider(StockProvider):
                     author_url=str(user.get("url", "")),
                     license_name=cls.license_name,
                     preview_image=str(video.get("image", "")),
+                    preview_images=cls._pictures(video),
                     file_size=int(best.get("file_size") or 0),
                     query=query,
                     description=cls.describe(str(video.get("url", ""))),
                 )
             )
         return [clip for clip in clips if clip.provider_id and clip.download_url]
+
+    @staticmethod
+    def _pictures(video: dict[str, Any]) -> list[str]:
+        """Stills Pexels samples across the clip, in playback order.
+
+        These are what makes real frame inspection affordable: the beginning,
+        the middle and the end of a candidate can be decoded from three small
+        JPEGs instead of downloading the video to find out it is a floor plan.
+        """
+
+        pictures = video.get("video_pictures") or []
+        ordered = sorted(
+            (p for p in pictures if p.get("picture")),
+            key=lambda p: int(p.get("nr") or 0),
+        )
+        return [str(p["picture"]) for p in ordered]
 
     @staticmethod
     def describe(page_url: str) -> str:

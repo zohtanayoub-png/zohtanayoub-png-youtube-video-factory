@@ -137,6 +137,15 @@ class Database:
     def initialize(self) -> None:
         with self.transaction() as conn:
             conn.executescript(SCHEMA)
+            # Migrations run here, before anything can read or write a row.
+            # They used to run lazily, on the first record_clip_use, which is
+            # after import_state - and import_state builds its column list from
+            # PRAGMA table_info, so every load of the history silently dropped
+            # test_use_count and test_last_used_at. That is how 420 clips ended
+            # up recorded as never used at all: the release moved their count
+            # out of use_count, and the next run's import threw away the column
+            # it had been moved into.
+            self._migrate_clip_modes(conn)
             conn.execute(
                 "INSERT OR REPLACE INTO schema_info(key, value) VALUES('version', ?)",
                 (str(SCHEMA_VERSION),),
@@ -199,6 +208,25 @@ class Database:
         return bool(self.query("SELECT 1 FROM topics WHERE slug = ?", (slug,)))
 
     # --------------------------------------------------------------- clips
+    # --------------------------------------------------------------- modes
+    #: A render either counts towards the long-term footage cooldown or it
+    #: does not. Sixteen development renders had already claimed a large slice
+    #: of the good Pexels footage for 45 days before anything was published,
+    #: which is a bill the real channel should never have been sent.
+    PRODUCTION = "production"
+    TEST = "test"
+
+    def _migrate_clip_modes(self, conn: sqlite3.Connection) -> None:
+        """Add the development-usage columns to a database that predates them."""
+
+        existing = {row[1] for row in conn.execute("PRAGMA table_info(clips)")}
+        if "test_use_count" not in existing:
+            conn.execute(
+                "ALTER TABLE clips ADD COLUMN test_use_count INTEGER NOT NULL DEFAULT 0"
+            )
+        if "test_last_used_at" not in existing:
+            conn.execute("ALTER TABLE clips ADD COLUMN test_last_used_at TEXT")
+
     def get_clip(self, provider: str, provider_id: str) -> sqlite3.Row | None:
         rows = self.query(
             "SELECT * FROM clips WHERE provider = ? AND provider_id = ?",
@@ -237,21 +265,37 @@ class Database:
         duration: float | None = None,
         content_hash: str | None = None,
         topic: str | None = None,
+        mode: str = PRODUCTION,
     ) -> None:
+        """Record that a clip was used.
+
+        ``mode`` decides which set of columns moves. A test render still gets
+        a row - knowing a clip was tried is useful - but it writes
+        ``test_last_used_at``, which nothing consults when deciding whether
+        footage is on cooldown. Only a production render touches
+        ``last_used_at``.
+        """
+
         now = utcnow()
+        test = str(mode) == self.TEST
         with self.transaction() as conn:
+            self._migrate_clip_modes(conn)
             conn.execute(
                 """INSERT INTO clips(provider, provider_id, url, width, height, duration,
-                                     content_hash, first_used_at, last_used_at, use_count, last_topic)
-                   VALUES(?,?,?,?,?,?,?,?,?,1,?)
+                                     content_hash, first_used_at, last_used_at, use_count,
+                                     test_last_used_at, test_use_count, last_topic)
+                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
                    ON CONFLICT(provider, provider_id) DO UPDATE SET
                        url = COALESCE(excluded.url, clips.url),
                        width = COALESCE(excluded.width, clips.width),
                        height = COALESCE(excluded.height, clips.height),
                        duration = COALESCE(excluded.duration, clips.duration),
                        content_hash = COALESCE(excluded.content_hash, clips.content_hash),
-                       last_used_at = excluded.last_used_at,
-                       use_count = clips.use_count + 1,
+                       last_used_at = COALESCE(excluded.last_used_at, clips.last_used_at),
+                       use_count = clips.use_count + excluded.use_count,
+                       test_last_used_at = COALESCE(
+                           excluded.test_last_used_at, clips.test_last_used_at),
+                       test_use_count = clips.test_use_count + excluded.test_use_count,
                        last_topic = COALESCE(excluded.last_topic, clips.last_topic)""",
                 (
                     provider,
@@ -262,10 +306,88 @@ class Database:
                     duration,
                     content_hash,
                     now,
-                    now,
+                    None if test else now,
+                    0 if test else 1,
+                    now if test else None,
+                    1 if test else 0,
                     topic,
                 ),
             )
+
+    def clip_mode_stats(self) -> dict[str, int]:
+        """How much of the footage history is production and how much is dev."""
+
+        with self.transaction() as conn:
+            self._migrate_clip_modes(conn)
+        rows = self.query(
+            "SELECT COUNT(*) AS n,"
+            " SUM(CASE WHEN use_count > 0 THEN 1 ELSE 0 END) AS production,"
+            " SUM(CASE WHEN test_use_count > 0 THEN 1 ELSE 0 END) AS test"
+            " FROM clips"
+        )
+        row = rows[0] if rows else None
+        return {
+            "clips": int((row["n"] if row else 0) or 0),
+            "production": int((row["production"] if row else 0) or 0),
+            "test": int((row["test"] if row else 0) or 0),
+        }
+
+    def reclassify_clip_history(
+        self,
+        before: str | None = None,
+        topics: Sequence[str] | None = None,
+        dry_run: bool = False,
+    ) -> dict[str, int]:
+        """Move production footage usage into the development column.
+
+        This is the repair for a cooldown that was filled by renders nobody
+        published. It **moves** the usage rather than deleting it: the row, its
+        counts and its timestamps all survive under ``test_*``, so the history
+        of what was tried is intact and only the cooldown stops seeing it.
+
+        ``before`` is an ISO timestamp; ``topics`` a list of topic slugs. With
+        neither, every recorded production use moves, which is the right answer
+        for a channel that has not published anything yet. Pass ``dry_run`` to
+        count what would move without touching it.
+        """
+
+        clauses = ["use_count > 0"]
+        params: list[Any] = []
+        if before:
+            clauses.append("last_used_at < ?")
+            params.append(str(before))
+        if topics:
+            clauses.append(
+                "last_topic IN (" + ",".join("?" for _ in topics) + ")"
+            )
+            params.extend(str(t) for t in topics)
+        where = " AND ".join(clauses)
+
+        with self.transaction() as conn:
+            self._migrate_clip_modes(conn)
+            affected = int(
+                conn.execute(
+                    f"SELECT COUNT(*) FROM clips WHERE {where}", params
+                ).fetchone()[0]
+            )
+            if dry_run or not affected:
+                return {"moved": 0, "would_move": affected}
+            conn.execute(
+                f"""UPDATE clips SET
+                        test_use_count = test_use_count + use_count,
+                        test_last_used_at = COALESCE(
+                            MAX(COALESCE(test_last_used_at, ''), COALESCE(last_used_at, '')),
+                            test_last_used_at),
+                        use_count = 0,
+                        last_used_at = NULL
+                    WHERE {where}""",
+                params,
+            )
+        log.info(
+            "Moved %d clip(s) out of the production cooldown and into "
+            "development history", affected,
+        )
+        return {"moved": affected, "would_move": affected}
 
     # -------------------------------------------------------------- videos
     def add_video(self, **fields: Any) -> int:

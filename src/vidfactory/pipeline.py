@@ -16,7 +16,8 @@ import math
 import shutil
 import time
 import uuid
-from dataclasses import dataclass, field
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -27,6 +28,7 @@ from .downloader import ClipDownloader
 from .editor import ShotPlan, VideoEditor, estimate_shot_count, plan_shots
 from .editorial_qc import EditorialReport, build_report
 from .ffmpeg_utils import ffmpeg_available, probe_media
+from .languages import language_from_config
 from .logging_utils import get_logger
 from .metadata import build_metadata, safe_filename
 from .provenance import (
@@ -36,10 +38,21 @@ from .provenance import (
     prepare_directory,
 )
 from .quality_control import QualityReport, validate_output
-from .ranking import ClipRanker, DiversitySettings, RankingContext, diversify, diversity_report
+from .ranking import (
+    ClipRanker,
+    DiversitySettings,
+    RankingContext,
+    VisualRankingSettings,
+    diversify,
+    diversity_report,
+    metadata_visual_flags,
+    rank_with_vision,
+)
 from .scene_planner import Scene, plan_scenes
 from .script_generator import Script, generate_script
 from .stock import StockClip, build_providers
+from .visual_analysis import VisualAnalyzer
+from .ass_subtitles import report as subtitle_report, style_for, write_ass
 from .subtitles import generate_subtitles
 from .title_alignment import detect_promise, score_alignment
 from .topic_engine import Topic, TopicEngine
@@ -102,6 +115,19 @@ class VideoPipeline:
         state_dir: str | Path = "data/state",
     ) -> None:
         self.config = config
+        # One decision, read once, used everywhere: topic grammar, knowledge
+        # pool, phrase pack, promise vocabulary, voice, pronunciation,
+        # subtitle chunking and metadata all follow from it.
+        self.language = language_from_config(config)
+        # Whether this render claims its footage for the long-term cooldown.
+        # Anything that is not explicitly "production" is treated as a test,
+        # because the expensive mistake is claiming footage by accident.
+        self.generation_mode = (
+            Database.PRODUCTION
+            if str(config.get("generation.mode", "test")).strip().lower()
+            == Database.PRODUCTION
+            else Database.TEST
+        )
         self.state_dir = Path(state_dir)
         # A run label may repeat (a re-run reuses the workflow run number), so
         # the generation id adds a timestamp and a random suffix. Every path
@@ -197,6 +223,7 @@ class VideoPipeline:
         engine = TopicEngine(
             history=history,
             similarity_threshold=float(self.config.get("topics.similarity_threshold", 0.62)),
+            language=self.language,
         )
         topic = (
             engine.from_user_input(topic_text)
@@ -213,7 +240,9 @@ class VideoPipeline:
         return topic
 
     def _write_script(self, topic: Topic, speech_rate_wpm: float | None = None) -> Script:
-        configured = float(self.config.get("script.words_per_minute", 150))
+        configured = float(
+            self.config.get("script.words_per_minute", 0) or self.language.words_per_minute
+        )
         rate = float(speech_rate_wpm or configured)
         if speech_rate_wpm and abs(rate - configured) > 5:
             log.info(
@@ -228,6 +257,7 @@ class VideoPipeline:
             engine=str(self.config.get("script.engine", "auto")),
             words_per_minute=rate,
             llm_settings=dict(self.config.get("script.llm", {}) or {}),
+            language=self.language,
         )
 
     def _plan_scenes(self, script: Script) -> list[Scene]:
@@ -236,10 +266,11 @@ class VideoPipeline:
     def _build_tts(self):
         return build_engine(
             engine=str(self.config.get("tts.engine", "auto")),
-            voice=str(self.config.get("tts.voice", "en_US-hfc_female-medium")),
+            voice=str(self.config.get("tts.voice", "") or ""),
             speed=float(self.config.get("tts.speed", 1.0)),
             sample_rate=int(self.config.get("audio.sample_rate", 48000)),
             fallback_voices=list(self.config.get("tts.fallback_voices", []) or []),
+            language=self.language,
         )
 
     def _narrate(self, scenes: Sequence[Scene], engine=None):
@@ -252,6 +283,7 @@ class VideoPipeline:
             max_chunk_chars=int(self.config.get("tts.max_chunk_chars", 320)),
             loudness_lufs=float(self.config.get("audio.loudness_lufs", -16.0)),
             sample_rate=int(self.config.get("audio.sample_rate", 48000)),
+            language=self.language,
         )
         return builder.build(scenes, self.workdir / "narration.wav")
 
@@ -308,6 +340,13 @@ class VideoPipeline:
         # earlier videos to repeat footage.
         headroom = float(sources.get("candidate_headroom", 1.35))
         needed = max(3, int(math.ceil(shots_needed * headroom)))
+        # How large a pool to gather before the metadata sweep stops early.
+        # At 2x, run 19 ranked 40 clips for 29 shots and the visual stage had
+        # nothing to choose from: its candidate average and its final-shot
+        # average were both 0.48, which is what "no selection happened" looks
+        # like. Ranking discards a good half of what is gathered, so the sweep
+        # has to over-collect for the shortlist multiplier to mean anything.
+        pool_target = float(sources.get("candidate_pool_multiplier", 4.0))
 
         candidates: dict[str, StockClip] = {}
         affinity: dict[str, list[str]] = {}
@@ -380,7 +419,7 @@ class VideoPipeline:
                 # plenty of footage: each idea has to contribute its own
                 # queries, or its shots end up drawn from another idea's
                 # search results and stop illustrating the narration.
-                if not visit_every_scene and len(candidates) >= needed * 2:
+                if not visit_every_scene and len(candidates) >= needed * pool_target:
                     return
                 before = len(candidates)
                 harvest(scene, pages=pages, include_generic=include_generic)
@@ -487,6 +526,151 @@ class VideoPipeline:
         if not ranked:
             raise PipelineError("No stock clip met the minimum quality requirements")
 
+        # ---- stage two: open the footage --------------------------------
+        # Everything so far has been captions. Now the shortlist gets its
+        # frames decoded and measured, and the order is rebuilt around what is
+        # actually in them.
+        ranked, visual_stats = self._inspect_footage(ranked, scenes, affinity, needed)
+        stats["visual"] = visual_stats
+
+        # ---- stage three: search again for what did not match ------------
+        #
+        # Run 16 warned that 19 of 49 clips barely matched their narration and
+        # used them anyway. A clip that does not show the sentence it sits
+        # under is a research failure, not a tolerable defect, so a scene
+        # whose footage misses the bar sends the search back out: the shot
+        # intents it has not tried yet, then deeper pages, then the rest of
+        # its ladder. Only when that budget is spent does a weaker clip
+        # become acceptable, and the log says when it happened.
+        # Research against the bar the *report* uses, not the ranking floor.
+        # visual.min_semantic_match (0.28) is the point below which a clip is
+        # not worth keeping at all; the editorial gate asks for an average of
+        # 0.50 with no more than 15% below 0.35. Searching until enough clips
+        # clear 0.28 stops exactly where the useful work would have started,
+        # which is why run 17 finished its research and still failed the gate
+        # at 0.44 with 36% low-relevance.
+        from .editorial_qc import LOW_RELEVANCE_MATCH
+
+        min_semantic = max(
+            float(self._visual_settings().min_semantic), LOW_RELEVANCE_MATCH
+        )
+        research_budget = int(sources.get("relevance_search_budget", 2))
+        # One frame-inspection budget for the whole stage, not one per round.
+        # Three rounds each granted the full budget is three times the wall
+        # clock, which on a runner is the difference between a four minute
+        # render and a forty minute one.
+        visual_budget = float(self.config.get("visual.time_budget_seconds", 420))
+        visual_spent = float(visual_stats.get("seconds", 0.0))
+        max_weak_scenes = int(sources.get("relevance_research_max_scenes", 8))
+        deep_page = {scene.scene_id: max_pages for scene in scene_order}
+        tried: dict[str, set[str]] = {}
+        stats["relevance_research_rounds"] = 0
+        stats["relevance_research_added"] = 0
+
+        def scene_best_match(scene: Scene) -> float:
+            """The best measured match among the clips this scene's search found."""
+
+            best = 0.0
+            for key in affinity.get(scene.scene_id, []):
+                clip = candidates.get(key)
+                visual = dict(getattr(clip, "visual", {}) or {}) if clip else {}
+                if visual.get("analyzed"):
+                    best = max(best, float(visual.get("semantic_match", 0.0)))
+            return best
+
+        def extra_queries(scene: Scene) -> list[str]:
+            """Queries this scene has not spent yet, most specific first."""
+
+            seen = tried.setdefault(scene.scene_id, set())
+            ordered: list[str] = []
+            for intent in getattr(scene, "shot_intents", []) or []:
+                for text in (intent.search_text, intent.query):
+                    if text and text not in seen:
+                        ordered.append(text)
+            for query in scene.specific_queries:
+                if query.text not in seen:
+                    ordered.append(query.text)
+            return list(dict.fromkeys(ordered))[:4]
+
+        for round_number in range(1, max(0, research_budget) + 1):
+            if min_semantic <= 0:
+                break
+            strong = [
+                c for c in ranked
+                if float(dict(c.visual or {}).get("semantic_match", 0.0)) >= min_semantic
+            ]
+            if len(strong) >= needed:
+                break
+            weak = sorted(
+                (s for s in scene_order if scene_best_match(s) < min_semantic),
+                key=scene_best_match,
+            )[:max_weak_scenes]
+            if not weak:
+                break
+            if visual_spent >= visual_budget:
+                log.info(
+                    "Relevance research stopping: the frame-inspection budget "
+                    "of %.0fs is spent", visual_budget,
+                )
+                break
+            log.info(
+                "Relevance research round %d: %d clip(s) clear %.2f for %d shots; "
+                "re-searching %d scene(s) whose footage does not show their narration",
+                round_number, len(strong), min_semantic, needed, len(weak),
+            )
+            added = 0
+            for scene in weak:
+                bucket = affinity.setdefault(scene.scene_id, [])
+                page = deep_page.get(scene.scene_id, max_pages) + 1
+                deep_page[scene.scene_id] = page
+                for query_text in extra_queries(scene):
+                    tried.setdefault(scene.scene_id, set()).add(query_text)
+                    for provider in providers:
+                        # One page per query: the unspent shot intents are new
+                        # queries, and a new query's first page is better
+                        # footage than an old query's fourth.
+                        which = page if provider.supports_pagination else 1
+                        for clip in run(provider, query_text, which):
+                            if clip.key not in candidates:
+                                candidates[clip.key] = clip
+                                added += 1
+                            if clip.key not in bucket:
+                                bucket.append(clip.key)
+            stats["relevance_research_rounds"] = round_number
+            stats["relevance_research_added"] += added
+            if not added:
+                log.info("Relevance research found no new footage; stopping")
+                break
+            log.info("Relevance research added %d new candidate(s)", added)
+            ranked = ranker.rank(list(candidates.values()), context)
+            ranked, visual_stats = self._inspect_footage(
+                ranked, scenes, affinity, needed,
+                time_budget=max(0.0, visual_budget - visual_spent),
+            )
+            visual_spent += float(visual_stats.get("seconds", 0.0))
+            visual_stats["seconds"] = round(visual_spent, 1)
+            stats["visual"] = visual_stats
+
+        if stats["relevance_research_rounds"]:
+            remaining = [
+                s.scene_id for s in scene_order if scene_best_match(s) < min_semantic
+            ]
+            if remaining:
+                log.warning(
+                    "RELEVANCE FALLBACK: %d scene(s) still have no clip matching "
+                    "their narration at %.2f after %d research round(s); their "
+                    "shots use the best available footage instead. Scenes: %s",
+                    len(remaining), min_semantic,
+                    stats["relevance_research_rounds"], ", ".join(remaining[:6]),
+                )
+                stats["relevance_fallback_scenes"] = len(remaining)
+
+        if not ranked:
+            raise PipelineError(
+                "Every candidate clip was rejected by frame inspection - "
+                "no footage in this search actually shows the narration"
+            )
+
         selected = diversify(
             ranked,
             needed,
@@ -539,7 +723,529 @@ class VideoPipeline:
 
         stats["downloaded"] = len(results)
         log.info("%d clips downloaded and validated", len(results))
+
+        # The shortlist was judged on provider stills. These are the frames
+        # that will actually be on screen, so the report is built from them.
+        if bool(self.config.get("visual.verify_downloads", True)):
+            self._verify_downloaded_frames(results, scenes)
+
         return results, affinity, stats
+
+    # ------------------------------------------------------------------
+    # Stage two: real frame inspection
+    # ------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    #  Final shot repair
+    # ------------------------------------------------------------------
+    #: Ways of asking for the same picture. A shot whose first search found
+    #: nothing that shows the narration is not helped by running that search
+    #: again, so each repair round rephrases: round one adds the concrete
+    #: framing words, round two swaps the subject nouns for synonyms, round
+    #: three widens to the room and the technique rather than the object.
+    _REPAIR_PREFIXES: tuple[tuple[str, ...], ...] = (
+        ("close up", "detail shot", "wide shot"),
+        ("interior design", "styled", "modern home"),
+        ("living room", "apartment interior", "home interior"),
+    )
+
+    def _repair_weak_shots(
+        self,
+        shots: list[Any],
+        clips: list[Any],
+        scenes: Sequence[Scene],
+        affinity: Mapping[str, Sequence[str]],
+        topic: Topic,
+    ) -> tuple[list[Any], dict[str, Any]]:
+        """Replace final shots whose footage does not show their narration.
+
+        The relevance gate used to detect these and stop. Detecting a problem
+        and giving up is not a pipeline, so a weak shot now sends its own
+        narration chunk back out to search - the shot intent, rephrased a
+        different way each round - and is replaced only by a clip that scores
+        strictly better on the same measurement.
+
+        Nothing here relaxes a threshold. A replacement has to beat the clip it
+        replaces, it has to be a source no other shot is using, and it goes
+        through the same ranking, cooldown and diversity rules as the original
+        selection. Good shots are never touched.
+        """
+
+        from .editorial_qc import LOW_RELEVANCE_MATCH
+
+        stats: dict[str, Any] = {
+            "repair_rounds_used": 0,
+            "weak_shots_before_repair": 0,
+            "weak_shots_after_repair": 0,
+            "repaired_shot_count": 0,
+            "average_relevance_before_repair": 0.0,
+            "average_relevance_after_repair": 0.0,
+        }
+        rounds = int(self.config.get("visual.max_repair_rounds", 3))
+        analyzer = self._visual_analyzer()
+        if not shots or rounds <= 0 or analyzer is None:
+            return clips, stats
+
+        by_key = {
+            str(getattr(getattr(c, "clip", None), "key", "")): c for c in clips
+        }
+        scene_by_id = {s.scene_id: s for s in scenes}
+
+        def relevance(key: str) -> float:
+            entry = by_key.get(key)
+            visual = dict(getattr(getattr(entry, "clip", None), "visual", {}) or {})
+            return float(visual.get("semantic_match", 0.0)) if visual.get("analyzed") else 1.0
+
+        def measured() -> list[float]:
+            return [
+                relevance(s.clip_key)
+                for s in shots
+                if dict(
+                    getattr(getattr(by_key.get(s.clip_key), "clip", None), "visual", {})
+                    or {}
+                ).get("analyzed")
+            ]
+
+        before = measured()
+        stats["average_relevance_before_repair"] = (
+            round(sum(before) / len(before), 3) if before else 0.0
+        )
+        weak = [s for s in shots if relevance(s.clip_key) < LOW_RELEVANCE_MATCH]
+        stats["weak_shots_before_repair"] = len(weak)
+        if not weak:
+            stats["weak_shots_after_repair"] = 0
+            stats["average_relevance_after_repair"] = stats[
+                "average_relevance_before_repair"
+            ]
+            return clips, stats
+
+        log.info("[REPAIR] %d low-relevance final shots detected", len(weak))
+
+        sources = dict(self.config.get("sources", {}) or {})
+        providers = build_providers(sources)
+        if not providers:
+            return clips, stats
+
+        min_shot = float(self.config.get("video.min_clip_seconds", 3))
+        max_shot = float(self.config.get("video.max_clip_seconds", 6))
+        per_query = int(sources.get("per_query_results", 30))
+        ranker = ClipRanker(
+            weights=dict(self.config.get("ranking.weights", {}) or {}),
+            min_score=float(self.config.get("ranking.min_score", 28)),
+            max_uses_per_clip=int(self.config.get("ranking.max_uses_per_clip", 3)),
+        )
+        context = RankingContext(
+            query=topic.title,
+            keywords=topic.keywords,
+            min_shot_seconds=min_shot,
+            max_shot_seconds=max_shot,
+            prefer_width=int(sources.get("prefer_width", 1920)),
+            min_width=int(sources.get("min_width", 1280)),
+            min_height=int(sources.get("min_height", 720)),
+            min_source_seconds=float(sources.get("min_source_seconds", 5.0)),
+            cooldown_days=float(self.config.get("ranking.clip_reuse_cooldown_days", 45)),
+            history=self._clip_history(),
+            enforce_aspirational=bool(self.config.get("ranking.enforce_aspirational", True)),
+            enforce_premium=False,
+            min_interior_relevance=float(
+                self.config.get("ranking.min_interior_relevance", 0.35)
+            ),
+        )
+        downloader = ClipDownloader(
+            workdir=self.workdir / "clips",
+            min_width=int(sources.get("min_width", 1280)),
+            min_height=int(sources.get("min_height", 720)),
+            min_seconds=min(float(sources.get("min_source_seconds", 5.0)), min_shot),
+            max_mb=float(sources.get("max_download_mb", 90)),
+            timeout=float(sources.get("download_timeout_seconds", 120)),
+            retries=int(sources.get("retries", 3)),
+            known_hashes=(),
+        )
+        settings = self._visual_settings()
+
+        def intent_for(shot: Any) -> tuple[str, str]:
+            """(English description of the shot, the query that found it)."""
+
+            scene = scene_by_id.get(shot.scene_id)
+            if scene is None:
+                return topic.title, topic.title
+            intents = list(getattr(scene, "shot_intents", []) or [])
+            if intents:
+                pick = intents[len(intents) // 2]
+                return pick.search_text, pick.query
+            return scene.search_text, scene.primary_visual_query
+
+        for round_number in range(1, rounds + 1):
+            if not weak:
+                break
+            stats["repair_rounds_used"] = round_number
+            used_keys = {s.clip_key for s in shots}
+            started_with = len(weak)
+            still_weak: list[Any] = []
+            prefixes = self._REPAIR_PREFIXES[
+                min(round_number - 1, len(self._REPAIR_PREFIXES) - 1)
+            ]
+
+            for shot in weak:
+                current = relevance(shot.clip_key)
+                description, base_query = intent_for(shot)
+                log.info(
+                    "[REPAIR] Shot %s: %.2f -> searching alternatives",
+                    shot.scene_id, current,
+                )
+                found: dict[str, Any] = {}
+                for prefix in prefixes:
+                    text = f"{prefix} {base_query}".strip()
+                    for provider in providers:
+                        page = round_number if provider.supports_pagination else 1
+                        try:
+                            results = provider.search(text, per_page=per_query, page=page)
+                        except Exception as exc:
+                            log.warning(
+                                "%s repair search failed for %r: %s",
+                                provider.name, text, exc,
+                            )
+                            continue
+                        for candidate in results:
+                            if candidate.key in used_keys or candidate.key in by_key:
+                                continue        # zero source reuse, still
+                            found.setdefault(candidate.key, candidate)
+
+                if not found:
+                    still_weak.append(shot)
+                    continue
+
+                ranked = ranker.rank(list(found.values()), context)[:12]
+                if not ranked:
+                    still_weak.append(shot)
+                    continue
+
+                for candidate in ranked:
+                    analysis = analyzer.analyze_clip(
+                        candidate,
+                        query=candidate.query or base_query,
+                        narration=description,
+                        metadata_flags=metadata_visual_flags(candidate, candidate.query),
+                    )
+                    candidate.visual = analysis.to_dict()
+                    candidate.visual_semantic_match = analysis.semantic_match
+
+                better = [
+                    c for c in ranked
+                    if dict(c.visual or {}).get("analyzed")
+                    and float(dict(c.visual).get("semantic_match", 0.0)) > current
+                ]
+                better.sort(
+                    key=lambda c: float(dict(c.visual).get("semantic_match", 0.0)),
+                    reverse=True,
+                )
+                if not better:
+                    still_weak.append(shot)
+                    continue
+
+                replacement = None
+                for candidate in better[:4]:
+                    fetched = downloader.fetch_many([candidate], needed=1)
+                    if fetched:
+                        replacement = fetched[0]
+                        break
+                if replacement is None:
+                    still_weak.append(shot)
+                    continue
+
+                score = float(dict(replacement.clip.visual or {}).get("semantic_match", 0.0))
+                log.info("[REPAIR] Replacement found: %.2f", score)
+                log.info("[REPAIR] Shot %s: %.2f -> %.2f", shot.scene_id, current, score)
+                old_key = shot.clip_key
+                by_key[replacement.clip.key] = replacement
+                clips = [c for c in clips if getattr(getattr(c, "clip", None), "key", "") != old_key]
+                clips.append(replacement)
+                by_key.pop(old_key, None)
+                used_keys.discard(old_key)
+                used_keys.add(replacement.clip.key)
+                shot.clip_key = replacement.clip.key
+                shot.source = Path(replacement.path)
+                shot.start = min(
+                    float(getattr(shot, "start", 0.0)),
+                    max(0.0, float(replacement.duration) - float(shot.duration) - 0.1),
+                )
+                stats["repaired_shot_count"] += 1
+                if score < LOW_RELEVANCE_MATCH:
+                    still_weak.append(shot)
+
+            log.info(
+                "[REPAIR] Round %d: %d -> %d weak shots",
+                round_number, started_with, len(still_weak),
+            )
+            weak = still_weak
+
+        after = measured()
+        stats["weak_shots_after_repair"] = len(weak)
+        stats["average_relevance_after_repair"] = (
+            round(sum(after) / len(after), 3) if after else 0.0
+        )
+        return clips, stats
+
+    def _visual_analyzer(self) -> VisualAnalyzer | None:
+        """Build the analyzer once per generation, model included if it loads.
+
+        Memoized: provisioning the model is the expensive part, and the
+        shortlist pass and the post-download verification pass both need it.
+        """
+
+        if hasattr(self, "_analyzer_cache"):
+            return self._analyzer_cache
+        analyzer = self._build_visual_analyzer()
+        self._analyzer_cache = analyzer
+        return analyzer
+
+    def _build_visual_analyzer(self) -> VisualAnalyzer | None:
+        if not bool(self.config.get("visual.enabled", True)):
+            log.info("Frame inspection is disabled; ranking on captions alone")
+            return None
+        model = None
+        model_settings = dict(self.config.get("visual.model", {}) or {})
+        if model_settings.get("enabled", True):
+            from .visual_model import load_model
+
+            model = load_model(model_settings)
+        return VisualAnalyzer(
+            model=model,
+            frames_per_clip=int(self.config.get("visual.frames_per_clip", 3)),
+            reject_confidence=float(self.config.get("visual.reject_confidence", 0.72)),
+            penalty_confidence=float(self.config.get("visual.penalty_confidence", 0.42)),
+            allow_remote_video=bool(self.config.get("visual.allow_remote_video", True)),
+        )
+
+    def _visual_settings(self) -> VisualRankingSettings:
+        weights = dict(self.config.get("visual.weights", {}) or {})
+        return VisualRankingSettings(
+            semantic=float(weights.get("semantic", 45)),
+            subject=float(weights.get("subject", 30)),
+            quality=float(weights.get("quality", 18)),
+            novelty=float(weights.get("novelty", 12)),
+            technical=float(weights.get("technical", 8)),
+            min_semantic=float(self.config.get("visual.min_semantic_match", 0.28)),
+        )
+
+    @staticmethod
+    def _scene_context(
+        scenes: Sequence[Scene], affinity: Mapping[str, Sequence[str]]
+    ) -> dict[str, Scene]:
+        """clip key -> the scene whose search returned it."""
+
+        by_id = {scene.scene_id: scene for scene in scenes}
+        context: dict[str, Scene] = {}
+        for scene_id, keys in (affinity or {}).items():
+            scene = by_id.get(scene_id)
+            if scene is None:
+                continue
+            for key in keys:
+                context.setdefault(key, scene)
+        return context
+
+    @staticmethod
+    def _intent_by_query(scenes: Sequence[Scene]) -> dict[str, str]:
+        """query text -> the English shot intent that asked for it.
+
+        A clip remembers the query that found it, so this is how a clip gets
+        scored against the sentence it will actually illustrate rather than
+        against the whole paragraph. Run 16 put a coffee-table close-up under
+        narration about floor space because both shared one scene-level
+        prompt.
+        """
+
+        intents: dict[str, str] = {}
+        for scene in scenes:
+            for intent in getattr(scene, "shot_intents", []) or []:
+                if intent.query and intent.search_text:
+                    intents.setdefault(intent.query, intent.search_text)
+        return intents
+
+    def _inspect_footage(
+        self,
+        ranked: Sequence[StockClip],
+        scenes: Sequence[Scene],
+        affinity: Mapping[str, Sequence[str]],
+        needed: int,
+        time_budget: float | None = None,
+    ) -> tuple[list[StockClip], dict[str, Any]]:
+        """Decode frames for the shortlist and re-rank on what they contain.
+
+        Only a shortlist is inspected, because decoding frames costs real time
+        and the metadata ranking is a perfectly good filter for the obvious
+        rejects. The shortlist is generous enough that the visual stage still
+        has room to reorder rather than merely confirm.
+        """
+
+        analyzer = self._visual_analyzer()
+        stats: dict[str, Any] = {
+            "model": analyzer.model_name if analyzer else "disabled",
+            "shortlisted": 0,
+            "analyzed": 0,
+            "frames": 0,
+            "rejected": 0,
+            "seconds": 0.0,
+        }
+        if analyzer is None or not ranked:
+            return list(ranked), stats
+
+        multiplier = float(self.config.get("visual.shortlist_multiplier", 1.6))
+        cap = int(self.config.get("visual.max_clips_analyzed", 260))
+        budget = (
+            float(time_budget)
+            if time_budget is not None
+            else float(self.config.get("visual.time_budget_seconds", 420))
+        )
+        workers = max(1, int(self.config.get("visual.workers", 4)))
+
+        size = min(len(ranked), cap, max(needed, int(math.ceil(needed * multiplier))))
+        # `needed` is the download count; the shortlist exists so the visual
+        # stage can reject. Capping it at the download count would mean
+        # inspecting exactly what we intend to keep.
+        shortlist = list(ranked[:size])
+        remainder = list(ranked[size:])
+        stats["shortlisted"] = len(shortlist)
+
+        context = self._scene_context(scenes, affinity)
+        intents = self._intent_by_query(scenes)
+        started = time.time()
+        deadline = started + budget
+
+        def inspect(clip: StockClip) -> StockClip:
+            # Already measured on an earlier pass. Re-searching for better
+            # footage must not re-decode the frames it has already seen.
+            if clip.visual:
+                return clip
+            if time.time() > deadline:
+                return clip
+            scene = context.get(clip.key)
+            analysis = analyzer.analyze_clip(
+                clip,
+                query=clip.query or (scene.primary_visual_query if scene else ""),
+                # The English description of what this shot should show, never
+                # the narration. CLIP is scoring an image against a text
+                # prompt; handing it a Spanish sentence measures how Spanish
+                # the prompt is, not how well the frame shows what is said.
+                # The shot intent is preferred over the scene's because it is
+                # the sentence this clip will actually sit under.
+                narration=(
+                    intents.get(clip.query or "")
+                    or (scene.search_text if scene else "")
+                ),
+                metadata_flags=metadata_visual_flags(clip, clip.query),
+            )
+            clip.visual = analysis.to_dict()
+            clip.visual_semantic_match = analysis.semantic_match
+            return clip
+
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            for clip in pool.map(inspect, shortlist):
+                if clip.visual.get("analyzed"):
+                    stats["analyzed"] += 1
+                    stats["frames"] += int(clip.visual.get("frame_count", 0))
+
+        stats["seconds"] = round(time.time() - started, 1)
+        timed_out = [c for c in shortlist if not c.visual]
+        if timed_out:
+            log.warning(
+                "Frame inspection ran out of its %.0fs budget with %d clips "
+                "unexamined; those keep their metadata ranking",
+                budget, len(timed_out),
+            )
+        stats["not_inspected"] = len(timed_out) + len(remainder)
+
+        settings = self._visual_settings()
+        examined = [c for c in shortlist if c.visual]
+        inspected = rank_with_vision(examined, settings)
+
+        # Same safety valve as the premium gate: rejecting footage is the
+        # right default, and shipping a video that repeats itself because the
+        # gate was too strict is worse than shipping one with a couple of
+        # weaker matches. Relax, and say so in the log and the report.
+        if len(inspected) < needed and settings.min_semantic > 0:
+            relaxed_settings = replace(settings, min_semantic=0.0)
+            relaxed = rank_with_vision(examined, relaxed_settings)
+            if len(relaxed) > len(inspected):
+                log.warning(
+                    "VISUAL RELEVANCE GATE RELAXED: only %d clips matched the "
+                    "narration well enough for %d shots; keeping %d weaker "
+                    "matches rather than repeating footage. Expect a lower "
+                    "visual_semantic_match_average.",
+                    len(inspected), needed, len(relaxed) - len(inspected),
+                )
+                stats["relevance_gate_relaxed"] = True
+                inspected = relaxed
+
+        stats["rejected"] = stats["analyzed"] - len(
+            [c for c in inspected if c.visual.get("analyzed")]
+        )
+        log.info(
+            "Frame inspection: %d clips, %d frames, %d rejected, %.1fs (%s)",
+            stats["analyzed"], stats["frames"], stats["rejected"],
+            stats["seconds"], stats["model"],
+        )
+
+        # Anything not inspected keeps its metadata score and queues behind
+        # everything that was: an unexamined clip is not evidence of quality.
+        tail = timed_out + remainder
+        if inspected and tail:
+            floor = min(c.score for c in inspected)
+            for clip in tail:
+                clip.score = min(clip.score, floor) - 1.0
+        return inspected + tail, stats
+
+    def _verify_downloaded_frames(
+        self, results: Sequence[Any], scenes: Sequence[Scene]
+    ) -> None:
+        """Re-run the analysis on the real video files that will be edited.
+
+        The shortlist was judged from provider stills, which are genuine
+        frames of the clip but not necessarily the frames the edit will use.
+        This pass reads the downloaded MP4 itself, so every number in the
+        editorial report describes footage that is actually in the video.
+        """
+
+        analyzer = self._visual_analyzer()
+        if analyzer is None or not results:
+            return
+        by_query = {scene.primary_visual_query: scene for scene in scenes}
+        started = time.time()
+
+        def verify(result: Any) -> None:
+            clip = result.clip
+            scene = by_query.get(clip.query)
+            analysis = analyzer.analyze_clip(
+                clip,
+                query=clip.query or (scene.primary_visual_query if scene else ""),
+                narration=(scene.search_text if scene else ""),
+                video=clip.local_path or result.path,
+                metadata_flags=metadata_visual_flags(clip, clip.query),
+            )
+            if analysis.analyzed:
+                clip.visual = analysis.to_dict()
+                clip.visual_semantic_match = analysis.semantic_match
+
+        workers = max(1, int(self.config.get("visual.workers", 4)))
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            list(pool.map(verify, results))
+
+        # Nothing is dropped here - the edit is already sized to this footage
+        # and a short video is worse than an imperfect clip - but a clip whose
+        # own frames disagree with its preview stills is worth saying out
+        # loud, and it is counted in the editorial report either way.
+        regressions = [
+            r.clip for r in results if (r.clip.visual or {}).get("rejected")
+        ]
+        for clip in regressions:
+            log.warning(
+                "VERIFIED WORSE: %s - %s (it passed on its preview stills)",
+                clip.key, (clip.visual or {}).get("reject_reason", ""),
+            )
+        log.info(
+            "Verified %d downloaded clips against their own frames in %.1fs "
+            "(%d disagreed with their preview stills)",
+            len(results), time.time() - started, len(regressions),
+        )
 
     @staticmethod
     def _scene_search_order(scenes: Sequence[Scene]) -> list[Scene]:
@@ -602,6 +1308,13 @@ class VideoPipeline:
         )
         shots = shot_plan.shots
 
+        # Repair before rendering, not after failing. A shot whose footage
+        # does not show its narration sends that narration back out to search
+        # and is replaced only by something that measures better.
+        clips, repair_stats = self._repair_weak_shots(
+            shots, list(clips), scenes, affinity or {}, topic
+        )
+
         editor = VideoEditor(
             workdir=self.workdir / "render",
             width=self.config.width,
@@ -630,16 +1343,52 @@ class VideoPipeline:
                 max_lines=int(self.config.get("subtitles.max_lines", 2)),
             )
 
+        # The clean SRT is what YouTube ingests; the ASS is what gets burned
+        # into the picture. Both are exported, always, because they are for
+        # two different audiences.
+        style_name = str(self.config.get("subtitles.style", "premium"))
+        style = style_for(style_name)
+        ass_path: Path | None = None
+        subtitle_metrics: dict[str, Any] = {}
+        if subtitles_path is not None and style_name.lower() != "none":
+            ass_path, events, subtitle_font = write_ass(
+                narration.chunks,
+                output_dir / "subtitles.ass",
+                style=style,
+                language=self.language,
+                width=self.config.width,
+                height=self.config.height,
+            )
+            subtitle_metrics = subtitle_report(events, style, self.config.height)
+            subtitle_metrics["subtitle_font"] = subtitle_font
+
         burn_in = bool(self.config.get("subtitles.burn_in", False))
+        burned: Path | None = None
+        if burn_in and subtitles_path:
+            # Prefer the styled file. Falling back to the SRT keeps burn-in
+            # working if styling was switched off rather than silently
+            # producing a video with no captions in it.
+            burned = ass_path or subtitles_path
+
         final_path = output_dir / "final_video.mp4"
         editor.mux(
             video_track,
             narration.audio_path,
             final_path,
             tail_seconds=tail_seconds,
-            subtitles=subtitles_path if (burn_in and subtitles_path) else None,
+            subtitles=burned,
             video_bitrate=str(self.config.get("video.video_bitrate", "")) or None,
         )
+        subtitle_metrics.update({
+            "subtitle_style": style_name.lower(),
+            "burn_in_subtitles": bool(burned),
+            "generation_mode": self.generation_mode,
+            "footage_claimed_for_cooldown": (
+                self.generation_mode == Database.PRODUCTION
+            ),
+            "subtitles_srt_exported": subtitles_path is not None,
+            "subtitles_ass_exported": ass_path is not None,
+        })
 
         info = probe_media(final_path)
 
@@ -680,7 +1429,7 @@ class VideoPipeline:
             duration_seconds=info.duration,
             sources=sources_payload["clips"],
             channel_name=str(self.config.get("channel.name", "")),
-            language=str(self.config.get("channel.language", "en-US")),
+            language=self.language.code,
             category_id=str(self.config.get("youtube.category_id", "26")),
             privacy_status=str(self.config.get("youtube.privacy_status", "private")),
             made_for_kids=bool(self.config.get("youtube.made_for_kids", False)),
@@ -693,7 +1442,7 @@ class VideoPipeline:
         # How many chosen ideas fail the title promise. Should be zero: the
         # script generator filters them out, so a non-zero count means a
         # filter regression rather than a content problem.
-        promise = detect_promise(topic.title, topic.angle)
+        promise = detect_promise(topic.title, topic.angle, language=self.language)
         alignment_failures = sum(
             1
             for section in script.items()
@@ -711,6 +1460,15 @@ class VideoPipeline:
                 thresholds=dict(self.config.get("editorial", {}) or {}),
                 provenance_passed=provenance_passed,
                 promise_alignment_failures=alignment_failures,
+                visual_stats=dict((search_stats or {}).get("visual", {}) or {}),
+                causal=getattr(script, "causal", None),
+                production={
+                    "language": self.language.code,
+                    "tts_voice": getattr(narration, "voice", ""),
+                    "tts_engine": getattr(narration, "engine", ""),
+                    **subtitle_metrics,
+                    **repair_stats,
+                },
             )
             report.save(output_dir / "editorial_quality_report.json")
             return report
@@ -849,6 +1607,7 @@ class VideoPipeline:
                 duration=clip.get("duration"),
                 content_hash=clip.get("content_hash"),
                 topic=topic.slug,
+                mode=self.generation_mode,
             )
         result.video_id = video_id  # type: ignore[attr-defined]
 

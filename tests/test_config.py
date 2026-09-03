@@ -13,6 +13,9 @@ def test_repository_config_is_valid(repo_root):
     assert config.width == 1920
     assert config.height == 1080
     assert config.fps == 30
+    # The channel narrates in US English by default; Spanish is a workflow
+    # dropdown away and equally supported.
+    assert config.get("channel.language") == "en-US"
     assert config.get("channel.audience_country") == "US"
 
 

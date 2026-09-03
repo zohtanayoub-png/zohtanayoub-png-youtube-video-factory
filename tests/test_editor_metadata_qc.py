@@ -168,7 +168,7 @@ def test_chapters_are_at_least_ten_seconds_apart(script):
 
 
 def test_tags_are_relevant_and_within_youtube_limits(topic):
-    tags = build_tags(topic, extra=topic.keywords)
+    tags = build_tags(topic, extra=topic.keywords, language="en")
     assert tags
     assert len(tags) <= 22
     assert sum(len(t) + 1 for t in tags) <= 500

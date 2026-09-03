@@ -55,8 +55,11 @@ DEFAULTS: dict[str, Any] = {
     },
     "tts": {
         "engine": "auto",
-        "voice": "en_US-hfc_female-medium",
-        "fallback_voices": ["en_US-amy-medium", "en_US-lessac-medium"],
+        # Empty means "the default voice for the content language". A
+        # beginner never has to pick one; choosing Spanish chooses the
+        # Spanish voice.
+        "voice": "",
+        "fallback_voices": [],
         "speed": 1.0,
         "sentence_pause_seconds": 0.28,
         "paragraph_pause_seconds": 0.55,
@@ -65,13 +68,16 @@ DEFAULTS: dict[str, Any] = {
     },
     "subtitles": {
         "enabled": True,
-        "burn_in": False,
+        "burn_in": True,
+        "style": "premium",
         "max_line_chars": 42,
         "max_lines": 2,
     },
     "script": {
         "engine": "auto",
-        "words_per_minute": 150,
+        # 0 means "whatever this language is actually spoken at", which the
+        # language registry knows and a hard-coded 150 does not.
+        "words_per_minute": 0,
         "llm": {
             "enabled": False,
             "model_repo": "Qwen/Qwen2.5-1.5B-Instruct-GGUF",
@@ -117,6 +123,36 @@ DEFAULTS: dict[str, Any] = {
         "clip_reuse_cooldown_days": 45,
         "max_uses_per_clip": 3,
     },
+    "visual": {
+        "enabled": True,
+        "frames_per_clip": 3,
+        "shortlist_multiplier": 1.6,
+        "max_clips_analyzed": 260,
+        "time_budget_seconds": 420,
+        "workers": 4,
+        "verify_downloads": True,
+        "allow_remote_video": True,
+        "min_semantic_match": 0.28,
+        "reject_confidence": 0.72,
+        "penalty_confidence": 0.42,
+        "weights": {
+            "semantic": 45,
+            "subject": 30,
+            "quality": 18,
+            "novelty": 12,
+            "technical": 8,
+        },
+        "model": {
+            "enabled": True,
+            "repo": "Xenova/mobileclip_s0",
+            "vision_file": "onnx/vision_model_quantized.onnx",
+            "text_file": "onnx/text_model_quantized.onnx",
+            "tokenizer_file": "tokenizer.json",
+            "image_size": 256,
+            "fallback": True,
+            "threads": 2,
+        },
+    },
     "topics": {"similarity_threshold": 0.62, "history_limit": 500},
     "autopilot": {"enabled": False, "videos_per_week": 3},
     "youtube": {
@@ -134,8 +170,11 @@ DEFAULTS: dict[str, Any] = {
         "min_title_alignment": 0.8,
         "min_creator_diversity": 0.5,
         "min_average_clip_score": 40.0,
-        "min_premium_visual_ratio": 0.80,
+        "min_premium_visual_ratio": 0.55,
         "max_promise_alignment_failures": 0,
+        "min_visual_semantic_match": 0.40,
+        "max_low_relevance_clips": 0.30,
+        "min_causal_promise_alignment": 0.85,
     },
     "quality": {
         "min_file_mb": 1.0,
@@ -229,12 +268,23 @@ class Config:
         return copy.deepcopy(self.data)
 
 
+VALID_SUBTITLE_STYLES = ("premium", "clean", "none")
+
+
 def validate(data: Mapping[str, Any]) -> None:
     """Raise :class:`ConfigError` when the configuration cannot be honoured."""
 
     if parse_bool(_dig(data, "audio.music"), False):
         raise ConfigError(
             "audio.music must be false - this project never adds background music."
+        )
+
+    style = str(_dig(data, "subtitles.style") or "premium").strip().lower()
+    if style not in VALID_SUBTITLE_STYLES:
+        raise ConfigError(
+            "subtitles.style must be one of "
+            + ", ".join(VALID_SUBTITLE_STYLES)
+            + f", got {style!r}"
         )
 
     duration = _dig(data, "video.duration_minutes")
@@ -285,8 +335,11 @@ def validate(data: Mapping[str, Any]) -> None:
         raise ConfigError("topics.similarity_threshold must be between 0 and 1 (exclusive)")
 
     wpm = float(_dig(data, "script.words_per_minute"))
-    if not 80 <= wpm <= 220:
-        raise ConfigError("script.words_per_minute must be between 80 and 220")
+    # 0 is not "unset by mistake", it is "use the language's own measured
+    # rate", which is a better default than any single number for a project
+    # that narrates in more than one language.
+    if wpm and not 80 <= wpm <= 220:
+        raise ConfigError("script.words_per_minute must be 0 or between 80 and 220")
 
 
 def _dig(data: Mapping[str, Any], dotted: str) -> Any:

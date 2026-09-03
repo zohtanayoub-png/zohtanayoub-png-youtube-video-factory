@@ -257,6 +257,75 @@ at least about five seconds.
 
 ---
 
+## How the factory decides a clip is good enough
+
+Before a clip is used, three real frames of it - near the start, the middle and
+near the end - are decoded with FFmpeg and measured. That is what catches the
+things a stock caption cannot tell you, because the caption is usually honest
+and still useless: "modern living room interior" is a true description of a
+floor plan of a modern living room, of a dog asleep in one, and of one where
+the sofa is still wrapped in plastic from the delivery.
+
+What the frames are checked for:
+
+| Rejected or heavily penalised | How it is spotted |
+|---|---|
+| Floor plans, drawings, documents | bright, colourless, made of hard thin lines |
+| Empty or unfurnished rooms | large flat areas, almost no edges, almost no colour |
+| Dark, poorly lit rooms | the luminance distribution itself |
+| Furniture under plastic sheeting | colourless drape with hard glints on the folds |
+| Renovation and building sites | dusty, low colour, busy with hard edges |
+| A person or pet as the subject | skin tones clustered in the middle of the frame |
+| Anything that does not show the narration | frame-to-sentence matching |
+
+There is also an optional AI vision model (CLIP, free and open source, runs on
+the CPU, cached between runs) that scores the same frames against written
+descriptions. It makes plastic covers, pets and room types much more reliable.
+It is **not required** - if it cannot be downloaded the frames are still
+inspected, and the report says which was used. To check:
+
+```bash
+python -m vidfactory visual-check
+```
+
+You do not have to do anything with this. It is on by default and looks after
+itself.
+
+---
+
+## Test renders and the footage cooldown
+
+A clip is not used again for 45 days after a video uses it, so the channel
+never shows the same footage twice in a fortnight. That rule should only count
+videos you actually publish.
+
+Every render therefore has a **mode**:
+
+| Mode | What it does to the cooldown |
+| --- | --- |
+| `test` (default) | records that the clip was tried, and leaves it available |
+| `production` | claims the clip for the next 45 days |
+
+In **Actions → Generate Video** it is the *Generation mode* dropdown, and it
+defaults to `test`. Switch it to `production` for a video that is going on the
+channel. The run summary prints `generation_mode` and
+`footage_claimed_for_cooldown` so you can always see which one it was.
+
+If development renders have already locked up footage:
+
+```bash
+python -m vidfactory cooldown                      # how much is locked up
+python -m vidfactory cooldown --release --dry-run  # what a release would free
+python -m vidfactory cooldown --release            # free it
+```
+
+`--release` **moves** the usage into development history rather than deleting
+it: every row, count and timestamp survives, and only the cooldown stops
+seeing them. Limit it with `--before 2026-09-01T00:00:00Z` or
+`--topic some-slug` if some of your renders were real.
+
+---
+
 ## Optional: the local AI script model
 
 The scripts are written by a built-in engine that needs no model and no
@@ -280,6 +349,41 @@ script:
 ```
 
 If it fails, leave it off. The videos are produced exactly as before.
+
+---
+
+## Language and subtitles
+
+Videos come out **in English** by default, narrated by a female American
+voice. There is nothing to set up.
+
+Want one in Spanish? On the *Generate Video* screen pick `language: Spanish`.
+Everything else follows automatically - the voice, the script, the subtitles
+and the metadata all change language on their own. **You do not need to touch
+the voice**: leave the `voice` dropdown on `Automatic`.
+
+| Language | Voice it picks | Sounds like |
+|---|---|---|
+| English | `en_US-hfc_female-medium` | female, American, warm |
+| Spanish | `es_ES-sharvard-medium` | female, Castilian, warm |
+
+Subtitles come out two ways and both are in the artifact:
+
+| File | What it is for |
+|---|---|
+| `subtitles.srt` | upload to YouTube; clean text, no styling |
+| `subtitles.ass` | the premium style, already burned into the video |
+
+The finished video has the captions **burned into the picture** in the premium
+style: two lines at most, short phrases, an occasional keyword in warm amber,
+and a generous bottom margin so the player controls never cover them. Prefer
+plain white captions? Choose `subtitle_style: clean`. Do not want them in the
+picture at all? Choose `none` - the `.srt` is still produced.
+
+> One thing that may surprise you: the **stock footage searches stay in
+> English** even when the video is in Spanish. That is deliberate. Pexels is
+> indexed in English and returns far better material for
+> `floor to ceiling curtains living room` than for a translation of it.
 
 ---
 

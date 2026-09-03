@@ -11,6 +11,24 @@ rendering service.
 
 ---
 
+## Language
+
+Videos are produced in **US English (en-US)** by default - title, hook, script,
+narration, subtitles, chapters, description, tags and summary - narrated by
+`en_US-hfc_female-medium`, a female American voice.
+
+**Spanish (es-ES) is one dropdown away and loses nothing.** It is written, not
+translated: `knowledge_es.py` and `phrases_es.py` are original Spanish writing,
+and the promise checks, topic grammar and metadata all carry their own Spanish
+vocabulary. Choosing Spanish also chooses `es_ES-sharvard-medium`, a female
+Castilian voice - the `voice` input stays on `Automatic` either way.
+
+One thing deliberately stays in English: **the stock footage queries.** Pexels
+is indexed in English and returns far better interiors for `floor to ceiling
+curtains living room` than for a translation of the narration, so each idea
+carries canonical English search metadata alongside its Spanish text. The
+viewer never sees it and the provider never sees Spanish.
+
 ## What it produces
 
 For every run you get:
@@ -36,11 +54,14 @@ program refuse to run.
 ## How it works
 
 ```
-TOPIC  ->  TITLE  ->  ORIGINAL SCRIPT  ->  SCENE PLANNING
-   ->  VISUAL SEARCH QUERIES  ->  SEARCH STOCK VIDEOS  ->  RANK RESULTS
-   ->  DOWNLOAD CLIPS  ->  GENERATE NARRATION  ->  MATCH CLIPS TO NARRATION
-   ->  EDIT VIDEO  ->  GENERATE SUBTITLES  ->  RENDER 1080P MP4
-   ->  QUALITY CHECK  ->  YOUTUBE METADATA  ->  SAVE  ->  OPTIONAL UPLOAD
+TOPIC  ->  TITLE  ->  ORIGINAL SCRIPT  ->  DOES EVERY PARAGRAPH EXPLAIN THE
+   TITLE'S PROMISE?  ->  SCENE PLANNING  ->  VISUAL SEARCH QUERIES
+   ->  SEARCH STOCK VIDEOS  ->  RANK ON METADATA (cheap)  ->  SHORTLIST
+   ->  DECODE REAL FRAMES AND LOOK AT THEM  ->  RANK ON WHAT IS IN THEM
+   ->  DOWNLOAD CLIPS  ->  RE-CHECK THEIR OWN FRAMES  ->  GENERATE NARRATION
+   ->  MATCH CLIPS TO NARRATION  ->  EDIT VIDEO  ->  GENERATE SUBTITLES
+   ->  RENDER 1080P MP4  ->  QUALITY CHECK  ->  YOUTUBE METADATA
+   ->  SAVE  ->  OPTIONAL UPLOAD
 ```
 
 One design decision is worth knowing about: **the narration is created before
@@ -49,14 +70,25 @@ sentence is known, so the visuals are cut to fit the words rather than the
 words being stretched to fit the visuals. That is what stops a clip freezing on
 screen for thirty seconds.
 
+The second is that **clips are judged by their pixels, not by their captions.**
+A stock caption saying "modern living room interior" is equally true of a floor
+plan of one, a dog asleep in one, and one with the sofa still wrapped in
+plastic from the delivery. So candidate footage has three real frames decoded
+from it - the beginning, the middle and the end - and those frames are
+measured. Nothing about that costs money: FFmpeg does the decoding, the
+statistics are computed in-process, and the optional CLIP model is an
+open-source ONNX export that runs on a CPU runner.
+
 ### The pieces
 
 | Stage | Tool | Cost |
 |---|---|---|
 | Topic selection | built-in generator with similarity rejection | free |
 | Script writing | curated knowledge base + variation engine (optional local LLM) | free |
-| Narration | [Piper](https://github.com/OHF-Voice/piper1-gpl) neural TTS, eSpeak NG fallback | free |
+| Narration | [Piper](https://github.com/OHF-Voice/piper1-gpl) neural TTS (`en_US-hfc_female-medium`, or `es_ES-sharvard-medium` in Spanish), eSpeak NG fallback | free |
+| Captions | ASS + libass burned in by FFmpeg, open-licence fonts | free |
 | Footage | Pexels and Pixabay APIs | free |
+| Frame inspection | FFmpeg decode + pixel statistics, optional CPU CLIP (ONNX) | free |
 | Editing and rendering | FFmpeg | free |
 | Subtitles | derived from the narration timeline (no speech recognition needed) | free |
 | Compute | GitHub Actions | free tier |
@@ -180,6 +212,51 @@ editorial one proves the video is actually watchable.
 * **unique source ratio** of at least 0.95
 * generic-query share, average clip score, creator / query / subject
   diversity, title-to-idea alignment, shot count and per-section coverage
+* **`causal_promise_alignment_score`** - every item must *say*, in the words
+  the viewer hears, how it produces the outcome the title promised. "Measure
+  before buying, because returns are expensive" does not belong in a video
+  called *...Make Your Space Look Bigger*; "measure, because oversized pieces
+  eat visible floor area and make the room feel cramped" does. Paragraphs that
+  fail are rewritten from the mechanism the idea already relies on, and
+  replaced if that is not possible. `section_alignment_scores` records each
+  one, and the run fails below 0.85.
+
+### Visual (measured from real frames)
+
+Also in `editorial_quality_report.json`:
+
+* **`visual_semantic_match_average`** - how well the frames of each clip match
+  the sentence being narrated
+* **`low_relevance_clip_count`** - clips that barely match what they illustrate
+* **`premium_visual_ratio`** - now requires the caption *and* the frames to
+  agree. **`premium_visual_ratio_caption_only`** is reported next to it: that
+  is the old number, and the gap between the two is the whole point. On a real
+  two minute render the caption-only figure was around 0.9 and the measured
+  one 0.4
+* **`empty_room_clip_count`**, **`plastic_covered_clip_count`**,
+  **`floor_plan_clip_count`**, **`renovation_clip_count`**,
+  **`people_dominant_clip_count`**, **`dark_clip_count`**
+* **`visual_analysis_model`** and **`visual_analysis_frame_count`** - which
+  backend produced the numbers, and how many frames it actually opened
+
+Candidates whose frames disqualify them with high confidence are rejected;
+medium confidence is a heavy ranking penalty. Ranking priority after
+inspection is deliberately **relevance first**: semantic match (45) above
+interior subject (30), visual quality (18), novelty (12) and technical quality
+(8). A beautiful unrelated luxury interior loses to a plainer clip that
+demonstrates the advice.
+
+### Captions and language
+
+Also in `editorial_quality_report.json`:
+
+* `language`, `tts_voice`, `tts_engine`
+* `subtitle_style`, `burn_in_subtitles`, `subtitles_srt_exported`,
+  `subtitles_ass_exported`, `subtitle_font`
+* `subtitle_event_count`, `average_subtitle_words`, `max_subtitle_lines`
+* `subtitle_safe_area_passed` - captions inside the player's safe area, at
+  most two lines
+* `subtitle_timing_passed` - no overlaps, no sub-half-second flashes
 
 ### Technical
 

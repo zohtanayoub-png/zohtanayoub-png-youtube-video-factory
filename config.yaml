@@ -6,6 +6,11 @@
 
 channel:
   name: HomeeDeeco
+  # Content language: title, script, narration, subtitles and metadata.
+  # "en-US" (default) or "es-ES". Spanish is fully supported and written
+  # natively, not translated - see knowledge_es.py and phrases_es.py.
+  # The stock-footage SEARCH language is always English and is deliberately
+  # not configurable here; see src/vidfactory/languages.py for why.
   language: en-US
   audience_country: US
   niche: home decor
@@ -40,25 +45,36 @@ audio:
 
 tts:
   engine: auto                  # auto | piper | espeak | silent
-  voice: en_US-hfc_female-medium   # warm, clear American English female voice
-  fallback_voices:
-    - en_US-amy-medium
-    - en_US-lessac-medium
+  # Empty = the default voice for the channel's language, which is what a
+  # beginner should leave it as:
+  #   English -> en_US-hfc_female-medium  (female, American, Piper, free)
+  #   Spanish -> es_ES-sharvard-medium    (female, Castilian, Piper, free)
+  # Only fill this in to force a different voice, and it has to belong to the
+  # same language as the script - a mismatch is refused rather than honoured.
+  voice: ""
+  fallback_voices: []
   speed: 1.0                    # 1.0 = natural pace (lower = slower)
   sentence_pause_seconds: 0.28
   paragraph_pause_seconds: 0.55
   scene_pause_seconds: 0.45
   max_chunk_chars: 320          # long scripts are chunked so TTS never breaks
 
+# ---------------------------------------------------------------------------
+#  SUBTITLES. subtitles.srt is always exported (accessibility and YouTube).
+#  Unless style is "none", subtitles.ass is exported too and is what gets
+#  burned into the picture. All FFmpeg and libass: no paid software and no
+#  proprietary fonts. Works identically in English and Spanish.
+# ---------------------------------------------------------------------------
 subtitles:
   enabled: true
-  burn_in: false                # default: ship a .srt file, do not burn in
-  max_line_chars: 42
+  burn_in: true                 # burn the captions into final_video.mp4
+  style: premium                # premium | clean | none
+  max_line_chars: 42            # affects the .srt only
   max_lines: 2
 
 script:
   engine: auto                  # auto | llm | template  (template = always works)
-  words_per_minute: 150         # narration speed used to size the script
+  words_per_minute: 0           # 0 = the language's own measured rate (languages.py)
   llm:
     enabled: false              # opt-in; template engine is the reliable default
     model_repo: Qwen/Qwen2.5-1.5B-Instruct-GGUF
@@ -75,6 +91,22 @@ sources:
   per_query_results: 30
   max_pages: 3                  # how deep to page a productive query
   candidate_headroom: 1.35      # download this much more than the shot count
+  # When a scene's footage does not actually show what the narration says,
+  # search again rather than accepting it: the shot intents that scene has not
+  # spent, then deeper pages, then the rest of its query ladder. Each round
+  # costs API calls and frame decoding, so the budget is small; the log says
+  # when it runs and when it gives up.
+  # Gather this many times the download count before the metadata sweep
+  # stops early. Ranking rejects roughly half of what is gathered, so at 2x
+  # the visual stage was handed 40 clips for 29 shots and could not choose.
+  candidate_pool_multiplier: 4.0
+  relevance_search_budget: 2
+  # How many of the worst-matching scenes each round re-searches. Every scene
+  # at once turned a four minute render into a forty minute one on a runner:
+  # fifteen scenes times four queries times two providers is several hundred
+  # extra API calls before the frames are even decoded. The worst eight are
+  # where the gain is.
+  relevance_research_max_scenes: 8
   min_width: 1280
   min_height: 720
   prefer_width: 1920
@@ -101,6 +133,53 @@ ranking:
   clip_reuse_cooldown_days: 45  # recently used clips are rejected
   max_uses_per_clip: 3
 
+# ---------------------------------------------------------------------------
+#  VISUAL ANALYSIS. Candidate clips are shortlisted on metadata, then their
+#  actual frames are decoded with FFmpeg and measured. Nothing here costs
+#  money: the statistics are computed in-process, and the optional CLIP model
+#  is an open-source ONNX export that runs on CPU and is cached between runs.
+#  Set visual.enabled to false to fall back to caption-only ranking.
+# ---------------------------------------------------------------------------
+visual:
+  enabled: true
+  frames_per_clip: 3            # beginning, middle and end of every candidate
+  # How many ranked candidates get their frames decoded, as a multiple of the
+  # shots needed. At 1.6 a 31 shot video inspected 42 clips and kept 31 of
+  # them, which is not a choice - it is taking almost everything that was
+  # offered, and it is why final-shot relevance came out at 0.44 against a 0.50
+  # bar. Selecting the best 31 of ninety is a different exercise from selecting
+  # the best 31 of forty-two. The cost is frame decoding, which the time budget
+  # already bounds.
+  shortlist_multiplier: 3.0
+  max_clips_analyzed: 260       # hard cap so a 30 minute video stays affordable
+  time_budget_seconds: 420      # after this the rest keep their metadata score
+  workers: 4                    # frame decodes run in parallel (I/O bound)
+  verify_downloads: true        # re-inspect real video frames after download
+  allow_remote_video: true      # decode from the clip URL when no stills exist
+  min_semantic_match: 0.28      # below this the clip does not show the narration
+  # How many times a final shot that does not show its narration may be
+  # re-searched and replaced before the editorial gate fails the render. Each
+  # round rephrases the query; a replacement must score strictly better than
+  # the clip it replaces, so this can only improve relevance, never mask it.
+  max_repair_rounds: 3
+  reject_confidence: 0.72       # a visual flag this strong rejects the clip
+  penalty_confidence: 0.42      # a visual flag this strong is a heavy penalty
+  weights:                      # stage two: relevance first, beauty third
+    semantic: 45
+    subject: 30
+    quality: 18
+    novelty: 12
+    technical: 8
+  model:
+    enabled: true               # optional CLIP backend; degrades to statistics
+    repo: Xenova/mobileclip_s0
+    vision_file: onnx/vision_model_quantized.onnx
+    text_file: onnx/text_model_quantized.onnx
+    tokenizer_file: tokenizer.json
+    image_size: 256
+    fallback: true              # try Xenova/clip-vit-base-patch32 if that fails
+    threads: 2
+
 topics:
   similarity_threshold: 0.62    # reject a new topic that is this similar to an old one
   history_limit: 500
@@ -114,6 +193,19 @@ youtube:
   privacy_status: private       # private | unlisted | public
   category_id: "26"             # Howto & Style
   made_for_kids: false
+
+# Whether this render's footage counts against the long-term cooldown.
+#
+#   production  the clips it uses are claimed for sources.cooldown_days
+#   test        the clips are recorded as tried, and stay available
+#
+# The default is test on purpose. Sixteen development renders reached the
+# cooldown before anything was published, which took 465 Pexels videos out of
+# circulation for forty-five days each; `vidfactory cooldown --release` is the
+# repair. Set this to production - or pass --mode production - for a render
+# that is actually going on the channel.
+generation:
+  mode: test
 
 output:
   directory: output
@@ -131,8 +223,31 @@ editorial:
   min_title_alignment: 0.8
   min_creator_diversity: 0.5
   min_average_clip_score: 40.0
-  min_premium_visual_ratio: 0.80   # share of clips that are premium interiors
+  # This was 0.80 when "premium" meant "the caption did not say anything bad".
+  # It now means the caption AND three decoded frames both agree, with no
+  # visual flag above the penalty threshold, which is a far higher bar for the
+  # same words. Measured across real two minute renders it lands at 0.36-0.42
+  # where the caption-only number was 0.91, so 0.80 would warn on every run
+  # and stop meaning anything. premium_visual_ratio_caption_only is reported
+  # next to it, so the gap between the two stays visible.
+  min_premium_visual_ratio: 0.55   # caption AND frames agree
   max_promise_alignment_failures: 0
+  # Calibrated against a measured distribution, not guessed: on a real
+  # two minute render the per-clip match ranged 0.15 to 0.91 with a mean of
+  # 0.43. The score is where a scene's own prompt lands among nine plausible
+  # alternatives, so 0.5 means "mid-pack" and below 0.35 means the frames are
+  # a better fit for some other subject than for the sentence they illustrate.
+  min_visual_semantic_match: 0.40  # candidate pool average (warning only)
+  max_low_relevance_clips: 0.30    # share of candidates below 0.35 individually
+  # The gate is on the clips that actually reach the screen, not on everything
+  # the search downloaded. Run 16 graded the candidate pool and reported "19 of
+  # 49 low relevance" for a video with 36 shots in it, which measures the
+  # search rather than the edit. Low-relevance candidates are now re-searched
+  # (see sources.relevance_search_budget) instead of tolerated, so the bar for
+  # what survives to the timeline is higher than the bar for what was fetched.
+  min_final_shot_semantic_match: 0.50
+  max_final_shot_low_relevance: 0.15
+  min_causal_promise_alignment: 0.90
 
 quality:
   min_file_mb: 1.0

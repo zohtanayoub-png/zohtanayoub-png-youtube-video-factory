@@ -45,11 +45,11 @@ _add("living rooms", [
         "tags": ["curtains", "windows", "height", "living room"],
     },
     {
-        "title": "Buy a rug that is genuinely too big rather than slightly too small",
+        "title": "Choose a rug that is generously sized, not undersized",
         "why": "A rug defines the seating zone. When it is undersized, the furniture floats on the floor with no visual anchor and the whole seating group reads as smaller and more scattered than it actually is.",
-        "how": "Aim for a rug wide enough that at least the front legs of every seat sit on it. In most living rooms that means eight by ten feet, not five by seven, and it should extend roughly six to eight inches past the sides of the sofa.",
+        "how": "Aim for a rug wide enough that at least the front legs of every seat sit on it, and keep it proportional to the room: leave a consistent border of floor showing around the edges rather than running it wall to wall. In most living rooms that means eight by ten feet, not five by seven.",
         "mistake": "The classic error is a small rug centered under the coffee table only, which shrinks the room and makes expensive furniture look accidental.",
-        "queries": ["large living room rug sofa", "modern living room carpet interior", "area rug under coffee table", "neutral rug living room design"],
+        "queries": ["large living room rug sofa", "sofa front legs on rug", "properly sized living room rug", "modern living room carpet interior", "area rug under coffee table", "neutral rug living room design"],
         "tags": ["rug", "layout", "living room", "floor"],
     },
     {
@@ -1964,15 +1964,35 @@ def normalize_category(name: str | None) -> str | None:
     return _match_aliases(key, ROOM_CATEGORIES) or _match_aliases(key, None)
 
 
-def tips_for(category: str | None, include_related: bool = True) -> list[Tip]:
-    """Return the tip pool for a category, optionally widened with related ones."""
+def tips_for(
+    category: str | None,
+    include_related: bool = True,
+    language: str = "en",
+) -> list[Tip]:
+    """Return the tip pool for a category, optionally widened with related ones.
+
+    ``language`` selects which body of writing is used. The Spanish pool is
+    written natively in :mod:`vidfactory.knowledge_es` rather than translated,
+    and it carries its own English ``queries``/``tags``/``search`` so the stock
+    searches stay in English regardless of what the viewer hears.
+    """
+
+    from .languages import resolve_language
+
+    resolved = resolve_language(language)
+    if not resolved.is_english:
+        from .knowledge_es import KNOWLEDGE_ES
+
+        source: dict[str, list[Tip]] = KNOWLEDGE_ES
+    else:
+        source = KNOWLEDGE
 
     canonical = normalize_category(category)
     pool: list[Tip] = []
     seen: set[str] = set()
 
     def extend(name: str) -> None:
-        for tip in KNOWLEDGE.get(name, []):
+        for tip in source.get(name, []):
             key = tip["title"]
             if key not in seen:
                 seen.add(key)
@@ -1984,7 +2004,7 @@ def tips_for(category: str | None, include_related: bool = True) -> list[Tip]:
             for related in RELATED_CATEGORIES.get(canonical, []):
                 extend(related)
     else:
-        for name in ALL_CATEGORIES:
+        for name in sorted(source):
             extend(name)
     return pool
 
