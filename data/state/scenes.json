@@ -2323,6 +2323,168 @@
       "duration": null,
       "query": "bright styled living room natural light",
       "category": "living rooms"
+    },
+    {
+      "id": 259,
+      "video_id": 16,
+      "scene_id": "intro-000-00",
+      "narration": "If your living room feels smaller than it really is, the problem may not be the square footage.",
+      "duration": null,
+      "query": "bright styled living room natural light",
+      "category": "living rooms"
+    },
+    {
+      "id": 260,
+      "video_id": 16,
+      "scene_id": "intro-000-01",
+      "narration": "A handful of ordinary decorating choices can visually shrink a room, and reversing them can make the exact same space feel dramatically bigger.",
+      "duration": null,
+      "query": "sunlit living room wide shot",
+      "category": "living rooms"
+    },
+    {
+      "id": 261,
+      "video_id": 16,
+      "scene_id": "intro-000-02",
+      "narration": "Over the next 2 minutes we will work through 3 ideas, and for each one I will explain why it works and how to actually do it.",
+      "duration": null,
+      "query": "elegant living room morning light",
+      "category": "living rooms"
+    },
+    {
+      "id": 262,
+      "video_id": 16,
+      "scene_id": "item-001-00",
+      "narration": "Number 1, and this one is a favorite. Vary the height of everything you place on a surface.",
+      "duration": null,
+      "query": "styled console table decor",
+      "category": "living rooms"
+    },
+    {
+      "id": 263,
+      "video_id": 16,
+      "scene_id": "item-001-01",
+      "narration": "Work in loose triangles: something tall like a lamp or a vase of branches, something medium like stacked books, and something low and organic like a bowl or a small plant.",
+      "duration": null,
+      "query": "living room shelf styling",
+      "category": "living rooms"
+    },
+    {
+      "id": 264,
+      "video_id": 16,
+      "scene_id": "item-001-02",
+      "narration": "Odd numbers photograph and read better than even ones. When objects on a shelf or console are all the same height, the eye skims across them and registers clutter rather than composition.",
+      "duration": null,
+      "query": "vase books coffee table styling",
+      "category": "living rooms"
+    },
+    {
+      "id": 265,
+      "video_id": 16,
+      "scene_id": "item-001-03",
+      "narration": "Do that much and the rest of the room starts to make more sense.",
+      "duration": null,
+      "query": "decorative objects interior shelf",
+      "category": "living rooms"
+    },
+    {
+      "id": 266,
+      "video_id": 16,
+      "scene_id": "item-001-04",
+      "narration": "Carrying the eye upward makes the walls read taller, and taller walls make the whole room feel bigger than its floor area says it is.",
+      "duration": null,
+      "query": "styled console table decor",
+      "category": "living rooms"
+    },
+    {
+      "id": 267,
+      "video_id": 16,
+      "scene_id": "item-002-00",
+      "narration": "Number 2. The classic error is a small rug centered under the coffee table only, which shrinks the room and makes expensive furniture look accidental.",
+      "duration": null,
+      "query": "large living room rug sofa",
+      "category": "living rooms"
+    },
+    {
+      "id": 268,
+      "video_id": 16,
+      "scene_id": "item-002-01",
+      "narration": "Get this wrong and everything else you do will fight it. Choose a rug that is generously sized, not undersized.",
+      "duration": null,
+      "query": "sofa front legs on rug",
+      "category": "living rooms"
+    },
+    {
+      "id": 269,
+      "video_id": 16,
+      "scene_id": "item-002-02",
+      "narration": "Aim for a rug wide enough that at least the front legs of every seat sit on it, and keep it proportional to the room: leave a consistent border of floor showing around the edges rather than running it wall to wall.",
+      "duration": null,
+      "query": "properly sized living room rug",
+      "category": "living rooms"
+    },
+    {
+      "id": 270,
+      "video_id": 16,
+      "scene_id": "item-002-03",
+      "narration": "In most living rooms that means eight by ten feet, not five by seven.",
+      "duration": null,
+      "query": "modern living room carpet interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 271,
+      "video_id": 16,
+      "scene_id": "item-002-04",
+      "narration": "A rug too small to reach the furniture leaves the seating floating in separate pieces, so one large enough to catch the front legs pulls the group into a single zone and the floor reads as more spacious.",
+      "duration": null,
+      "query": "area rug under coffee table",
+      "category": "living rooms"
+    },
+    {
+      "id": 272,
+      "video_id": 16,
+      "scene_id": "item-003-00",
+      "narration": "And then there is this, which people almost always skip. Number 3 on the list. Ever wondered why some rooms get this right and others do not? Leave the corners of the room resolved.",
+      "duration": null,
+      "query": "corner plant floor lamp living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 273,
+      "video_id": 16,
+      "scene_id": "item-003-01",
+      "narration": "Empty, awkward corners are where a room visibly runs out of ideas, and stuffing them with random small objects makes it worse.",
+      "duration": null,
+      "query": "styled room corner interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 274,
+      "video_id": 16,
+      "scene_id": "item-003-02",
+      "narration": "A tall plant, a floor lamp, a leaning mirror or a single chair with a small table. One considered object beats three leftovers.",
+      "duration": null,
+      "query": "reading nook corner chair",
+      "category": "living rooms"
+    },
+    {
+      "id": 275,
+      "video_id": 16,
+      "scene_id": "item-003-03",
+      "narration": "A reflection adds depth your eye reads as real, so the far wall stops behaving like the end of the room and the space feels bigger than it measures.",
+      "duration": null,
+      "query": "living room corner decor",
+      "category": "living rooms"
+    },
+    {
+      "id": 276,
+      "video_id": 16,
+      "scene_id": "outro-000-00",
+      "narration": "That brings us to the end of the list. That is it for today. Thanks for spending the time.",
+      "duration": null,
+      "query": "bright styled living room natural light",
+      "category": "living rooms"
     }
   ]
 }
