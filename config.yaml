@@ -139,7 +139,14 @@ ranking:
 visual:
   enabled: true
   frames_per_clip: 3            # beginning, middle and end of every candidate
-  shortlist_multiplier: 1.6     # how many ranked candidates get inspected
+  # How many ranked candidates get their frames decoded, as a multiple of the
+  # shots needed. At 1.6 a 31 shot video inspected 42 clips and kept 31 of
+  # them, which is not a choice - it is taking almost everything that was
+  # offered, and it is why final-shot relevance came out at 0.44 against a 0.50
+  # bar. Selecting the best 31 of ninety is a different exercise from selecting
+  # the best 31 of forty-two. The cost is frame decoding, which the time budget
+  # already bounds.
+  shortlist_multiplier: 3.0
   max_clips_analyzed: 260       # hard cap so a 30 minute video stays affordable
   time_budget_seconds: 420      # after this the rest keep their metadata score
   workers: 4                    # frame decodes run in parallel (I/O bound)

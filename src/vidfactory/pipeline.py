@@ -535,7 +535,18 @@ class VideoPipeline:
         # intents it has not tried yet, then deeper pages, then the rest of
         # its ladder. Only when that budget is spent does a weaker clip
         # become acceptable, and the log says when it happened.
-        min_semantic = float(self._visual_settings().min_semantic)
+        # Research against the bar the *report* uses, not the ranking floor.
+        # visual.min_semantic_match (0.28) is the point below which a clip is
+        # not worth keeping at all; the editorial gate asks for an average of
+        # 0.50 with no more than 15% below 0.35. Searching until enough clips
+        # clear 0.28 stops exactly where the useful work would have started,
+        # which is why run 17 finished its research and still failed the gate
+        # at 0.44 with 36% low-relevance.
+        from .editorial_qc import LOW_RELEVANCE_MATCH
+
+        min_semantic = max(
+            float(self._visual_settings().min_semantic), LOW_RELEVANCE_MATCH
+        )
         research_budget = int(sources.get("relevance_search_budget", 2))
         # One frame-inspection budget for the whole stage, not one per round.
         # Three rounds each granted the full budget is three times the wall
