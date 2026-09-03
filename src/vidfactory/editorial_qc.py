@@ -569,4 +569,12 @@ def build_report(
 
     report = EditorialReport(metrics=metrics, checks=checks, section_coverage=coverage)
     report.log_summary()
+    if final_visual:
+        log.info(
+            "[QC] final low relevance: %.0f%% - %s",
+            final_low_relevance_pct * 100,
+            "PASSED"
+            if final_low_relevance_pct <= float(limits["max_final_shot_low_relevance"])
+            else "FAILED",
+        )
     return report

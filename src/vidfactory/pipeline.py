@@ -734,6 +734,257 @@ class VideoPipeline:
     # ------------------------------------------------------------------
     # Stage two: real frame inspection
     # ------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    #  Final shot repair
+    # ------------------------------------------------------------------
+    #: Ways of asking for the same picture. A shot whose first search found
+    #: nothing that shows the narration is not helped by running that search
+    #: again, so each repair round rephrases: round one adds the concrete
+    #: framing words, round two swaps the subject nouns for synonyms, round
+    #: three widens to the room and the technique rather than the object.
+    _REPAIR_PREFIXES: tuple[tuple[str, ...], ...] = (
+        ("close up", "detail shot", "wide shot"),
+        ("interior design", "styled", "modern home"),
+        ("living room", "apartment interior", "home interior"),
+    )
+
+    def _repair_weak_shots(
+        self,
+        shots: list[Any],
+        clips: list[Any],
+        scenes: Sequence[Scene],
+        affinity: Mapping[str, Sequence[str]],
+        topic: Topic,
+    ) -> tuple[list[Any], dict[str, Any]]:
+        """Replace final shots whose footage does not show their narration.
+
+        The relevance gate used to detect these and stop. Detecting a problem
+        and giving up is not a pipeline, so a weak shot now sends its own
+        narration chunk back out to search - the shot intent, rephrased a
+        different way each round - and is replaced only by a clip that scores
+        strictly better on the same measurement.
+
+        Nothing here relaxes a threshold. A replacement has to beat the clip it
+        replaces, it has to be a source no other shot is using, and it goes
+        through the same ranking, cooldown and diversity rules as the original
+        selection. Good shots are never touched.
+        """
+
+        from .editorial_qc import LOW_RELEVANCE_MATCH
+
+        stats: dict[str, Any] = {
+            "repair_rounds_used": 0,
+            "weak_shots_before_repair": 0,
+            "weak_shots_after_repair": 0,
+            "repaired_shot_count": 0,
+            "average_relevance_before_repair": 0.0,
+            "average_relevance_after_repair": 0.0,
+        }
+        rounds = int(self.config.get("visual.max_repair_rounds", 3))
+        analyzer = self._visual_analyzer()
+        if not shots or rounds <= 0 or analyzer is None:
+            return clips, stats
+
+        by_key = {
+            str(getattr(getattr(c, "clip", None), "key", "")): c for c in clips
+        }
+        scene_by_id = {s.scene_id: s for s in scenes}
+
+        def relevance(key: str) -> float:
+            entry = by_key.get(key)
+            visual = dict(getattr(getattr(entry, "clip", None), "visual", {}) or {})
+            return float(visual.get("semantic_match", 0.0)) if visual.get("analyzed") else 1.0
+
+        def measured() -> list[float]:
+            return [
+                relevance(s.clip_key)
+                for s in shots
+                if dict(
+                    getattr(getattr(by_key.get(s.clip_key), "clip", None), "visual", {})
+                    or {}
+                ).get("analyzed")
+            ]
+
+        before = measured()
+        stats["average_relevance_before_repair"] = (
+            round(sum(before) / len(before), 3) if before else 0.0
+        )
+        weak = [s for s in shots if relevance(s.clip_key) < LOW_RELEVANCE_MATCH]
+        stats["weak_shots_before_repair"] = len(weak)
+        if not weak:
+            stats["weak_shots_after_repair"] = 0
+            stats["average_relevance_after_repair"] = stats[
+                "average_relevance_before_repair"
+            ]
+            return clips, stats
+
+        log.info("[REPAIR] %d low-relevance final shots detected", len(weak))
+
+        sources = dict(self.config.get("sources", {}) or {})
+        providers = build_providers(sources)
+        if not providers:
+            return clips, stats
+
+        min_shot = float(self.config.get("video.min_clip_seconds", 3))
+        max_shot = float(self.config.get("video.max_clip_seconds", 6))
+        per_query = int(sources.get("per_query_results", 30))
+        ranker = ClipRanker(
+            weights=dict(self.config.get("ranking.weights", {}) or {}),
+            min_score=float(self.config.get("ranking.min_score", 28)),
+            max_uses_per_clip=int(self.config.get("ranking.max_uses_per_clip", 3)),
+        )
+        context = RankingContext(
+            query=topic.title,
+            keywords=topic.keywords,
+            min_shot_seconds=min_shot,
+            max_shot_seconds=max_shot,
+            prefer_width=int(sources.get("prefer_width", 1920)),
+            min_width=int(sources.get("min_width", 1280)),
+            min_height=int(sources.get("min_height", 720)),
+            min_source_seconds=float(sources.get("min_source_seconds", 5.0)),
+            cooldown_days=float(self.config.get("ranking.clip_reuse_cooldown_days", 45)),
+            history=self._clip_history(),
+            enforce_aspirational=bool(self.config.get("ranking.enforce_aspirational", True)),
+            enforce_premium=False,
+            min_interior_relevance=float(
+                self.config.get("ranking.min_interior_relevance", 0.35)
+            ),
+        )
+        downloader = ClipDownloader(
+            workdir=self.workdir / "clips",
+            min_width=int(sources.get("min_width", 1280)),
+            min_height=int(sources.get("min_height", 720)),
+            min_seconds=min(float(sources.get("min_source_seconds", 5.0)), min_shot),
+            max_mb=float(sources.get("max_download_mb", 90)),
+            timeout=float(sources.get("download_timeout_seconds", 120)),
+            retries=int(sources.get("retries", 3)),
+            known_hashes=(),
+        )
+        settings = self._visual_settings()
+
+        def intent_for(shot: Any) -> tuple[str, str]:
+            """(English description of the shot, the query that found it)."""
+
+            scene = scene_by_id.get(shot.scene_id)
+            if scene is None:
+                return topic.title, topic.title
+            intents = list(getattr(scene, "shot_intents", []) or [])
+            if intents:
+                pick = intents[len(intents) // 2]
+                return pick.search_text, pick.query
+            return scene.search_text, scene.primary_visual_query
+
+        for round_number in range(1, rounds + 1):
+            if not weak:
+                break
+            stats["repair_rounds_used"] = round_number
+            used_keys = {s.clip_key for s in shots}
+            started_with = len(weak)
+            still_weak: list[Any] = []
+            prefixes = self._REPAIR_PREFIXES[
+                min(round_number - 1, len(self._REPAIR_PREFIXES) - 1)
+            ]
+
+            for shot in weak:
+                current = relevance(shot.clip_key)
+                description, base_query = intent_for(shot)
+                log.info(
+                    "[REPAIR] Shot %s: %.2f -> searching alternatives",
+                    shot.scene_id, current,
+                )
+                found: dict[str, Any] = {}
+                for prefix in prefixes:
+                    text = f"{prefix} {base_query}".strip()
+                    for provider in providers:
+                        page = round_number if provider.supports_pagination else 1
+                        try:
+                            results = provider.search(text, per_page=per_query, page=page)
+                        except Exception as exc:
+                            log.warning(
+                                "%s repair search failed for %r: %s",
+                                provider.name, text, exc,
+                            )
+                            continue
+                        for candidate in results:
+                            if candidate.key in used_keys or candidate.key in by_key:
+                                continue        # zero source reuse, still
+                            found.setdefault(candidate.key, candidate)
+
+                if not found:
+                    still_weak.append(shot)
+                    continue
+
+                ranked = ranker.rank(list(found.values()), context)[:12]
+                if not ranked:
+                    still_weak.append(shot)
+                    continue
+
+                for candidate in ranked:
+                    analysis = analyzer.analyze_clip(
+                        candidate,
+                        query=candidate.query or base_query,
+                        narration=description,
+                        metadata_flags=metadata_visual_flags(candidate, candidate.query),
+                    )
+                    candidate.visual = analysis.to_dict()
+                    candidate.visual_semantic_match = analysis.semantic_match
+
+                better = [
+                    c for c in ranked
+                    if dict(c.visual or {}).get("analyzed")
+                    and float(dict(c.visual).get("semantic_match", 0.0)) > current
+                ]
+                better.sort(
+                    key=lambda c: float(dict(c.visual).get("semantic_match", 0.0)),
+                    reverse=True,
+                )
+                if not better:
+                    still_weak.append(shot)
+                    continue
+
+                replacement = None
+                for candidate in better[:4]:
+                    fetched = downloader.fetch_many([candidate], needed=1)
+                    if fetched:
+                        replacement = fetched[0]
+                        break
+                if replacement is None:
+                    still_weak.append(shot)
+                    continue
+
+                score = float(dict(replacement.clip.visual or {}).get("semantic_match", 0.0))
+                log.info("[REPAIR] Replacement found: %.2f", score)
+                log.info("[REPAIR] Shot %s: %.2f -> %.2f", shot.scene_id, current, score)
+                old_key = shot.clip_key
+                by_key[replacement.clip.key] = replacement
+                clips = [c for c in clips if getattr(getattr(c, "clip", None), "key", "") != old_key]
+                clips.append(replacement)
+                by_key.pop(old_key, None)
+                used_keys.discard(old_key)
+                used_keys.add(replacement.clip.key)
+                shot.clip_key = replacement.clip.key
+                shot.source = Path(replacement.path)
+                shot.start = min(
+                    float(getattr(shot, "start", 0.0)),
+                    max(0.0, float(replacement.duration) - float(shot.duration) - 0.1),
+                )
+                stats["repaired_shot_count"] += 1
+                if score < LOW_RELEVANCE_MATCH:
+                    still_weak.append(shot)
+
+            log.info(
+                "[REPAIR] Round %d: %d -> %d weak shots",
+                round_number, started_with, len(still_weak),
+            )
+            weak = still_weak
+
+        after = measured()
+        stats["weak_shots_after_repair"] = len(weak)
+        stats["average_relevance_after_repair"] = (
+            round(sum(after) / len(after), 3) if after else 0.0
+        )
+        return clips, stats
+
     def _visual_analyzer(self) -> VisualAnalyzer | None:
         """Build the analyzer once per generation, model included if it loads.
 
@@ -1057,6 +1308,13 @@ class VideoPipeline:
         )
         shots = shot_plan.shots
 
+        # Repair before rendering, not after failing. A shot whose footage
+        # does not show its narration sends that narration back out to search
+        # and is replaced only by something that measures better.
+        clips, repair_stats = self._repair_weak_shots(
+            shots, list(clips), scenes, affinity or {}, topic
+        )
+
         editor = VideoEditor(
             workdir=self.workdir / "render",
             width=self.config.width,
@@ -1209,6 +1467,7 @@ class VideoPipeline:
                     "tts_voice": getattr(narration, "voice", ""),
                     "tts_engine": getattr(narration, "engine", ""),
                     **subtitle_metrics,
+                    **repair_stats,
                 },
             )
             report.save(output_dir / "editorial_quality_report.json")

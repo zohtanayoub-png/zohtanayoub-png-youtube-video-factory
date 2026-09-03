@@ -369,3 +369,157 @@ def test_releasing_can_be_limited_to_one_topic():
     db.reclassify_clip_history(topics=["dev-run"])
     assert not db.is_clip_on_cooldown("pexels", "1", 45)
     assert db.is_clip_on_cooldown("pexels", "2", 45)
+
+
+# ---------------------------------------------------------------------------
+# Automatic repair of weak final shots
+# ---------------------------------------------------------------------------
+
+class _Clip:
+    def __init__(self, key, match, path="/tmp/x.mp4"):
+        self.key = key
+        self.query = "living room"
+        self.author = "a"
+        self.visual = {"analyzed": True, "semantic_match": match}
+        self.visual_semantic_match = match
+
+
+class _Entry:
+    def __init__(self, clip, path="/tmp/x.mp4", duration=9.0):
+        self.clip = clip
+        self.path = path
+        self.duration = duration
+
+
+class _Shot:
+    def __init__(self, scene_id, clip_key, duration=4.0):
+        self.scene_id = scene_id
+        self.clip_key = clip_key
+        self.duration = duration
+        self.start = 0.0
+        self.source = None
+
+
+def _pipeline_stub(monkeypatch, tmp_path, replacement_scores):
+    """A Pipeline with just enough wired up to exercise the repair pass."""
+
+    from vidfactory import pipeline as pipeline_module
+    from vidfactory.config import load_config
+
+    config = load_config()
+    pipe = pipeline_module.VideoPipeline.__new__(pipeline_module.VideoPipeline)
+    pipe.config = config
+    pipe.workdir = tmp_path
+    pipe.database = Database(":memory:")
+    pipe.database.initialize()
+
+    class _Analyzer:
+        def analyze_clip(self, clip, **kwargs):
+            class _A:
+                semantic_match = clip.visual["semantic_match"]
+
+                def to_dict(self):
+                    return dict(clip.visual)
+
+            return _A()
+
+    class _Provider:
+        name = "stub"
+        supports_pagination = True
+
+        def search(self, text, per_page=30, page=1):
+            return [
+                _Clip(f"stub:{text}:{page}:{i}", score)
+                for i, score in enumerate(replacement_scores)
+            ]
+
+    monkeypatch.setattr(pipeline_module, "build_providers", lambda sources: [_Provider()])
+    monkeypatch.setattr(pipeline_module, "metadata_visual_flags", lambda *a, **k: {})
+    monkeypatch.setattr(pipe, "_visual_analyzer", lambda: _Analyzer())
+    monkeypatch.setattr(pipe, "_clip_history", lambda: {})
+
+    class _Ranker:
+        def __init__(self, **kwargs):
+            pass
+
+        def rank(self, clips, context):
+            return list(clips)
+
+    class _Downloader:
+        def __init__(self, **kwargs):
+            pass
+
+        def fetch_many(self, clips, needed=1):
+            return [_Entry(c) for c in clips[:needed]]
+
+    monkeypatch.setattr(pipeline_module, "ClipRanker", _Ranker)
+    monkeypatch.setattr(pipeline_module, "ClipDownloader", _Downloader)
+    return pipe
+
+
+def test_weak_shots_are_repaired_rather_than_reported(monkeypatch, tmp_path):
+    from vidfactory.topic_engine import Topic
+
+    pipe = _pipeline_stub(monkeypatch, tmp_path, replacement_scores=[0.72])
+    weak, strong = _Clip("p:1", 0.20), _Clip("p:2", 0.80)
+    clips = [_Entry(weak), _Entry(strong)]
+    shots = [_Shot("item-001-00", "p:1"), _Shot("item-001-01", "p:2")]
+
+    updated, stats = pipe._repair_weak_shots(
+        shots, clips, [], {},
+        Topic(title="Small Living Room Tricks", category="small spaces"),
+    )
+    assert stats["weak_shots_before_repair"] == 1
+    assert stats["weak_shots_after_repair"] == 0
+    assert stats["repaired_shot_count"] == 1
+    assert stats["repair_rounds_used"] == 1
+    # The good shot was left completely alone.
+    assert shots[1].clip_key == "p:2"
+    assert shots[0].clip_key != "p:1"
+
+
+def test_a_replacement_must_actually_score_better(monkeypatch, tmp_path):
+    from vidfactory.topic_engine import Topic
+
+    # Every alternative is worse than the clip already in place.
+    pipe = _pipeline_stub(monkeypatch, tmp_path, replacement_scores=[0.10])
+    weak = _Clip("p:1", 0.30)
+    shots = [_Shot("item-001-00", "p:1")]
+
+    _, stats = pipe._repair_weak_shots(
+        shots, [_Entry(weak)], [], {},
+        Topic(title="Small Living Room Tricks", category="small spaces"),
+    )
+    assert stats["repaired_shot_count"] == 0
+    assert stats["weak_shots_after_repair"] == 1
+    assert shots[0].clip_key == "p:1"
+
+
+def test_repair_gives_up_after_three_rounds(monkeypatch, tmp_path):
+    from vidfactory.topic_engine import Topic
+
+    # Better than the original, but still under the relevance threshold.
+    pipe = _pipeline_stub(monkeypatch, tmp_path, replacement_scores=[0.31])
+    shots = [_Shot("item-001-00", "p:1")]
+
+    _, stats = pipe._repair_weak_shots(
+        shots, [_Entry(_Clip("p:1", 0.10))], [], {},
+        Topic(title="Small Living Room Tricks", category="small spaces"),
+    )
+    assert stats["repair_rounds_used"] == 3
+    assert stats["weak_shots_after_repair"] == 1
+
+
+def test_repair_never_reuses_a_source_another_shot_holds(monkeypatch, tmp_path):
+    from vidfactory.topic_engine import Topic
+
+    pipe = _pipeline_stub(monkeypatch, tmp_path, replacement_scores=[0.9])
+    weak, strong = _Clip("p:1", 0.20), _Clip("p:2", 0.80)
+    shots = [_Shot("item-001-00", "p:1"), _Shot("item-001-01", "p:2")]
+
+    updated, _ = pipe._repair_weak_shots(
+        shots, [_Entry(weak), _Entry(strong)], [], {},
+        Topic(title="Small Living Room Tricks", category="small spaces"),
+    )
+    keys = [s.clip_key for s in shots]
+    assert len(keys) == len(set(keys)), "a repair introduced a duplicate source"

@@ -157,6 +157,11 @@ visual:
   verify_downloads: true        # re-inspect real video frames after download
   allow_remote_video: true      # decode from the clip URL when no stills exist
   min_semantic_match: 0.28      # below this the clip does not show the narration
+  # How many times a final shot that does not show its narration may be
+  # re-searched and replaced before the editorial gate fails the render. Each
+  # round rephrases the query; a replacement must score strictly better than
+  # the clip it replaces, so this can only improve relevance, never mask it.
+  max_repair_rounds: 3
   reject_confidence: 0.72       # a visual flag this strong rejects the clip
   penalty_confidence: 0.42      # a visual flag this strong is a heavy penalty
   weights:                      # stage two: relevance first, beauty third

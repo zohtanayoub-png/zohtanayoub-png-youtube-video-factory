@@ -137,6 +137,17 @@ src/vidfactory/
   `subject_deny_signals` is matched against an idea's title and tags only and
   cannot be rescued, because "Mix at least three materials in every room" is a
   texture tip however many sentences about reflection get bolted on.
+* **A weak final shot is repaired, not reported.** Detecting a problem and
+  giving up is not a pipeline. Before editorial QC, `_repair_weak_shots` takes
+  every final shot below `LOW_RELEVANCE_MATCH`, sends its own shot intent back
+  out to search - rephrased differently each round: framing words, then
+  synonyms, then the room and technique rather than the object - ranks,
+  frame-inspects, and swaps the clip **only** when the replacement scores
+  strictly better on the same measurement. Three rounds, then the gate fails.
+  Good shots are never touched, a replacement can never be a source another
+  shot holds, and no threshold moves: `repair_rounds_used`,
+  `weak_shots_before_repair`, `weak_shots_after_repair`,
+  `repaired_shot_count` and the before/after averages are all in the report.
 * **Low relevance triggers a new search, not a warning.** A scene whose footage
   does not match its narration sends the search back out - the shot intents it
   has not spent, then deeper pages, then the rest of its ladder - for
