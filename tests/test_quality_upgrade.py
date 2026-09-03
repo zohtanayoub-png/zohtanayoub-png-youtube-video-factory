@@ -579,7 +579,7 @@ def test_the_hook_creates_curiosity_without_channel_boilerplate():
 
 def test_the_hook_is_promise_aware():
     bigger = generate_script(
-        TopicEngine(language="en").from_user_input("25 Ideas That Make Any Space Look Bigger"), 5.0, language="en").sections[0].text
+        TopicEngine(language="en").from_user_input("Ideas That Make Any Space Look Bigger"), 5.0, language="en").sections[0].text
     expensive = generate_script(
-        TopicEngine(language="en").from_user_input("25 Ways To Make Your Home Look More Expensive"), 5.0, language="en").sections[0].text
+        TopicEngine(language="en").from_user_input("Ways To Make Your Home Look More Expensive"), 5.0, language="en").sections[0].text
     assert bigger != expensive
