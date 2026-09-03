@@ -17,6 +17,7 @@ import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from .config import Config, ConfigError, load_config, parse_bool
 from .database import Database
@@ -309,6 +310,101 @@ def command_visual_check(args: argparse.Namespace) -> int:
     return 1
 
 
+def command_entity_check(args: argparse.Namespace) -> int:
+    """Measure the entity probes against real footage instead of guessing.
+
+    ``ENTITY_PRESENCE_PASS`` and the ramp bounds around it were set by analogy
+    with the concept flags, never measured, and run 26 duly failed 57 of 88
+    shots with scores of exactly 0.0 - which is not a statement about how many
+    Pexels interiors contain a lamp. A threshold on a measurement has to come
+    from the measurement.
+
+    For each entity this searches with the entity's own queries, which should
+    return footage containing it, and with another entity's queries, which
+    should not. Both sets go through the real probes and the separation
+    between them is printed. If the two distributions overlap completely the
+    prompts are wrong; if they separate, the crossing point is the threshold.
+
+    Preview stills are used where the provider publishes them, so this costs a
+    few hundred kilobytes rather than a few hundred megabytes.
+    """
+
+    from .entities import ENTITIES, BY_NAME
+    from .stock.registry import build_providers
+    from .visual_analysis import VisualAnalyzer
+    from .visual_model import load_model
+
+    config = load_config(args.config)
+    model = load_model(dict(config.get("visual.model", {}) or {}))
+    if model is None:
+        print("[FAIL] no CLIP backend here, so the probes cannot be measured.")
+        print("       run this where 'vidfactory visual-check' reports ok.")
+        return 1
+
+    providers = build_providers(dict(config.get("sources", {}) or {}))
+    providers = [p for p in providers if p.name != "local"]
+    if not providers:
+        print("[FAIL] no stock provider - set PEXELS_API_KEY")
+        return 1
+    provider = providers[0]
+
+    analyzer = VisualAnalyzer(
+        model=model,
+        frames_per_clip=int(config.get("visual.frames_per_clip", 3)),
+        allow_remote_video=False,        # stills only; this is a cheap probe
+    )
+    wanted = [n.strip() for n in str(args.entities or "").split(",") if n.strip()]
+    entities = [BY_NAME[n] for n in wanted if n in BY_NAME] or list(ENTITIES)
+    per_entity = max(2, int(args.samples))
+
+    def scores_for(entity, query: str) -> list[float]:
+        try:
+            results = provider.search(query, per_page=per_entity, page=1)
+        except Exception as exc:
+            print(f"       search failed for {query!r}: {exc}")
+            return []
+        out: list[float] = []
+        for clip in results[:per_entity]:
+            analysis = analyzer.analyze_clip(
+                clip, query=query, narration=entity.triggers[0]
+            )
+            grounding = analysis.grounding
+            if grounding.checked:
+                out.append(grounding.score)
+        return out
+
+    report: dict[str, Any] = {}
+    for entity in entities:
+        other = next(e for e in ENTITIES if e.name != entity.name)
+        present = scores_for(entity, entity.queries[0])
+        absent = scores_for(entity, other.queries[0])
+        report[entity.name] = {"present": present, "absent": absent}
+        def summary(values: list[float]) -> str:
+            if not values:
+                return "no samples"
+            values = sorted(values)
+            return (f"n={len(values)} min={values[0]:.2f} "
+                    f"median={values[len(values) // 2]:.2f} max={values[-1]:.2f}")
+        print(f"{entity.name:16} containing it : {summary(present)}")
+        print(f"{'':16} something else: {summary(absent)}")
+
+    present_all = sorted(v for r in report.values() for v in r["present"])
+    absent_all = sorted(v for r in report.values() for v in r["absent"])
+    print("=" * 62)
+    if present_all and absent_all:
+        overlap = sum(1 for a in absent_all if a >= present_all[len(present_all) // 2])
+        print(f"present  n={len(present_all)} "
+              f"median={present_all[len(present_all) // 2]:.3f}")
+        print(f"absent   n={len(absent_all)} "
+              f"median={absent_all[len(absent_all) // 2]:.3f}")
+        print(f"{overlap} of {len(absent_all)} 'absent' clips score at or above "
+              f"the 'present' median")
+    if args.json_out:
+        Path(args.json_out).write_text(json.dumps(report, indent=2), encoding="utf-8")
+        print(f"raw scores written to {args.json_out}")
+    return 0
+
+
 def command_state(args: argparse.Namespace) -> int:
     database = Database(args.database)
     database.import_state(Path(args.state))
@@ -484,6 +580,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="check whether real frame inspection (and the CLIP backend) works here",
     )
     visual_check.set_defaults(func=command_visual_check)
+
+    entity_check = subparsers.add_parser(
+        "entity-check",
+        help="measure the required-entity probes against real footage",
+    )
+    entity_check.add_argument(
+        "--entities", default="", help="comma-separated entity names (default: all)"
+    )
+    entity_check.add_argument("--samples", type=int, default=6)
+    entity_check.add_argument("--json-out", default="")
+    entity_check.set_defaults(func=command_entity_check)
 
     return parser
 

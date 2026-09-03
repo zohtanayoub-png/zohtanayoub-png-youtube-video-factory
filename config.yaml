@@ -162,6 +162,11 @@ visual:
   # round rephrases the query; a replacement must score strictly better than
   # the clip it replaces, so this can only improve relevance, never mask it.
   max_repair_rounds: 3
+  # Run 26 issued close to two thousand provider requests repairing seventy-one
+  # weak shots and Pexels rate-limited it into uselessness - five repairs out of
+  # seventy-one, every later search a 429. A budget spent worst-first finds more
+  # than an unbounded sweep that gets itself throttled.
+  max_repair_searches: 40
   reject_confidence: 0.72       # a visual flag this strong rejects the clip
   penalty_confidence: 0.42      # a visual flag this strong is a heavy penalty
   weights:                      # stage two: relevance first, beauty third

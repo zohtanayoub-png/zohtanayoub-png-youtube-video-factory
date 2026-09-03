@@ -1,0 +1,76 @@
+# =============================================================================
+#  REQUIRED-ENTITY PROBE CALIBRATION
+#  Answers one question with numbers instead of analogy: does the contrastive
+#  probe actually separate footage containing an object from footage that does
+#  not? Run 26 failed 57 of 88 shots at scores of exactly 0.0, which is not a
+#  statement about how many Pexels interiors contain a lamp - it is a statement
+#  about a threshold that was never measured.
+#  Cheap: preview stills only, no video downloads, no render.
+# =============================================================================
+name: Entity Calibration
+
+on:
+  workflow_dispatch:
+    inputs:
+      entities:
+        description: "Comma-separated entity names (blank = all)"
+        required: false
+        type: string
+        default: ""
+      samples:
+        description: "Clips sampled per entity, per side"
+        required: false
+        type: string
+        default: "6"
+
+permissions:
+  contents: read
+
+jobs:
+  calibrate:
+    name: Measure the entity probes against real footage
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+          pip install onnxruntime
+
+      - name: Restore the cached model files
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: vidfactory-cache-Automatic-visual-v2
+
+      - name: Measure
+        env:
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+        run: |
+          python -m vidfactory entity-check \
+            --entities "${{ inputs.entities }}" \
+            --samples "${{ inputs.samples }}" \
+            --json-out entity-calibration.json | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the raw scores
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: entity-calibration
+          path: entity-calibration.json
+          retention-days: 30
+          if-no-files-found: warn

@@ -932,18 +932,55 @@ class VideoPipeline:
                 return pick.search_text, pick.query
             return scene.search_text, scene.primary_visual_query
 
+        # Run 26 issued something close to two thousand provider requests -
+        # seventy-one weak shots, three rounds, several phrasings each, two
+        # providers - and Pexels rate-limited it into uselessness: every
+        # search in the last rounds came back 429 and the pass repaired five
+        # shots out of seventy-one. A budget spent worst-first finds more than
+        # an unbounded sweep that gets itself throttled.
+        budget_per_round = int(self.config.get("visual.max_repair_searches", 40))
+        live = list(providers)
+
+        def search(provider: Any, text: str, page: int) -> list[Any]:
+            """One provider call, retiring a provider that has stopped answering."""
+
+            try:
+                return list(provider.search(text, per_page=per_query, page=page))
+            except Exception as exc:
+                failures[provider.name] = failures.get(provider.name, 0) + 1
+                log.warning(
+                    "%s repair search failed for %r: %s", provider.name, text, exc
+                )
+                if failures[provider.name] >= 4 and provider in live:
+                    live.remove(provider)
+                    log.warning(
+                        "[REPAIR] %s has failed %d searches in a row; "
+                        "dropping it for the rest of the pass",
+                        provider.name, failures[provider.name],
+                    )
+                return []
+
+        failures: dict[str, int] = {}
+
         for round_number in range(1, rounds + 1):
-            if not weak:
+            if not weak or not live:
                 break
             stats["repair_rounds_used"] = round_number
             used_keys = {s.clip_key for s in shots}
             started_with = len(weak)
             still_weak: list[Any] = []
+            spent = 0
+            # Worst first, so a budget that runs out has already been spent
+            # where it mattered.
+            weak.sort(key=lambda s: relevance(s.clip_key))
             prefixes = self._REPAIR_PREFIXES[
                 min(round_number - 1, len(self._REPAIR_PREFIXES) - 1)
             ]
 
             for shot in weak:
+                if spent >= budget_per_round or not live:
+                    still_weak.append(shot)
+                    continue
                 current = relevance(shot.clip_key)
                 description, base_query = intent_for(shot)
                 log.info(
@@ -970,40 +1007,27 @@ class VideoPipeline:
                         )
 
                 found: dict[str, Any] = {}
-                if needs_entity:
-                    for text in entity_first:
-                        for provider in providers:
-                            page = round_number if provider.supports_pagination else 1
-                            try:
-                                results = provider.search(
-                                    text, per_page=per_query, page=page
-                                )
-                            except Exception as exc:
-                                log.warning(
-                                    "%s repair search failed for %r: %s",
-                                    provider.name, text, exc,
-                                )
-                                continue
-                            for candidate in results:
-                                if candidate.key in used_keys or candidate.key in by_key:
-                                    continue
-                                found.setdefault(candidate.key, candidate)
-                for prefix in searches:
-                    text = f"{prefix} {base_query}".strip()
-                    for provider in providers:
+
+                def collect(text: str) -> None:
+                    nonlocal spent
+                    for provider in list(live):
                         page = round_number if provider.supports_pagination else 1
-                        try:
-                            results = provider.search(text, per_page=per_query, page=page)
-                        except Exception as exc:
-                            log.warning(
-                                "%s repair search failed for %r: %s",
-                                provider.name, text, exc,
-                            )
-                            continue
-                        for candidate in results:
+                        spent += 1
+                        for candidate in search(provider, text, page):
                             if candidate.key in used_keys or candidate.key in by_key:
                                 continue        # zero source reuse, still
                             found.setdefault(candidate.key, candidate)
+
+                if needs_entity:
+                    # The object's own searches come first and, when they
+                    # answer, the advice's phrasings are not needed at all.
+                    for text in entity_first[:2]:
+                        collect(text)
+                if len(found) < per_query and spent < budget_per_round:
+                    for prefix in searches:
+                        collect(f"{prefix} {base_query}".strip())
+                        if len(found) >= per_query or spent >= budget_per_round:
+                            break
 
                 if not found:
                     still_weak.append(shot)
@@ -1073,8 +1097,8 @@ class VideoPipeline:
                     still_weak.append(shot)
 
             log.info(
-                "[REPAIR] Round %d: %d -> %d weak shots",
-                round_number, started_with, len(still_weak),
+                "[REPAIR] Round %d: %d -> %d weak shots (%d searches spent of %d)",
+                round_number, started_with, len(still_weak), spent, budget_per_round,
             )
             weak = still_weak
 
