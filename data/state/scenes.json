@@ -1738,6 +1738,132 @@
       "duration": null,
       "query": "bright styled living room natural light",
       "category": "living rooms"
+    },
+    {
+      "id": 194,
+      "video_id": 12,
+      "scene_id": "intro-000-00",
+      "narration": "La mayoría de las habitaciones pequeñas no van cortas de metros. Van cortas de líneas de visión, de luz y de altura aprovechada, y las tres cosas se arreglan en un fin de semana.",
+      "duration": null,
+      "query": "bright styled living room natural light",
+      "category": "living rooms"
+    },
+    {
+      "id": 195,
+      "video_id": 12,
+      "scene_id": "intro-000-01",
+      "narration": "En este vídeo vamos a ver tres, una por una, con el motivo que hay detrás de cada una y cómo aplicarla en una casa real.",
+      "duration": null,
+      "query": "sunlit living room wide shot",
+      "category": "living rooms"
+    },
+    {
+      "id": 196,
+      "video_id": 12,
+      "scene_id": "item-001-00",
+      "narration": "Limpia los cristales y despeja el alféizar. Cristales por dentro y por fuera, alféizar vacío o con una sola pieza, y cortinas que al abrirse queden fuera del vano.",
+      "duration": null,
+      "query": "clean bright window interior daylight",
+      "category": "living rooms"
+    },
+    {
+      "id": 197,
+      "video_id": 12,
+      "scene_id": "item-001-01",
+      "narration": "Es lo más barato que puedes hacer y lo que más luz devuelve: un cristal sucio y un alféizar lleno roban una parte notable de la luz que entra.",
+      "duration": null,
+      "query": "sunlight through window living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 198,
+      "video_id": 12,
+      "scene_id": "item-001-02",
+      "narration": "Colgar la tela alta y ancha deja el cristal despejado, así que entra más luz y la pared se lee más alta de lo que mide.",
+      "duration": null,
+      "query": "clear windowsill interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 199,
+      "video_id": 12,
+      "scene_id": "item-002-00",
+      "narration": "Esta sorprende bastante. La número 2 de la lista. Que se vea el objeto, no la bombilla.",
+      "duration": null,
+      "query": "shaded lamp no glare interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 200,
+      "video_id": 12,
+      "scene_id": "item-002-01",
+      "narration": "Una bombilla desnuda a la altura de los ojos deslumbra, y el deslumbramiento hace que todo lo que la rodea parezca más oscuro por contraste. Pantalla, difusor o bombilla de filamento de baja intensidad.",
+      "duration": null,
+      "query": "warm filament bulb interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 201,
+      "video_id": 12,
+      "scene_id": "item-002-02",
+      "narration": "Si ves el punto de luz desde el sofá, hay que taparlo.",
+      "duration": null,
+      "query": "diffused light fixture home",
+      "category": "living rooms"
+    },
+    {
+      "id": 202,
+      "video_id": 12,
+      "scene_id": "item-002-03",
+      "narration": "La luz que llega a las paredes y a las esquinas le enseña al ojo dónde termina la habitación, y una habitación con los límites visibles se lee como más grande que otra que se apaga a dos metros.",
+      "duration": null,
+      "query": "comfortable lighting living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 203,
+      "video_id": 12,
+      "scene_id": "item-003-00",
+      "narration": "Hay una idea relacionada que merece la pena contar aquí. Número 3. Si solo vas a corregir una cosa de la lista, plantéate que sea esta. Repite el mismo metal en toda la estancia.",
+      "duration": null,
+      "query": "consistent brass fittings interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 204,
+      "video_id": 12,
+      "scene_id": "item-003-01",
+      "narration": "Mezclar cromo, latón y negro en la misma habitación se lee como decisiones tomadas por separado, que es justo lo contrario de lo que parece caro.",
+      "duration": null,
+      "query": "matching metal finishes home",
+      "category": "living rooms"
+    },
+    {
+      "id": 205,
+      "video_id": 12,
+      "scene_id": "item-003-02",
+      "narration": "Elige un metal dominante y llévalo a tiradores, lámparas, marcos y grifería. Un segundo metal como acento, y nada más.",
+      "duration": null,
+      "query": "black metal details interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 206,
+      "video_id": 12,
+      "scene_id": "item-003-03",
+      "narration": "Iluminar el perímetro hace visibles los límites del espacio, lo que hace que la habitación entera se perciba más amplia que con un único foco en el centro.",
+      "duration": null,
+      "query": "cohesive hardware finish",
+      "category": "living rooms"
+    },
+    {
+      "id": 207,
+      "video_id": 12,
+      "scene_id": "outro-000-00",
+      "narration": "Ahí lo tienes: tres ideas con las que trabajar. Gracias por verlo, y nos vemos en el siguiente.",
+      "duration": null,
+      "query": "bright styled living room natural light",
+      "category": "living rooms"
     }
   ]
 }
