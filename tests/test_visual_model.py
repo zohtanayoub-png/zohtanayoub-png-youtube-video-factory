@@ -256,7 +256,12 @@ class _AngleBackend:
         return [_unit(0.0)] * len(frames)
 
     def encode_texts(self, texts):
-        return [_unit(self.angles.get(t, 1.2)) for t in texts]
+        # Every prompt reaches the model through PROMPT_TEMPLATE, so the test
+        # looks its angle up by the bare concept.
+        def bare(text: str) -> str:
+            return text[len("a photo of ") :] if text.startswith("a photo of ") else text
+
+        return [_unit(self.angles.get(bare(t), 1.2)) for t in texts]
 
 
 def _textured_frame():
@@ -289,14 +294,14 @@ def _analysis(angles, query="a styled living room"):
 
 
 def test_a_clip_matching_its_own_prompt_scores_high():
-    prompt = "a photo of a styled living room"
+    prompt = "a styled living room"
     angles = {prompt: 0.30}
     angles.update({d: 0.55 for d in DISTRACTOR_PROMPTS})
     assert _analysis(angles).semantic_match > 0.75
 
 
 def test_a_clip_matching_a_distractor_better_scores_low():
-    prompt = "a photo of a styled living room"
+    prompt = "a styled living room"
     angles = {prompt: 0.60}
     angles.update({d: 0.58 for d in DISTRACTOR_PROMPTS})
     angles[DISTRACTOR_PROMPTS[0]] = 0.30
@@ -310,7 +315,7 @@ def test_an_ordinary_interior_does_not_collect_negative_flags():
     # Every negative concept is very slightly closer than the best positive,
     # which under a temperature-100 softmax was enough to read as certain.
     angles.update({text: 0.499 for text, _ in NEGATIVE_CONCEPTS})
-    angles.update({f"a photo of a styled living room": 0.50})
+    angles["a styled living room"] = 0.50
     angles.update({d: 0.60 for d in DISTRACTOR_PROMPTS})
     analysis = _analysis(angles)
     assert not analysis.penalised_flags, analysis.flags
@@ -322,7 +327,7 @@ def test_a_clearly_negative_frame_is_still_flagged():
     plastic = NEGATIVE_CONCEPTS[1][0]
     assert NEGATIVE_CONCEPTS[1][1] == "plastic_covered_furniture"
     angles[plastic] = 0.05          # far closer to the image than anything else
-    angles.update({"a photo of a styled living room": 0.9})
+    angles["a styled living room"] = 0.9
     angles.update({d: 0.9 for d in DISTRACTOR_PROMPTS})
     analysis = _analysis(angles)
     assert analysis.flags.get("plastic_covered_furniture", 0) > 0.6
@@ -338,7 +343,7 @@ def test_a_negative_concept_that_merely_ties_a_positive_is_not_evidence():
 
     angles = {c: 0.50 for c in POSITIVE_CONCEPTS}
     angles.update({text: 0.50 for text, _ in NEGATIVE_CONCEPTS})
-    angles["a photo of a styled living room"] = 0.50
+    angles["a styled living room"] = 0.50
     angles.update({d: 0.50 for d in DISTRACTOR_PROMPTS})
     analysis = _analysis(angles)
     assert not any(

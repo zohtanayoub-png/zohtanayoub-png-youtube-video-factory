@@ -64,15 +64,31 @@ REJECT_CONFIDENCE = 0.72
 #: Confidence at which a visual flag applies a large ranking penalty.
 PENALTY_CONFIDENCE = 0.42
 
-#: Positive concepts (used by the CLIP backend, and as documentation of what
-#: "premium" is supposed to mean here).
+#: Positive concepts: what this channel wants footage to be, and what every
+#: negative concept has to beat before it counts as evidence.
+#:
+#: The short entries are not redundant. CLIP scores a short prompt higher than
+#: a long one on the same image, so a six-word positive ("a beautiful
+#: professionally styled living room") loses to a three-word negative ("a
+#: construction site") on footage that is plainly a living room. On a real
+#: render that mismatch flagged construction or renovation on fifteen of forty
+#: ordinary Pexels interiors. Giving the positives short forms of the same
+#: meaning makes the comparison about the meaning again.
 POSITIVE_CONCEPTS: tuple[str, ...] = (
+    # the descriptive form - what "premium" means here
     "a beautiful professionally styled living room",
     "a bright aspirational home interior",
     "a furnished elegant interior",
     "a cozy high quality living room",
     "modern interior design",
     "a well styled residential room",
+    # the same meanings at the length the negatives are written at
+    "a living room",
+    "a home interior",
+    "a furnished room",
+    "a decorated room",
+    "a styled interior",
+    "a bedroom",
 )
 
 #: Negative concepts. ``flag`` maps a concept onto the flag it evidences.
@@ -921,6 +937,11 @@ class VisualAnalysis:
         }
 
 
+#: Every concept, distractor and scene prompt goes through one template, so
+#: comparisons are between meanings rather than between phrasings.
+PROMPT_TEMPLATE = "a photo of {}"
+
+
 def _cosine(a: Sequence[float], b: Sequence[float]) -> float:
     dot = sum(x * y for x, y in zip(a, b))
     na = math.sqrt(sum(x * x for x in a)) or 1.0
@@ -1198,7 +1219,10 @@ class VisualAnalyzer:
         does not amplify noise.
         """
 
-        prompts = list(POSITIVE_CONCEPTS) + [text for text, _ in NEGATIVE_CONCEPTS]
+        prompts = [
+            PROMPT_TEMPLATE.format(text)
+            for text in (*POSITIVE_CONCEPTS, *(t for t, _ in NEGATIVE_CONCEPTS))
+        ]
         try:
             text_vectors = self._encode_texts(prompts)
         except Exception as exc:                          # pragma: no cover
@@ -1246,8 +1270,8 @@ class VisualAnalyzer:
         wanted = (query or narration or "").strip()
         if not wanted:
             return None
-        prompt = f"a photo of {wanted}" if len(wanted) < 60 else wanted
-        prompts = [prompt, *DISTRACTOR_PROMPTS]
+        prompt = PROMPT_TEMPLATE.format(wanted) if len(wanted) < 60 else wanted
+        prompts = [prompt, *(PROMPT_TEMPLATE.format(d) for d in DISTRACTOR_PROMPTS)]
         try:
             text_vectors = self._encode_texts(prompts)
         except Exception as exc:                          # pragma: no cover
