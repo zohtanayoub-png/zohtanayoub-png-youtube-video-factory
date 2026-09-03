@@ -248,11 +248,12 @@ def test_footage_that_does_not_show_the_narration_still_fails_qc(
             encoding="utf-8"
         )
     )
-    assert report["metrics"]["final_shot_visual_semantic_match_average"] < 0.50
+    assert report["passed"] is False
+    assert report["final_shot_visual_semantic_match_average"] < 0.50
     # The repair pass ran and found nothing better, rather than not running.
-    assert report["metrics"]["weak_shots_before_repair"] > 0
-    assert report["metrics"]["repair_rounds_used"] >= 1
-    assert report["metrics"]["weak_shots_after_repair"] > 0
+    assert report["weak_shots_before_repair"] > 0
+    assert report["repair_rounds_used"] >= 1
+    assert report["weak_shots_after_repair"] > 0
 
 
 def test_a_failed_run_is_recorded(local_pipeline, monkeypatch):
