@@ -258,7 +258,7 @@ def test_every_scene_gets_enough_specific_queries():
 
 
 def test_query_diversity_across_a_video():
-    topic = TopicEngine(language="en").from_user_input("20 Cozy Bedroom Ideas For A Warmer Home")
+    topic = TopicEngine(language="en").from_user_input("Cozy Bedroom Ideas For A Warmer Home")
     scenes = plan_scenes(generate_script(topic, 5.0, language="en"))
     primaries = [s.visual_queries[0].text for s in scenes]
     assert len(set(primaries)) / len(primaries) > 0.4
@@ -429,7 +429,7 @@ def test_generated_scripts_only_contain_aligned_ideas():
 
 
 def test_a_general_title_accepts_every_idea():
-    topic = TopicEngine(language="en").from_user_input("30 Modern Living Room Ideas")
+    topic = TopicEngine(language="en").from_user_input("Modern Living Room Ideas")
     script = generate_script(topic, 10.0, language="en")
     assert script.promise_key == "general"
     assert script.title_idea_alignment == 1.0
@@ -561,7 +561,7 @@ def test_the_formulaic_connectives_are_gone():
 
 
 def test_items_do_not_all_follow_one_sentence_shape():
-    topic = TopicEngine(language="en").from_user_input("20 Cozy Bedroom Ideas For A Warmer Home")
+    topic = TopicEngine(language="en").from_user_input("Cozy Bedroom Ideas For A Warmer Home")
     items = generate_script(topic, 15.0, language="en").items()
     openings = {" ".join(s.text.split()[:3]) for s in items}
     assert len(openings) > len(items) * 0.5
@@ -579,7 +579,7 @@ def test_the_hook_creates_curiosity_without_channel_boilerplate():
 
 def test_the_hook_is_promise_aware():
     bigger = generate_script(
-        TopicEngine(language="en").from_user_input("25 Ideas That Make Any Space Look Bigger"), 5.0, language="en").sections[0].text
+        TopicEngine(language="en").from_user_input("Ideas That Make Any Space Look Bigger"), 5.0, language="en").sections[0].text
     expensive = generate_script(
-        TopicEngine(language="en").from_user_input("25 Ways To Make Your Home Look More Expensive"), 5.0, language="en").sections[0].text
+        TopicEngine(language="en").from_user_input("Ways To Make Your Home Look More Expensive"), 5.0, language="en").sections[0].text
     assert bigger != expensive

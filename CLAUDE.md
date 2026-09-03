@@ -60,6 +60,7 @@ src/vidfactory/
   state_merge.py     union two divergent copies of data/state (see below)
   causal_alignment.py does the written paragraph explain the title's promise
   contradiction.py   does the paragraph argue *for* its own heading
+  concepts.py        is the paragraph about the same thing as its heading
   title_alignment.py what a title promises, and which ideas actually deliver it
   editorial_qc.py    repetition, relevance and diversity gates (not ffprobe)
   stock/             provider adapters: base, pexels, pixabay, local, registry
@@ -129,6 +130,25 @@ src/vidfactory/
   explanation during repair, then by a post-write check that rewrites the
   paragraph and finally replaces the idea. `contradiction_count` is an **error**
   in the editorial report, not a warning.
+* **A mechanism is not a subject.** `vertical_emphasis` is equally true of a
+  curtain rod, a bookcase and a gallery wall, so matching on the mechanism
+  alone let run 22 explain "Hang art at eye level" with "hanging the fabric
+  high and wide leaves the glass itself uncovered". Causal alignment scored it
+  1.00 and the contradiction check found nothing, because on their own terms
+  both were right. `concepts.py` locks an explanation to **mechanism +
+  concept**: `repair_text` will not reach for another subject's sentence, and
+  a post-write pass rewrites anything that slips through.
+  `cross_concept_contamination_count` is an **error** in the report.
+* **A number in the topic is a requirement.** "10 Small Living Room Tricks"
+  must contain ten; run 22 renamed it to five. `Topic.count_is_explicit`
+  carries the request, `plan_item_count` honours it, and `_trim_to_duration`
+  pays for it by shortening sections - optional material first, and only then
+  the advice itself, never the causal explanation. An impossible count raises
+  rather than renaming the video.
+* **The script is sized from the rate the voice actually spoke at.** The
+  engine's declared words-per-minute is a constant; `record_speech_rate`
+  measures each render and `measured_speech_rate` sizes the next one, so a
+  five minute request lands inside ten percent instead of at 4:04.
 * **A large mirror and an oversized sofa are not the same mechanism.**
   `statement_piece_scale` (fewer, larger objects reduce visual fragmentation)
   and `furniture_footprint_scale` (an oversized sofa eats visible floor) share
@@ -214,7 +234,12 @@ src/vidfactory/
   to its video's new one. Counters use `ours + theirs - base`, the only
   formula that neither loses a use nor invents one; importing both snapshots
   instead would key on the autoincrement `id` and let one branch's
-  `videos.id = 3` overwrite the other's different video.
+  `videos.id = 3` overwrite the other's different video. `schema_info` is
+  merged too, because it holds the measured speech rate: the version takes
+  the newer side, and two measured rates for one voice are averaged rather
+  than picked between, since both are real renders of the same voice.
+  Leaving that table out of the union restored the engine's declared 155
+  wpm on the next render, which is the whole of the duration bug.
 * **Schema migrations run in `initialize()`, not lazily.** They used to run on
   the first `record_clip_use`, which is *after* `import_state` - and
   `import_state` builds its column list from `PRAGMA table_info`, so every

@@ -48,6 +48,15 @@ from .topic_engine import Topic
 log = get_logger("SCRIPT")
 
 WORDS_PER_ITEM_TARGET = 105
+
+#: The fewest words in which an idea can still say what to do and why it
+#: works. Below this it is a list entry, not advice - which is the line
+#: between "shorten the sections to fit the count" and "this count does not
+#: fit this duration".
+MIN_ITEM_WORDS = 30
+
+#: Sentence boundaries, for trimming a script back to its allotted time.
+_SENTENCES = re.compile(r"(?<=[.!?])\s+")
 #: Below this length the intro and outro are compacted so short videos
 #: (used by the integration test and for quick previews) stay on target.
 COMPACT_BELOW_MINUTES = 3.0
@@ -740,9 +749,39 @@ class TemplateScriptEngine:
         floor = 1 if duration_minutes < 1.5 else 3
         wanted = max(floor, int(round(body_words / WORDS_PER_ITEM_TARGET)))
         promised = topic.item_count
-        # Honor the number promised in the title, but only when it is close
-        # enough to the requested duration to be achievable. A 5 minute video
-        # cannot honestly deliver 25 ideas, so the title gets renumbered.
+        # A number the viewer typed is a requirement. "10 Small Living Room
+        # Tricks" has to contain ten, with the sections sized to fit the
+        # duration - run 22 quietly renamed it to five instead, which is the
+        # one outcome nobody asked for. Only an impossible count fails, and it
+        # fails loudly.
+        if promised and getattr(topic, "count_is_explicit", False):
+            if pool_size < promised:
+                raise ValueError(
+                    f"The topic asks for {promised} ideas but only {pool_size} "
+                    "support this title. Ask for fewer, or widen the topic."
+                )
+            affordable = int(
+                max(1.0, (target_words - overhead)) // MIN_ITEM_WORDS
+            )
+            if promised > affordable:
+                raise ValueError(
+                    f"{promised} ideas will not fit into "
+                    f"{duration_minutes:g} minutes: at {MIN_ITEM_WORDS} words each "
+                    f"that needs {promised * MIN_ITEM_WORDS + overhead} words and "
+                    f"there is room for about {int(target_words)}. Ask for "
+                    f"{affordable} or fewer, or for a longer video."
+                )
+            if promised != wanted:
+                log.info(
+                    "Honouring the %d ideas the topic asks for (%.0f minutes "
+                    "would otherwise suggest %d); sections shorten to fit",
+                    promised, duration_minutes, wanted,
+                )
+            return promised
+
+        # Otherwise the title's number is a suggestion, kept when it is close
+        # enough to the requested duration to be honest. A 5 minute video
+        # cannot deliver 25 ideas, so the title gets renumbered.
         if promised and pool_size >= promised:
             tolerance = max(3, int(0.35 * wanted))
             if abs(promised - wanted) <= tolerance:
@@ -851,6 +890,9 @@ class TemplateScriptEngine:
             causal=causal,
         )
         self._fit_to_duration(script, duration_minutes, rng)
+        # ...and back down again when an explicit item count made the script
+        # longer than the time it was given.
+        self._trim_to_duration(script, duration_minutes, promise)
         # Fitting rewrites paragraphs, so the guarantee is re-checked (and
         # re-repaired) against the text that will actually be spoken.
         script.causal = self._revalidate_causal(script.sections, promise, causal)
@@ -1123,6 +1165,91 @@ class TemplateScriptEngine:
         )
 
     # ------------------------------------------------------------------
+    def _trim_to_duration(
+        self, script: Script, duration_minutes: float, promise: Promise
+    ) -> int:
+        """Shorten items until the script fits the time it was given.
+
+        The counterpart of the expansion pass, and the thing that makes an
+        explicit item count affordable: ten ideas in five minutes is a real
+        request, it just means shorter ideas. Run 22 had only the expander, so
+        a forced count could only overshoot.
+
+        Optional material goes first - a transition, a "number six", a closing
+        aside - because it carries no advice. The idea's own why and how, and
+        the sentence explaining why it delivers the title's promise, are never
+        removed: a shorter video still has to say something.
+        """
+
+        target = duration_minutes * self.words_per_minute
+        items = script.items()
+        if not items or script.word_count <= target * 1.05:
+            return 0
+
+        def optional_sentences(section: ScriptSection) -> list[str]:
+            tip = section.tip or {}
+            core = " ".join(
+                str(tip.get(key, "")) for key in ("why", "how", "mistake")
+            ).lower()
+            sentences = [s.strip() for s in _SENTENCES.split(section.text) if s.strip()]
+            keep_last = sentences[-1:] if sentences else []
+            return [
+                s for s in sentences[:-1]
+                if s not in keep_last and s.lower().rstrip(".") not in core
+                and not any(s.lower().rstrip(".") in part for part in core.split(". "))
+            ]
+
+        removed = 0
+        # Two passes. The first removes material that carries no advice. Only
+        # when that is exhausted does the second shorten the advice itself,
+        # and even then an item keeps its opening, one substantive sentence
+        # and the explanation of why it delivers the promise - which is a
+        # shorter tip, not a hollow one.
+        allow_core = False
+        for _round in range(16):
+            if script.word_count <= target * 1.02:
+                break
+            shortened = False
+            for section in items:
+                if script.word_count <= target * 1.02:
+                    break
+                sentences = [s.strip() for s in _SENTENCES.split(section.text) if s.strip()]
+                floor = 3 if allow_core else 3
+                if len(sentences) <= floor:
+                    continue
+                spare = optional_sentences(section)
+                if not spare and allow_core:
+                    # Everything left says something; give up the longest of
+                    # the middle sentences and keep the frame and the reason.
+                    spare = sentences[1:-1]
+                if not spare:
+                    continue
+                # Longest first: the fewest cuts for the words saved.
+                victim = max(spare, key=lambda s: len(s.split()))
+                candidate = " ".join(s for s in sentences if s != victim)
+                if score_paragraph(candidate, promise).score < PASS_THRESHOLD:
+                    continue
+                if find_contradictions(
+                    section.heading, candidate,
+                    language=getattr(promise, "language", "en"),
+                ):
+                    continue
+                section.text = _clean(candidate)
+                removed += 1
+                shortened = True
+            if not shortened:
+                if allow_core:
+                    break
+                # Optional material is exhausted; start shortening the advice
+                # itself rather than stopping while still over budget.
+                allow_core = True
+        if removed:
+            log.info(
+                "Trimmed %d optional sentence(s) to fit %.0f minutes (%d words)",
+                removed, duration_minutes, script.word_count,
+            )
+        return removed
+
     def _elaborations_for(self, tip: Tip, rng: random.Random) -> list[str]:
         """Collect on-topic expansion sentences for a tip, best match first."""
 

@@ -57,6 +57,12 @@ on:
         required: false
         type: boolean
         default: true
+      number_of_items:
+        description: "How many tips (a number in the topic always wins)"
+        required: false
+        type: choice
+        default: "Automatic"
+        options: [Automatic, "5", "7", "10", "15", "20"]
       generation_mode:
         description: "Production claims its footage for 45 days; test does not"
         required: false
@@ -107,6 +113,10 @@ on:
         required: false
         type: boolean
         default: true
+      number_of_items:
+        required: false
+        type: string
+        default: "Automatic"
       generation_mode:
         required: false
         type: string
@@ -239,6 +249,7 @@ jobs:
           INPUT_VOICE: ${{ inputs.voice }}
           INPUT_SUBTITLES: ${{ inputs.subtitles }}
           INPUT_BURN_IN: ${{ inputs.burn_in_subtitles }}
+          INPUT_ITEMS: ${{ inputs.number_of_items }}
           INPUT_MODE: ${{ inputs.generation_mode }}
           INPUT_UPLOAD: ${{ inputs.upload_to_youtube }}
           INPUT_PRIVACY: ${{ inputs.privacy_status }}
@@ -257,6 +268,7 @@ jobs:
             --subtitles "${INPUT_SUBTITLES}" \
             --burn-in "${INPUT_BURN_IN}" \
             --mode "${INPUT_MODE}" \
+            --items "${INPUT_ITEMS}" \
             --upload "${INPUT_UPLOAD}" \
             --privacy "${INPUT_PRIVACY}" \
             --run-id "run-${RUN_NUMBER}" \
@@ -349,6 +361,12 @@ jobs:
               "dark_clip_count",
               "causal_promise_alignment_score",
               "contradiction_count",
+              "cross_concept_contamination_count",
+              "requested_item_count",
+              "actual_item_count",
+              "requested_duration_seconds",
+              "actual_duration_seconds",
+              "duration_accuracy_percentage",
               "weak_shots_before_repair",
               "weak_shots_after_repair",
               "repair_rounds_used",
@@ -571,6 +589,12 @@ jobs:
               "generation_mode",
               "footage_claimed_for_cooldown",
               "contradiction_count",
+              "cross_concept_contamination_count",
+              "requested_item_count",
+              "actual_item_count",
+              "requested_duration_seconds",
+              "actual_duration_seconds",
+              "duration_accuracy_percentage",
               "weak_shots_before_repair",
               "weak_shots_after_repair",
               "repair_rounds_used",

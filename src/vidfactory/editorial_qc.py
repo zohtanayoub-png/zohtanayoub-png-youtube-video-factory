@@ -334,6 +334,10 @@ def build_report(
         c.to_dict() for c in getattr(contradiction_report, "items", []) or []
     ]
     contradiction_count = len(contradictions)
+    contamination = [
+        c.to_dict() for c in getattr(causal, "contamination", []) or []
+    ]
+    contamination_count = len(contamination)
     section_scores = (
         [round(float(r.score), 3) for r in getattr(causal, "results", [])]
         if causal is not None
@@ -401,6 +405,11 @@ def build_report(
         # opposite of its own advice is not publishable.
         "contradiction_count": contradiction_count,
         "contradictions": contradictions,
+        # A sentence can explain the right mechanism, the right way round, and
+        # still be about curtains in a section about pictures. Run 22 shipped
+        # exactly that at a causal score of 1.00, so this is an error too.
+        "cross_concept_contamination_count": contamination_count,
+        "cross_concept_contamination": contamination,
         # ---- language, voice and captions --------------------------------
         **dict(production or {}),
         "search": stats,
@@ -417,6 +426,18 @@ def build_report(
                 + "; ".join(c.get("why", "") for c in contradictions[:2])
                 if contradiction_count
                 else "no section contradicts its own advice"
+            ),
+            severity="error",
+        ),
+        EditorialCheck(
+            "no_cross_concept_contamination",
+            contamination_count == 0,
+            (
+                f"{contamination_count} section(s) explain themselves with "
+                "another subject's language: "
+                + "; ".join(c.get("why", "") for c in contamination[:2])
+                if contamination_count
+                else "every section explains itself in its own terms"
             ),
             severity="error",
         ),
@@ -520,6 +541,26 @@ def build_report(
                 if final_visual
                 else "no frames were inspected, so relevance is unmeasured"
             ),
+        ),
+        EditorialCheck(
+            "duration_accuracy",
+            (
+                not metrics.get("requested_duration_seconds")
+                or 90.0 <= float(metrics.get("duration_accuracy_percentage", 100.0)) <= 110.0
+            ),
+            f"{metrics.get('actual_duration_seconds', 0)}s against a requested "
+            f"{metrics.get('requested_duration_seconds', 0)}s "
+            f"({metrics.get('duration_accuracy_percentage', 0)}% of it)",
+            severity="warning",
+        ),
+        EditorialCheck(
+            "requested_item_count",
+            (
+                not metrics.get("item_count_was_explicit")
+                or metrics.get("actual_item_count") == metrics.get("requested_item_count")
+            ),
+            f"{metrics.get('actual_item_count', 0)} ideas against the "
+            f"{metrics.get('requested_item_count', 0)} the topic asked for",
         ),
         EditorialCheck(
             "candidate_pool_relevance",

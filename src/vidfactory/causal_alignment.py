@@ -35,6 +35,11 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Sequence
 
+from .concepts import (
+    Contamination,
+    explanation_fits,
+    find_contamination,
+)
 from .contradiction import (
     AdviceDirection,
     Contradiction,
@@ -134,12 +139,18 @@ class CausalResult:
     replaced: bool = False
     #: Sentences that argue against this section's own heading.
     contradictions: list[Contradiction] = field(default_factory=list)
+    #: Sentences that are about something the section is not.
+    contamination: list[Contamination] = field(default_factory=list)
     #: What the heading tells the viewer to do, and to avoid.
     direction: AdviceDirection | None = None
 
     @property
     def passed(self) -> bool:
-        return self.score >= PASS_THRESHOLD and not self.contradictions
+        return (
+            self.score >= PASS_THRESHOLD
+            and not self.contradictions
+            and not self.contamination
+        )
 
     def explain(self) -> str:
         outcome = self.outcomes[0] if self.outcomes else ""
@@ -178,6 +189,8 @@ class CausalResult:
             "replaced": self.replaced,
             "contradiction_count": len(self.contradictions),
             "contradictions": [c.to_dict() for c in self.contradictions],
+            "cross_concept_contamination_count": len(self.contamination),
+            "cross_concept_contamination": [c.to_dict() for c in self.contamination],
             "direction": self.direction.to_dict() if self.direction else {},
         }
 
@@ -295,6 +308,16 @@ def repair_text(
                     family.name, heading,
                 )
                 continue
+            # A mechanism is not a subject. vertical_emphasis is equally true
+            # of a curtain rod and a gallery wall, so without this the curtain
+            # explanation lands on the art advice - which is what run 22
+            # shipped, at a causal score of 1.00.
+            if heading and not explanation_fits(heading, sentence, tip):
+                log.debug(
+                    "Skipped the %s explanation for %r: it is about something "
+                    "the section is not", family.name, heading,
+                )
+                continue
             counters[family.name] = start + offset + 1
             return repaired
     return None
@@ -325,6 +348,9 @@ class CausalReport:
     #: Sections whose paragraph argued against their own heading, and what
     #: was done about it. Production requires this to be empty.
     contradiction: ContradictionReport = field(default_factory=ContradictionReport)
+    #: Sentences transplanted from another subject. Production requires none.
+    contamination: list[Contamination] = field(default_factory=list)
+    contamination_rewrites: int = 0
 
     @property
     def overall(self) -> float:
@@ -340,6 +366,10 @@ class CausalReport:
     def contradiction_count(self) -> int:
         return self.contradiction.count
 
+    @property
+    def cross_concept_contamination_count(self) -> int:
+        return len(self.contamination)
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "promise": self.promise_key,
@@ -350,6 +380,9 @@ class CausalReport:
             "replacements": self.replacements,
             "sections": [r.to_dict() for r in self.results],
             **self.contradiction.to_dict(),
+            "cross_concept_contamination_count": len(self.contamination),
+            "cross_concept_contamination": [c.to_dict() for c in self.contamination],
+            "contamination_rewrites": self.contamination_rewrites,
         }
 
 
@@ -455,6 +488,56 @@ def validate_sections(
                 "Item %s (%s) contradicts its own advice: %s",
                 result.index, heading, found[0].explain(),
             )
+
+        # ------------------------------------------------------------------
+        # Cross-concept contamination. A sentence can state the mechanism, use
+        # a connective, claim the outcome and argue the right way round, and
+        # still be about curtains in a section about pictures - which is what
+        # run 22 shipped at a causal score of 1.00. Nothing above can see it,
+        # because a mechanism is not a subject.
+        # ------------------------------------------------------------------
+        intruders = find_contamination(heading, section.text, tip)
+        if intruders and rewrite:
+            trimmed = " ".join(
+                s.strip()
+                for s in _SENTENCE_SPLIT.split(str(section.text or ""))
+                if s.strip() and s.strip() not in {c.sentence for c in intruders}
+            )
+            candidate = trimmed
+            if score_paragraph(trimmed, promise).score < PASS_THRESHOLD:
+                candidate = repair_text(
+                    trimmed, promise, tip, used=counters, heading=heading
+                ) or trimmed
+            if (
+                not find_contamination(heading, candidate, tip)
+                and score_paragraph(candidate, promise).score >= PASS_THRESHOLD
+                and not find_contradictions(
+                    heading, candidate, language=language, direction=direction
+                )
+            ):
+                section.text = candidate
+                result = rescore(section)
+                result.direction = direction
+                result.repaired = True
+                report.contamination_rewrites += 1
+                log.info(
+                    "Item %s (%s) explained itself with somebody else's subject; "
+                    "rewrote it in its own", result.index, heading,
+                )
+                intruders = []
+            else:
+                intruders = find_contamination(heading, section.text, tip)
+
+        if intruders:
+            for item in intruders:
+                item.index = result.index
+            result.contamination = list(intruders)
+            report.contamination.extend(intruders)
+            log.error(
+                "Item %s (%s) is contaminated: %s",
+                result.index, heading, intruders[0].explain(),
+            )
+
         report.contradiction.directions.append(direction)
         report.results.append(result)
 

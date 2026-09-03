@@ -80,7 +80,7 @@ def rendered(tmp_path_factory, request):
             frames_per_clip=int(config.get("visual.frames_per_clip", 3)),
         ),
     )
-    result = pipeline.run(topic_text="25 Small Living Room Ideas That Make Any Space Look Bigger")
+    result = pipeline.run(topic_text="Small Living Room Ideas That Make Any Space Look Bigger")
     yield result, config, database, root
     database.close()
 

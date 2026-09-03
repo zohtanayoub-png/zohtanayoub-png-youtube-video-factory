@@ -559,3 +559,178 @@ def test_a_repaired_paragraph_states_its_mechanism():
     )
     assert repaired is not None
     assert score_paragraph(repaired, BIGGER).score == 1.0
+
+
+# ---------------------------------------------------------------------------
+# Run 22: an explanation about the wrong subject
+# ---------------------------------------------------------------------------
+
+#: Verbatim from run 22's script. The section is about hanging pictures; the
+#: sentence is about curtains. Causal alignment scored it 1.00 and the
+#: contradiction check found nothing, because on their own terms both were
+#: right - a mechanism is not a subject.
+RUN22_ART_HEADING = "Hang art at eye level and scale it to the furniture"
+RUN22_CURTAIN_SENTENCE = (
+    "Hanging the fabric high and wide leaves the glass itself uncovered, so "
+    "more daylight reaches the room and the wall reads taller than it measures."
+)
+
+
+def test_run22_curtain_explanation_in_an_art_section_is_detected():
+    from vidfactory.concepts import find_contamination
+
+    found = find_contamination(
+        RUN22_ART_HEADING, RUN22_CURTAIN_SENTENCE, TIPS[RUN22_ART_HEADING]
+    )
+    assert found, "a curtain explanation under art advice must be caught"
+    assert found[0].subject == ["wall_art"]
+    assert "window_dressing" in found[0].intruder
+
+
+def test_the_older_checks_could_not_have_caught_it():
+    """Which is why a third check exists rather than a tweak to the other two."""
+
+    paragraph = f"{TIPS[RUN22_ART_HEADING]['why']} {RUN22_CURTAIN_SENTENCE}"
+    assert score_paragraph(paragraph, BIGGER).score >= PASS_THRESHOLD
+    assert not find_contradictions(RUN22_ART_HEADING, paragraph)
+
+
+def test_an_art_section_is_repaired_in_its_own_language():
+    tip = TIPS[RUN22_ART_HEADING]
+    section = FakeSection(
+        index=1,
+        heading=RUN22_ART_HEADING,
+        text=f"{tip['why']} {RUN22_CURTAIN_SENTENCE}",
+        tip=tip,
+    )
+    report = validate_sections([section], BIGGER, rewrite=True)
+    assert report.cross_concept_contamination_count == 0
+    assert report.contamination_rewrites == 1
+    assert "fabric" not in section.text and "glass" not in section.text
+    assert score_paragraph(section.text, BIGGER).score >= PASS_THRESHOLD
+
+
+def test_repair_never_reaches_for_another_subjects_explanation():
+    from vidfactory.concepts import find_contamination
+
+    tip = TIPS[RUN22_ART_HEADING]
+    repaired = repair_text(tip["why"], BIGGER, tip, heading=RUN22_ART_HEADING)
+    assert repaired is not None
+    assert not find_contamination(RUN22_ART_HEADING, repaired, tip)
+
+
+@pytest.mark.parametrize(
+    "heading, sentence",
+    [
+        ("Choose a rug that is generously sized, not undersized",
+         "Painting the trim the same colour as the wall lets it read as one plane."),
+        ("Aim for at least three light sources per room",
+         "An oversized sofa eats visible floor area and narrows the walking paths."),
+        ("Hang a large mirror opposite the window",
+         "An undersized rug leaves the furniture floating with no anchor."),
+        ("Take storage up to the ceiling",
+         "Mounting the curtain track close to the ceiling stretches the window upward."),
+    ],
+)
+def test_the_other_contamination_pairs_are_caught(heading, sentence):
+    from vidfactory.concepts import find_contamination
+
+    assert find_contamination(heading, sentence, {"title": heading})
+
+
+def test_a_section_may_still_mention_its_own_neighbours():
+    """Art hung over a sofa is art advice, not a transplant."""
+
+    from vidfactory.concepts import find_contamination
+
+    assert not find_contamination(
+        RUN22_ART_HEADING,
+        "Artwork scaled to the sofa beneath it anchors the wall.",
+        TIPS[RUN22_ART_HEADING],
+    )
+
+
+# ---------------------------------------------------------------------------
+# Run 22: a requested item count that was quietly changed
+# ---------------------------------------------------------------------------
+
+def _engine():
+    from vidfactory.topic_engine import TopicEngine
+
+    return TopicEngine()
+
+
+def test_a_number_in_the_topic_is_read_as_a_request():
+    topic = _engine().from_user_input(
+        "10 Small Living Room Tricks That Make Your Space Look Bigger"
+    )
+    assert topic.item_count == 10
+    assert topic.count_is_explicit is True
+
+
+def test_a_topic_with_no_number_leaves_the_count_open():
+    topic = _engine().from_user_input(
+        "Small Living Room Tricks That Make Your Space Look Bigger"
+    )
+    assert topic.count_is_explicit is False
+
+
+def test_an_impossible_count_fails_loudly_rather_than_renaming():
+    with pytest.raises(ValueError, match="requested"):
+        _engine().from_user_input("400 Small Living Room Tricks")
+
+
+def test_ten_requested_tips_are_delivered_in_a_five_minute_video():
+    """Run 22 asked for ten and silently produced five."""
+
+    from vidfactory.script_generator import generate_script
+
+    topic = _engine().from_user_input(
+        "10 Small Living Room Tricks That Make Your Space Look Bigger"
+    )
+    script = generate_script(topic, duration_minutes=5, language="en")
+    assert len(script.items()) == 10
+    assert script.title.startswith("10 ")
+
+
+def test_a_forced_count_is_paid_for_by_shorter_sections():
+    """Ten ideas in five minutes means shorter ideas, not a longer video."""
+
+    from vidfactory.script_generator import generate_script
+
+    topic = _engine().from_user_input(
+        "10 Small Living Room Tricks That Make Your Space Look Bigger"
+    )
+    script = generate_script(topic, duration_minutes=5, language="en")
+    # 5 minutes at the default 155 wpm, with the +-10% the report gates on.
+    assert 700 <= script.word_count <= 860, script.word_count
+    # Shortening must not cost the guarantees the earlier rounds added.
+    assert script.causal.overall >= 0.90
+    assert script.causal.contradiction_count == 0
+    assert script.causal.cross_concept_contamination_count == 0
+
+
+def test_every_delivered_tip_still_says_what_to_do():
+    from vidfactory.script_generator import generate_script
+
+    topic = _engine().from_user_input(
+        "10 Small Living Room Tricks That Make Your Space Look Bigger"
+    )
+    script = generate_script(topic, duration_minutes=5, language="en")
+    for item in script.items():
+        assert len(item.text.split()) >= 25, item.text
+
+
+def test_the_measured_speech_rate_is_remembered_between_renders():
+    db = Database(":memory:")
+    db.initialize()
+    assert db.measured_speech_rate("piper", "en_US-hfc_female-medium") == 0.0
+    db.record_speech_rate("piper", "en_US-hfc_female-medium", 800, 300)
+    assert db.measured_speech_rate("piper", "en_US-hfc_female-medium") == 160.0
+
+
+def test_an_implausible_speech_rate_is_ignored():
+    db = Database(":memory:")
+    db.initialize()
+    db.record_speech_rate("piper", "v", 10_000, 5)
+    assert db.measured_speech_rate("piper", "v") == 0.0

@@ -215,6 +215,27 @@ PROMISES: tuple[Promise, ...] = (
                 ),
             ),
             Mechanism(
+                "wall_art_scale",
+                ("art", "artwork", "print", "canvas", "gallery wall", "framed",
+                 "picture", "poster", "wall art"),
+                # Art has its own reason for making a wall read larger, and it
+                # is not the curtain one. Run 22 explained a picture with a
+                # sentence about uncovered glass because both mechanisms are
+                # called vertical_emphasis.
+                "Artwork scaled to the furniture beneath it anchors the wall "
+                "instead of floating on it, so the eye reads one composed "
+                "surface and the room feels larger and more deliberate.",
+                also_because=(
+                    "A picture too small for its wall leaves the surface looking "
+                "fragmented and half-finished, while one sized to the furniture "
+                "below pulls the whole wall together and the room reads as more "
+                "spacious.",
+                    "Hanging art so it relates to what sits under it gives the wall a "
+                "single centre of gravity, which makes the space feel calmer and "
+                "more spacious than a scatter of small frames.",
+                ),
+            ),
+            Mechanism(
                 "furniture_footprint_scale",
                 # "undersized" and "too small" are deliberately absent: they
                 # describe whatever object is undersized, which is usually the
@@ -318,7 +339,8 @@ PROMISES: tuple[Promise, ...] = (
             ),
             Mechanism(
                 "window_geometry",
-                ("the fabric high", "fabric hung", "the track", "the glass", "the frame", "curtain", "drape", "rod", "panel", "blind"),
+                ("the fabric high", "fabric hung", "the track", "the glass",
+                 "beyond the frame", "the window frame", "curtain", "drape", "rod", "panel", "blind"),
                 "Hanging the fabric high and wide leaves the glass itself "
                 "uncovered, so more daylight reaches the room and the wall reads "
                 "taller than it measures.",

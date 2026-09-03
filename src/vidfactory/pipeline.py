@@ -173,12 +173,23 @@ class VideoPipeline:
             # Build the voice first: how fast it actually speaks decides how
             # many words a 20 minute video needs.
             tts_engine = self._build_tts()
-            script = self._write_script(topic, tts_engine.speech_rate_wpm)
+            measured = self.database.measured_speech_rate(
+                getattr(tts_engine, "name", ""), getattr(tts_engine, "voice", "")
+            )
+            script = self._write_script(
+                topic, measured or tts_engine.speech_rate_wpm
+            )
             scenes = self._plan_scenes(script)
             narration = self._narrate(scenes, tts_engine)
 
             # Work out the real shot count before searching, so the amount of
             # footage gathered matches what the edit will actually consume.
+            self.database.record_speech_rate(
+                getattr(tts_engine, "name", ""),
+                getattr(tts_engine, "voice", ""),
+                script.word_count,
+                float(getattr(narration, "duration", 0.0)),
+            )
             scene_durations = self._scene_durations(scenes, narration)
             shots_needed = estimate_shot_count(
                 scene_durations,
@@ -234,6 +245,15 @@ class VideoPipeline:
             if topic_text and topic_text.strip()
             else engine.generate()
         )
+        # script.item_count is the workflow's number_of_items input. A number
+        # the viewer typed into the topic is the more specific request, so it
+        # wins; this only fills in when the title names no count.
+        requested = int(self.config.get("script.item_count", 0) or 0)
+        if requested > 0 and not topic.count_is_explicit:
+            topic.item_count = requested
+            topic.count_is_explicit = True
+            log.info("Using the requested item count of %d", requested)
+
         self.database.add_topic(
             slug=topic.slug,
             title=topic.title,
@@ -1392,6 +1412,19 @@ class VideoPipeline:
         subtitle_metrics.update({
             "subtitle_style": style_name.lower(),
             "burn_in_subtitles": bool(burned),
+            "requested_duration_seconds": round(
+                float(self.config.get("video.duration_minutes", 20)) * 60.0, 1
+            ),
+            "actual_duration_seconds": round(float(narration.duration + tail_seconds), 1),
+            "duration_accuracy_percentage": round(
+                100.0
+                * float(narration.duration + tail_seconds)
+                / max(1.0, float(self.config.get("video.duration_minutes", 20)) * 60.0),
+                1,
+            ),
+            "requested_item_count": int(getattr(topic, "item_count", 0)),
+            "item_count_was_explicit": bool(getattr(topic, "count_is_explicit", False)),
+            "actual_item_count": len(script.items()),
             "generation_mode": self.generation_mode,
             "footage_claimed_for_cooldown": (
                 self.generation_mode == Database.PRODUCTION
