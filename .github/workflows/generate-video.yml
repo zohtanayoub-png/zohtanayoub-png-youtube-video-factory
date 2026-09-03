@@ -266,6 +266,7 @@ jobs:
               "visual_semantic_match_average",
               "low_relevance_clip_count",
               "premium_visual_ratio",
+              "premium_visual_ratio_caption_only",
               "empty_room_clip_count",
               "plastic_covered_clip_count",
               "floor_plan_clip_count",

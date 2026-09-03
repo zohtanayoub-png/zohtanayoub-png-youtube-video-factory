@@ -244,13 +244,21 @@ def build_report(
     # reported 91% premium footage from captions alone while the video
     # contained a floor plan, two empty rooms and a plastic-wrapped sofa.
     premium_clips = 0
+    caption_only_clips = 0
     for report, visual in zip(premium_reports, visual_reports):
         by_caption = bool(report.get("is_premium", False))
+        caption_only_clips += int(by_caption)
         if visual.get("analyzed"):
             premium_clips += int(by_caption and bool(visual.get("is_premium_visual")))
         else:
             premium_clips += int(by_caption)
     premium_ratio = round(premium_clips / len(selected), 3) if selected else 0.0
+    # Reported alongside it so the two are comparable: this is the number the
+    # old caption-only metric would have produced, and the gap between them is
+    # the whole point of opening the footage.
+    caption_only_ratio = (
+        round(caption_only_clips / len(selected), 3) if selected else 0.0
+    )
 
     people_dominant = max(
         sum(1 for r in rated if r.get("is_people_dominant")),
@@ -293,6 +301,7 @@ def build_report(
         "dark_clip_count": dark_clips,
         "empty_room_clip_count": empty_clips,
         "premium_visual_ratio": premium_ratio,
+        "premium_visual_ratio_caption_only": caption_only_ratio,
         "mean_interior_relevance": mean_relevance,
         "promise_alignment_failures": int(promise_alignment_failures),
         # ---- real frame inspection --------------------------------------
@@ -377,8 +386,10 @@ def build_report(
         EditorialCheck(
             "premium_visual_ratio",
             premium_ratio >= float(limits["min_premium_visual_ratio"]),
-            f"{premium_ratio:.0%} of clips are premium interior footage "
-            f"(minimum {float(limits['min_premium_visual_ratio']):.0%}); "
+            f"{premium_ratio:.0%} of clips are premium interior footage by "
+            f"caption AND frames (minimum "
+            f"{float(limits['min_premium_visual_ratio']):.0%}); the caption "
+            f"alone would have said {caption_only_ratio:.0%}; "
             f"{people_dominant} people-dominant, {dark_clips} dark, "
             f"{empty_clips} empty",
             severity="warning",

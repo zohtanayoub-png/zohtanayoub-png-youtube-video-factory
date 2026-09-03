@@ -210,8 +210,10 @@ Also in `editorial_quality_report.json`:
   the sentence being narrated
 * **`low_relevance_clip_count`** - clips that barely match what they illustrate
 * **`premium_visual_ratio`** - now requires the caption *and* the frames to
-  agree; it was 0.912 for a video containing a floor plan and a
-  plastic-wrapped sofa when captions were the only evidence
+  agree. **`premium_visual_ratio_caption_only`** is reported next to it: that
+  is the old number, and the gap between the two is the whole point. On a real
+  two minute render the caption-only figure was around 0.9 and the measured
+  one 0.4
 * **`empty_room_clip_count`**, **`plastic_covered_clip_count`**,
   **`floor_plan_clip_count`**, **`renovation_clip_count`**,
   **`people_dominant_clip_count`**, **`dark_clip_count`**

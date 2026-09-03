@@ -503,4 +503,6 @@ def test_premium_ratio_requires_both_the_caption_and_the_pixels(footage):
         shot_plan=_Plan(), clips=[_Result(clip)], scenes=[], script=_Script()
     )
     assert report.metrics["premium_visual_ratio"] == 0.0
+    # The caption on its own would have counted it, which is the whole point.
+    assert report.metrics["premium_visual_ratio_caption_only"] == 1.0
     assert report.metrics["floor_plan_clip_count"] == 1

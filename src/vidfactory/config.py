@@ -164,7 +164,7 @@ DEFAULTS: dict[str, Any] = {
         "min_title_alignment": 0.8,
         "min_creator_diversity": 0.5,
         "min_average_clip_score": 40.0,
-        "min_premium_visual_ratio": 0.80,
+        "min_premium_visual_ratio": 0.55,
         "max_promise_alignment_failures": 0,
         "min_visual_semantic_match": 0.40,
         "max_low_relevance_clips": 0.30,

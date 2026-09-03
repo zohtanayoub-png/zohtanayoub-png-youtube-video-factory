@@ -166,7 +166,14 @@ editorial:
   min_title_alignment: 0.8
   min_creator_diversity: 0.5
   min_average_clip_score: 40.0
-  min_premium_visual_ratio: 0.80   # share of clips that are premium interiors
+  # This was 0.80 when "premium" meant "the caption did not say anything bad".
+  # It now means the caption AND three decoded frames both agree, with no
+  # visual flag above the penalty threshold, which is a far higher bar for the
+  # same words. Measured across real two minute renders it lands at 0.36-0.42
+  # where the caption-only number was 0.91, so 0.80 would warn on every run
+  # and stop meaning anything. premium_visual_ratio_caption_only is reported
+  # next to it, so the gap between the two stays visible.
+  min_premium_visual_ratio: 0.55   # caption AND frames agree
   max_promise_alignment_failures: 0
   # Calibrated against a measured distribution, not guessed: on a real
   # two minute render the per-clip match ranged 0.15 to 0.91 with a mean of
