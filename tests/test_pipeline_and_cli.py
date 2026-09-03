@@ -200,6 +200,7 @@ def test_pipeline_runs_end_to_end_with_local_clips(local_pipeline):
     assert metrics["artifact_provenance_passed"] is True
 
 
+@pytest.mark.integration
 def test_the_offline_render_is_reproducible(tmp_path, has_ffmpeg, repo_root):
     """Two runs of the same fixture agree on the relevance they measured.
 
@@ -218,30 +219,40 @@ def test_the_offline_render_is_reproducible(tmp_path, has_ffmpeg, repo_root):
     assert scores[0] == scores[1]
 
 
+@pytest.mark.integration
 def test_footage_that_does_not_show_the_narration_still_fails_qc(
     tmp_path, has_ffmpeg, repo_root
 ):
     """The gate is not bypassed - it is measured against a decided score.
 
     Every clip is scripted below the production threshold, and the local
-    provider has nothing better to offer, so the repair pass runs, cannot find
-    a replacement that scores higher, and editorial QC fails. Proving that is
-    the whole point of supplying the score rather than removing the check.
+    library has nothing better to offer, so the repair pass runs three rounds,
+    fails to find a replacement that scores higher, and the render is refused.
+    Proving that is the whole point of supplying the score rather than
+    removing the check.
     """
 
     if not has_ffmpeg:
         pytest.skip("ffmpeg required")
     pipeline = _local_pipeline(tmp_path, repo_root, semantic=(0.20, 0.30))
-    result = pipeline.run(topic_text="5 Small Living Room Ideas")
 
-    metrics = result.editorial.metrics
-    assert metrics["final_shot_visual_semantic_match_average"] < 0.50
-    assert not result.editorial.passed, "QC must reject footage that shows nothing"
-    failed = {c.name for c in result.editorial.checks if not c.passed}
-    assert "final_shot_relevance" in failed
+    with pytest.raises(PipelineError) as failure:
+        pipeline.run(topic_text="5 Small Living Room Ideas")
+    assert "final_shot_relevance" in str(failure.value)
+    assert "minimum 0.5" in str(failure.value)
+
+    # The report is written before the run is refused, so the numbers behind
+    # that refusal can be read rather than inferred.
+    report = json.loads(
+        next(pipeline.output_dir.glob("editorial_quality_report.json")).read_text(
+            encoding="utf-8"
+        )
+    )
+    assert report["metrics"]["final_shot_visual_semantic_match_average"] < 0.50
     # The repair pass ran and found nothing better, rather than not running.
-    assert metrics["weak_shots_before_repair"] > 0
-    assert metrics["repair_rounds_used"] >= 1
+    assert report["metrics"]["weak_shots_before_repair"] > 0
+    assert report["metrics"]["repair_rounds_used"] >= 1
+    assert report["metrics"]["weak_shots_after_repair"] > 0
 
 
 def test_a_failed_run_is_recorded(local_pipeline, monkeypatch):
