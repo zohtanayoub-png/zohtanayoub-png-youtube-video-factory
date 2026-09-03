@@ -802,6 +802,159 @@
       "duration": null,
       "query": "bright styled living room natural light",
       "category": "living rooms"
+    },
+    {
+      "id": 90,
+      "video_id": 6,
+      "scene_id": "intro-000-00",
+      "narration": "There is a version of your living room that feels noticeably larger, and reaching it does not involve knocking down a single wall.",
+      "duration": null,
+      "query": "bright styled living room natural light",
+      "category": "living rooms"
+    },
+    {
+      "id": 91,
+      "video_id": 6,
+      "scene_id": "intro-000-01",
+      "narration": "It involves undoing about six decisions that are quietly costing you space.",
+      "duration": null,
+      "query": "sunlit living room wide shot",
+      "category": "living rooms"
+    },
+    {
+      "id": 92,
+      "video_id": 6,
+      "scene_id": "intro-000-02",
+      "narration": "Over the next 2 minutes we will work through 3 ideas, and for each one I will explain why it works and how to actually do it.",
+      "duration": null,
+      "query": "elegant living room morning light",
+      "category": "living rooms"
+    },
+    {
+      "id": 93,
+      "video_id": 6,
+      "scene_id": "item-001-00",
+      "narration": "Number 1. Do not center the ceiling light by default.",
+      "duration": null,
+      "query": "ceiling light living room interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 94,
+      "video_id": 6,
+      "scene_id": "item-001-01",
+      "narration": "The middle of the ceiling is almost never where the light is needed, which is why so many rooms have a bright empty center and a dim sofa.",
+      "duration": null,
+      "query": "pendant over seating area",
+      "category": "living rooms"
+    },
+    {
+      "id": 95,
+      "video_id": 6,
+      "scene_id": "item-001-02",
+      "narration": "Move or swag the fixture over the actual activity zone, or leave it off entirely and light the room from the perimeter with lamps.",
+      "duration": null,
+      "query": "modern ceiling fixture home",
+      "category": "living rooms"
+    },
+    {
+      "id": 96,
+      "video_id": 6,
+      "scene_id": "item-001-03",
+      "narration": "Light reaching the walls and corners shows your eye exactly where the room ends, and a room whose boundaries are visible reads as larger than one that fades into shadow a few feet in.",
+      "duration": null,
+      "query": "living room ceiling lamp",
+      "category": "living rooms"
+    },
+    {
+      "id": 97,
+      "video_id": 6,
+      "scene_id": "item-002-00",
+      "narration": "Which of these would you notice if it were missing? Probably this: balance visual weight across the room.",
+      "duration": null,
+      "query": "balanced living room furniture",
+      "category": "living rooms"
+    },
+    {
+      "id": 98,
+      "video_id": 6,
+      "scene_id": "item-002-01",
+      "narration": "If all the heavy, dark, tall pieces end up on one side, the room feels like it is tipping, even if nobody can name why.",
+      "duration": null,
+      "query": "symmetrical interior arrangement",
+      "category": "living rooms"
+    },
+    {
+      "id": 99,
+      "video_id": 6,
+      "scene_id": "item-002-02",
+      "narration": "Mentally split the room in half and check that each side carries a similar amount of mass. Balance a tall bookcase with a heavy sofa, not with a floor lamp.",
+      "duration": null,
+      "query": "well proportioned living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 100,
+      "video_id": 6,
+      "scene_id": "item-002-03",
+      "narration": "Oversized pieces eat visible floor area and narrow the walking paths, so a small room feels cramped even though its footprint never changed.",
+      "duration": null,
+      "query": "furniture balance interior design",
+      "category": "living rooms"
+    },
+    {
+      "id": 101,
+      "video_id": 6,
+      "scene_id": "item-003-00",
+      "narration": "The flip side of that is worth knowing too. Measure the room before you buy anything.",
+      "duration": null,
+      "query": "measuring room floor plan",
+      "category": "living rooms"
+    },
+    {
+      "id": 102,
+      "video_id": 6,
+      "scene_id": "item-003-01",
+      "narration": "Furniture almost always looks smaller in a showroom, and returning a sofa is one of the most expensive mistakes in home decorating.",
+      "duration": null,
+      "query": "tape measure interior planning",
+      "category": "living rooms"
+    },
+    {
+      "id": 103,
+      "video_id": 6,
+      "scene_id": "item-003-02",
+      "narration": "Tape the outline of a piece on the floor with painter's tape and live with it for two days. Check doorways, stair turns and lift dimensions too.",
+      "duration": null,
+      "query": "empty room before furniture",
+      "category": "living rooms"
+    },
+    {
+      "id": 104,
+      "video_id": 6,
+      "scene_id": "item-003-03",
+      "narration": "This is the sort of thing people cannot name but always notice.",
+      "duration": null,
+      "query": "room layout planning",
+      "category": "living rooms"
+    },
+    {
+      "id": 105,
+      "video_id": 6,
+      "scene_id": "item-003-04",
+      "narration": "A piece that is too big for the room steals the floor around it, so what is left over feels cramped even though nothing else changed.",
+      "duration": null,
+      "query": "measuring room floor plan",
+      "category": "living rooms"
+    },
+    {
+      "id": 106,
+      "video_id": 6,
+      "scene_id": "outro-000-00",
+      "narration": "That brings us to the end of the list. That is it for today. Thanks for spending the time.",
+      "duration": null,
+      "query": "bright styled living room natural light",
+      "category": "living rooms"
     }
   ]
 }
