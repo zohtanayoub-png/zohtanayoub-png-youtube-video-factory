@@ -373,45 +373,6 @@ jobs:
                   print(f"- `{check['name']}` ({check['severity']}): {check['detail']}")
           PY
 
-      - name: Report the narration and caption settings that were used
-        # Deliberately near the end of the job and deliberately short: the
-        # full quality table is hundreds of lines up, and "which voice
-        # actually spoke" is the one fact worth being able to read at a
-        # glance from the run page.
-        if: always()
-        continue-on-error: true
-        env:
-          OUTPUT_DIR: ${{ steps.generate.outputs.output_dir }}
-        run: |
-          python - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
-          import json, os, pathlib
-
-          report = pathlib.Path(os.environ.get("OUTPUT_DIR") or "") / "editorial_quality_report.json"
-          if not report.exists():
-              print("\n_No report to read._")
-              raise SystemExit(0)
-          data = json.loads(report.read_text())
-          print("\n### Narration and captions\n")
-          for key in (
-              "language", "tts_engine", "tts_voice",
-              "subtitle_style", "burn_in_subtitles", "subtitle_font",
-              "subtitles_srt_exported", "subtitles_ass_exported",
-              "subtitle_event_count", "average_subtitle_words",
-              "max_subtitle_lines", "subtitle_safe_area_passed",
-              "subtitle_timing_passed",
-          ):
-              if key in data:
-                  print(f"- **{key}**: `{data[key]}`")
-          engine = str(data.get("tts_engine", ""))
-          if engine == "piper":
-              print(f"\nPiper ran: narrated by `{data.get('tts_voice')}`.")
-          elif engine:
-              print(
-                  f"\n**Piper did not run** - narration fell back to `{engine}`, "
-                  f"which is intelligible but not natural."
-              )
-          PY
-
       - name: Inspect the burned-in captions
         # Measured, not assumed. The premium style is only worth anything if
         # the captions are actually in the picture, in the lower third, and
@@ -543,3 +504,42 @@ jobs:
         run: |
           rm -rf work
           df -h / | tail -1
+
+      - name: Report the narration and caption settings that were used
+        # Deliberately near the end of the job and deliberately short: the
+        # full quality table is hundreds of lines up, and "which voice
+        # actually spoke" is the one fact worth being able to read at a
+        # glance from the run page.
+        if: always()
+        continue-on-error: true
+        env:
+          OUTPUT_DIR: ${{ steps.generate.outputs.output_dir }}
+        run: |
+          python - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
+          import json, os, pathlib
+
+          report = pathlib.Path(os.environ.get("OUTPUT_DIR") or "") / "editorial_quality_report.json"
+          if not report.exists():
+              print("\n_No report to read._")
+              raise SystemExit(0)
+          data = json.loads(report.read_text())
+          print("\n### Narration and captions\n")
+          for key in (
+              "language", "tts_engine", "tts_voice",
+              "subtitle_style", "burn_in_subtitles", "subtitle_font",
+              "subtitles_srt_exported", "subtitles_ass_exported",
+              "subtitle_event_count", "average_subtitle_words",
+              "max_subtitle_lines", "subtitle_safe_area_passed",
+              "subtitle_timing_passed",
+          ):
+              if key in data:
+                  print(f"- **{key}**: `{data[key]}`")
+          engine = str(data.get("tts_engine", ""))
+          if engine == "piper":
+              print(f"\nPiper ran: narrated by `{data.get('tts_voice')}`.")
+          elif engine:
+              print(
+                  f"\n**Piper did not run** - narration fell back to `{engine}`, "
+                  f"which is intelligible but not natural."
+              )
+          PY
