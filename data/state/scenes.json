@@ -2161,6 +2161,168 @@
       "duration": null,
       "query": "bright styled living room natural light",
       "category": "living rooms"
+    },
+    {
+      "id": 241,
+      "video_id": 15,
+      "scene_id": "intro-000-00",
+      "narration": "There is a version of your living room that feels noticeably larger, and reaching it does not involve knocking down a single wall.",
+      "duration": null,
+      "query": "bright styled living room natural light",
+      "category": "living rooms"
+    },
+    {
+      "id": 242,
+      "video_id": 15,
+      "scene_id": "intro-000-01",
+      "narration": "It involves undoing about six decisions that are quietly costing you space. What follows is 3 practical ideas. No shopping lists you cannot afford, no renovations, just decisions that change how a room reads.",
+      "duration": null,
+      "query": "sunlit living room wide shot",
+      "category": "living rooms"
+    },
+    {
+      "id": 243,
+      "video_id": 15,
+      "scene_id": "item-001-00",
+      "narration": "Idea number 1. Buy one bigger thing instead of three medium things. Scale is expensive to fake. One oversized mirror, lamp or artwork will always look more considered than a wall of small purchases.",
+      "duration": null,
+      "query": "oversized mirror living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 244,
+      "video_id": 15,
+      "scene_id": "item-001-01",
+      "narration": "Set the budget you were going to spread across several items and spend it in one place, on the largest piece the wall can carry.",
+      "duration": null,
+      "query": "large statement lamp interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 245,
+      "video_id": 15,
+      "scene_id": "item-001-02",
+      "narration": "Oversized pieces eat visible floor area and narrow the walking paths, so a small room feels cramped even though its footprint never changed.",
+      "duration": null,
+      "query": "big artwork above sofa",
+      "category": "living rooms"
+    },
+    {
+      "id": 246,
+      "video_id": 15,
+      "scene_id": "item-002-00",
+      "narration": "Keep that in mind while we look at this. Number 2. Here is a mistake worth catching early. Mix at least three materials in every room.",
+      "duration": null,
+      "query": "texture layering living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 247,
+      "video_id": 15,
+      "scene_id": "item-002-01",
+      "narration": "Rooms that use one material everywhere read flat, and rooms that use ten read chaotic. Three or four contrasting textures create the tactile richness people describe as warm.",
+      "duration": null,
+      "query": "wood and linen interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 248,
+      "video_id": 15,
+      "scene_id": "item-002-02",
+      "narration": "Pair something soft, something hard, and something natural: a wool rug, a wood or stone table, and a woven basket or linen curtain.",
+      "duration": null,
+      "query": "woven basket living room decor",
+      "category": "living rooms"
+    },
+    {
+      "id": 249,
+      "video_id": 15,
+      "scene_id": "item-002-03",
+      "narration": "Add one small reflective element, like an aged brass lamp, to catch the light.",
+      "duration": null,
+      "query": "natural materials modern home",
+      "category": "living rooms"
+    },
+    {
+      "id": 250,
+      "video_id": 15,
+      "scene_id": "item-002-04",
+      "narration": "A reflection adds depth your eye reads as real, so the far wall stops behaving like the end of the room and the space feels bigger than it measures.",
+      "duration": null,
+      "query": "texture layering living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 251,
+      "video_id": 15,
+      "scene_id": "item-003-00",
+      "narration": "This next point comes up in almost every home. Number 3, and this one is a favorite. Imagine walking into the same room twice, once with this done and once without.",
+      "duration": null,
+      "query": "large living room rug sofa",
+      "category": "living rooms"
+    },
+    {
+      "id": 252,
+      "video_id": 15,
+      "scene_id": "item-003-01",
+      "narration": "Buy a rug that is genuinely too big rather than slightly too small. A rug defines the seating zone.",
+      "duration": null,
+      "query": "modern living room carpet interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 253,
+      "video_id": 15,
+      "scene_id": "item-003-02",
+      "narration": "When it is undersized, the furniture floats on the floor with no visual anchor and the whole seating group reads as smaller and more scattered than it actually is.",
+      "duration": null,
+      "query": "area rug under coffee table",
+      "category": "living rooms"
+    },
+    {
+      "id": 254,
+      "video_id": 15,
+      "scene_id": "item-003-03",
+      "narration": "Aim for a rug wide enough that at least the front legs of every seat sit on it.",
+      "duration": null,
+      "query": "neutral rug living room design",
+      "category": "living rooms"
+    },
+    {
+      "id": 255,
+      "video_id": 15,
+      "scene_id": "item-003-04",
+      "narration": "In most living rooms that means eight by ten feet, not five by seven, and it should extend roughly six to eight inches past the sides of the sofa.",
+      "duration": null,
+      "query": "large living room rug sofa",
+      "category": "living rooms"
+    },
+    {
+      "id": 256,
+      "video_id": 15,
+      "scene_id": "item-003-05",
+      "narration": "The classic error is a small rug centered under the coffee table only, which shrinks the room and makes expensive furniture look accidental.",
+      "duration": null,
+      "query": "modern living room carpet interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 257,
+      "video_id": 15,
+      "scene_id": "item-003-06",
+      "narration": "A piece that is too big for the room steals the floor around it, so what is left over feels cramped even though nothing else changed.",
+      "duration": null,
+      "query": "area rug under coffee table",
+      "category": "living rooms"
+    },
+    {
+      "id": 258,
+      "video_id": 15,
+      "scene_id": "outro-000-00",
+      "narration": "That is all 3 of them. If you found something here worth trying, there are more videos like this on the channel.",
+      "duration": null,
+      "query": "bright styled living room natural light",
+      "category": "living rooms"
     }
   ]
 }
