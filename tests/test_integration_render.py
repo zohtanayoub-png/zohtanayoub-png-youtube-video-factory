@@ -21,7 +21,7 @@ from vidfactory.config import load_config
 from vidfactory.database import Database
 from vidfactory.ffmpeg_utils import probe_media
 from vidfactory.pipeline import VideoPipeline
-from vidfactory.testassets import build_test_library, clips_needed_for
+from vidfactory.testassets import ScriptedVisualAnalyzer, build_test_library, clips_needed_for
 
 pytestmark = pytest.mark.integration
 
@@ -67,6 +67,18 @@ def rendered(tmp_path_factory, request):
         workdir=root / "work",
         run_id="integration",
         state_dir=root / "state",
+        # Synthetic footage, so the semantic score is decided rather than
+        # measured - see ScriptedVisualAnalyzer. Asking a real image/text
+        # model how well an FFmpeg gradient shows a decorating technique has
+        # no defensible answer, and the answer it gives depends on whether the
+        # CLIP export could be downloaded on this machine. Everything else in
+        # this render - frames, flags, ranking, repair, editorial QC - runs
+        # against the supplied score exactly as production does.
+        visual_analyzer=ScriptedVisualAnalyzer(
+            low=0.60,
+            high=0.75,
+            frames_per_clip=int(config.get("visual.frames_per_clip", 3)),
+        ),
     )
     result = pipeline.run(topic_text="25 Small Living Room Ideas That Make Any Space Look Bigger")
     yield result, config, database, root
