@@ -329,9 +329,9 @@ def command_entity_check(args: argparse.Namespace) -> int:
     few hundred kilobytes rather than a few hundred megabytes.
     """
 
-    from .entities import ENTITIES, BY_NAME
+    from .entities import ENTITIES, BY_NAME, grounding_prompts, score_from_similarities
     from .stock.registry import build_providers
-    from .visual_analysis import VisualAnalyzer
+    from .visual_analysis import PROMPT_TEMPLATE, VisualAnalyzer, _cosine, _ramp
     from .visual_model import load_model
 
     config = load_config(args.config)
@@ -358,24 +358,52 @@ def command_entity_check(args: argparse.Namespace) -> int:
     per_entity = max(2, int(args.samples))
 
     def scores_for(entity, query: str) -> list[float]:
+        """This entity's probes against whatever ``query`` returns.
+
+        The entity is passed in rather than re-derived from the query text.
+        The first version of this let the analyzer infer it, so scoring rug
+        footage "as if it were lighting" silently scored it as rug footage and
+        every entity's control row came back byte-identical - which is exactly
+        the tell that said the harness, not only the probe, was wrong.
+        """
+
         try:
             results = provider.search(query, per_page=per_entity, page=1)
         except Exception as exc:
             print(f"       search failed for {query!r}: {exc}")
             return []
+        prompts, _ = grounding_prompts(entity)
+        try:
+            text_vectors = analyzer._encode_texts(
+                [PROMPT_TEMPLATE.format(p) for p in prompts]
+            )
+        except Exception as exc:
+            print(f"       prompt encoding failed: {exc}")
+            return []
         out: list[float] = []
         for clip in results[:per_entity]:
-            analysis = analyzer.analyze_clip(
-                clip, query=query, narration=entity.triggers[0]
-            )
-            grounding = analysis.grounding
+            frames = [f for f in analyzer.sample(clip) if f and f.ok]
+            if not frames:
+                continue
+            try:
+                image_vectors = list(model.encode_images(frames))
+            except Exception:
+                continue
+            per_frame = [
+                [_cosine(image, t) for t in text_vectors] for image in image_vectors
+            ]
+            grounding = score_from_similarities(entity, per_frame, _ramp)
             if grounding.checked:
                 out.append(grounding.score)
         return out
 
     report: dict[str, Any] = {}
-    for entity in entities:
-        other = next(e for e in ENTITIES if e.name != entity.name)
+    for index, entity in enumerate(entities):
+        # A different entity each time, so the control is genuinely footage of
+        # something else rather than the first entity in the list every time.
+        other = entities[(index + len(entities) // 2) % len(entities)]
+        if other.name == entity.name:
+            other = entities[(index + 1) % len(entities)]
         present = scores_for(entity, entity.queries[0])
         absent = scores_for(entity, other.queries[0])
         report[entity.name] = {"present": present, "absent": absent}

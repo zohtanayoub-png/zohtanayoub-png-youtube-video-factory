@@ -44,13 +44,18 @@ from .logging_utils import get_logger
 log = get_logger("ENTITY")
 
 
-#: A shot is grounded when the positive reading beats the best competing one
-#: by this much cosine similarity. Deliberately the same scale as
-#: ``CONCEPT_MARGIN_HIGH``: these are the same kind of comparison.
-ENTITY_MARGIN_LOW = -0.01
-ENTITY_MARGIN_HIGH = 0.045
+#: How far the positive reading has to beat the *average* competing one.
+#: Not the best competing one: a calibration run over sixty real Pexels clips
+#: that genuinely contain their object scored them at a median of 0.049 under
+#: best-versus-best, because "a close-up of furniture" and "a person standing
+#: indoors" are broad prompts and a broad prompt beats a specific one on CLIP
+#: similarity almost every time. That is the same generality bias
+#: ``_clip_semantic`` documents and solves, and this repeated it.
+ENTITY_MARGIN_LOW = -0.02
+ENTITY_MARGIN_HIGH = 0.06
 
-#: The ramped margin a shot needs to count as showing its object.
+#: The score a shot needs to count as showing its object. Set from the
+#: calibration run rather than by analogy - see ``vidfactory entity-check``.
 ENTITY_PRESENCE_PASS = 0.5
 
 
@@ -450,12 +455,29 @@ def score_from_similarities(
     per_frame: Sequence[Sequence[float]],
     ramp: Any,
 ) -> EntityGrounding:
-    """Median over frames of (best positive - best competitor), ramped.
+    """Where the positive reading lands among all the readings, per frame.
 
-    The median rather than the mean for the same reason the pixel flags use
-    one: a single frame where the camera has panned off the rug should not
-    condemn a clip that shows it, and a single lucky frame should not rescue
-    one that does not.
+    The first version of this took the best positive against the *best*
+    competitor, and a calibration run said so plainly: sixty real clips
+    containing their object scored a median of 0.049, while clips of something
+    else scored 0.373. Anti-correlated, not merely mis-thresholded.
+
+    The cause is the generality bias :func:`_clip_semantic` already documents.
+    "a close-up of furniture" and "a person standing indoors" are broad, "a lit
+    floor lamp in a room" is specific, and CLIP scores the broad prompt higher
+    against almost any photograph - so a maximum taken over five broad
+    competitors beats a maximum taken over four specific positives whether or
+    not the lamp is there. Worse, it is not even wrong about the picture: a
+    clip of a rug under a sofa genuinely *is* a close-up of furniture.
+
+    So this asks the scale-free question instead, the same two signals that
+    module settled on: where the best positive sits in the range of all the
+    similarities, and how far it beats the *average* competitor rather than
+    the luckiest one.
+
+    The median over frames, for the reason the pixel flags use one: a single
+    frame where the camera has panned off the rug should not condemn a clip
+    that shows it, and a single lucky frame should not rescue one that does not.
     """
 
     offset = len(entity.positives)
@@ -464,9 +486,15 @@ def score_from_similarities(
         if len(similarities) <= offset:
             continue
         best_positive = max(similarities[:offset])
-        best_competitor = max(similarities[offset:])
-        margins.append(ramp(best_positive - best_competitor,
-                            ENTITY_MARGIN_LOW, ENTITY_MARGIN_HIGH))
+        competitors = similarities[offset:]
+        low, high = min(similarities), max(similarities)
+        spread = high - low
+        position = (best_positive - low) / spread if spread > 1e-6 else 0.5
+        margin = best_positive - (sum(competitors) / len(competitors))
+        margins.append(
+            0.65 * position
+            + 0.35 * ramp(margin, ENTITY_MARGIN_LOW, ENTITY_MARGIN_HIGH)
+        )
     if not margins:
         return EntityGrounding(entity=entity.name, labels=entity.labels)
     margins.sort()
