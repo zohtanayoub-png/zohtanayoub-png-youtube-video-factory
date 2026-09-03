@@ -234,7 +234,12 @@ src/vidfactory/
   to its video's new one. Counters use `ours + theirs - base`, the only
   formula that neither loses a use nor invents one; importing both snapshots
   instead would key on the autoincrement `id` and let one branch's
-  `videos.id = 3` overwrite the other's different video.
+  `videos.id = 3` overwrite the other's different video. `schema_info` is
+  merged too, because it holds the measured speech rate: the version takes
+  the newer side, and two measured rates for one voice are averaged rather
+  than picked between, since both are real renders of the same voice.
+  Leaving that table out of the union restored the engine's declared 155
+  wpm on the next render, which is the whole of the duration bug.
 * **Schema migrations run in `initialize()`, not lazily.** They used to run on
   the first `record_clip_use`, which is *after* `import_state` - and
   `import_state` builds its column list from `PRAGMA table_info`, so every

@@ -256,3 +256,73 @@ def test_the_measured_speech_rate_survives_an_export_and_import(tmp_path):
     second = Database(str(tmp_path / "b.db"))
     second.import_state(tmp_path / "state")
     assert second.measured_speech_rate("piper", "en_US-hfc_female-medium") > 150.0
+
+
+def test_the_speech_rate_survives_a_merge(tmp_path):
+    """A calibration only one side measured is still a calibration.
+
+    schema_info was not merged at all, so a resolution wrote back the bare
+    version row that ``initialize`` creates and the next render sized its
+    script from the engine's declared 155 wpm again - undoing exactly the fix
+    that got run 24 from 263s to 305s.
+    """
+
+    base, ours, theirs, out = _sides(tmp_path)
+    write(base, "schema_info", [{"key": "version", "value": "1"}])
+    write(ours, "schema_info", [
+        {"key": "version", "value": "1"},
+        {"key": "speech_rate:piper:en_US-hfc_female-medium", "value": "180.96"},
+    ])
+    write(theirs, "schema_info", [{"key": "version", "value": "1"}])
+
+    merge_state(base, ours, theirs, out)
+    settings = {r["key"]: r["value"] for r in json.load(open(out / "schema_info.json"))["rows"]}
+    assert settings["speech_rate:piper:en_US-hfc_female-medium"] == "180.96"
+
+    database = Database(str(tmp_path / "f.db"))
+    database.import_state(out)
+    assert database.measured_speech_rate("piper", "en_US-hfc_female-medium") == 180.96
+
+
+def test_two_measured_rates_are_averaged_not_picked(tmp_path):
+    """Both sides measured the same voice. Neither render is thrown away."""
+
+    base, ours, theirs, out = _sides(tmp_path)
+    key = "speech_rate:piper:en_US-hfc_female-medium"
+    write(base, "schema_info", [{"key": key, "value": "155.0"}])
+    write(ours, "schema_info", [{"key": key, "value": "180.0"}])
+    write(theirs, "schema_info", [{"key": key, "value": "170.0"}])
+
+    merge_state(base, ours, theirs, out)
+    settings = {r["key"]: r["value"] for r in json.load(open(out / "schema_info.json"))["rows"]}
+    assert float(settings[key]) == 175.0
+
+
+def test_the_schema_version_takes_the_newer_side(tmp_path):
+    base, ours, theirs, out = _sides(tmp_path)
+    write(base, "schema_info", [{"key": "version", "value": "1"}])
+    write(ours, "schema_info", [{"key": "version", "value": "1"}])
+    write(theirs, "schema_info", [{"key": "version", "value": "2"}])
+
+    merge_state(base, ours, theirs, out)
+    settings = {r["key"]: r["value"] for r in json.load(open(out / "schema_info.json"))["rows"]}
+    assert settings["version"] == "2"
+
+
+def test_the_merged_history_in_the_repository_kept_both_sides(tmp_path):
+    """What the resolution of main into this branch actually produced."""
+
+    database = Database(str(tmp_path / "f.db"))
+    database.import_state("data/state")
+    stats = database.clip_mode_stats()
+    # main rendered run 22 while this branch rendered 23 and 24, so the union
+    # holds more clips than either side did alone.
+    assert stats["clips"] >= 490
+    development_uses = database.query("SELECT SUM(test_use_count) AS n FROM clips")[0]["n"]
+    production_uses = database.query("SELECT SUM(use_count) AS n FROM clips")[0]["n"]
+    # 639 development uses on this branch + 544 on main - 465 they shared.
+    assert int(development_uses) == 718
+    # No development render ever claimed production footage, on either side.
+    assert int(production_uses) == 34
+    assert stats["production"] == 34
+    assert database.measured_speech_rate("piper", "en_US-hfc_female-medium") > 150.0

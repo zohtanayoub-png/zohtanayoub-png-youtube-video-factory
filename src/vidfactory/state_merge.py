@@ -135,11 +135,16 @@ def _generation_key(row: Row) -> str:
     return f"{_text(row.get('run_id'))}|{_text(row.get('started_at'))}"
 
 
+def _setting_key(row: Row) -> str:
+    return _text(row.get("key"))
+
+
 KEYS: dict[str, Callable[[Row], str]] = {
     "topics": _topic_key,
     "clips": _clip_key,
     "videos": _video_key,
     "generations": _generation_key,
+    "schema_info": _setting_key,
 }
 
 
@@ -264,11 +269,56 @@ def _merge_generation(ours: Row | None, theirs: Row | None, base: Row | None) ->
     return merged
 
 
+def _merge_setting(ours: Row | None, theirs: Row | None, base: Row | None) -> Row:
+    """Settings are single values, so the union has to decide what they mean.
+
+    ``schema_info`` holds the schema version and the measured speech rate, and
+    the rate is the reason this table is merged at all: it is what sizes the
+    next script, and a resolution that quietly restored the engine's declared
+    155 wpm would put the duration back where run 23 was.
+
+    Three keys, three meanings. The version is the newest schema either side
+    reached, so it is the maximum. A measured rate is two independent estimates
+    of how fast one voice actually speaks, so when both sides rendered, their
+    mean is a better estimate than either and neither render is discarded.
+    Anything else is resolved the ordinary three-way way: the side that changed
+    it wins.
+    """
+
+    key = _setting_key(ours or theirs or {})
+    ours_value = (ours or {}).get("value")
+    theirs_value = (theirs or {}).get("value")
+    base_value = (base or {}).get("value")
+
+    if key == "version":
+        versions = [_count({"v": v}, "v") for v in (ours_value, theirs_value) if v is not None]
+        return {"key": key, "value": str(max(versions or [1]))}
+
+    if key.startswith("speech_rate:"):
+        rates = []
+        for value in (ours_value, theirs_value):
+            try:
+                rate = float(value)
+            except (TypeError, ValueError):
+                continue
+            if rate > 0:
+                rates.append(rate)
+        if rates:
+            return {"key": key, "value": str(round(sum(rates) / len(rates), 2))}
+
+    if ours_value is not None and ours_value != base_value:
+        return {"key": key, "value": ours_value}
+    if theirs_value is not None:
+        return {"key": key, "value": theirs_value}
+    return {"key": key, "value": ours_value if ours_value is not None else base_value}
+
+
 MERGERS: dict[str, Callable[[Row | None, Row | None, Row | None], Row]] = {
     "topics": _merge_topic,
     "clips": _merge_clip,
     "videos": _merge_video,
     "generations": _merge_generation,
+    "schema_info": _merge_setting,
 }
 
 
@@ -313,7 +363,7 @@ def merge_state(
     report = MergeReport()
     merged_tables: dict[str, list[Row]] = {}
 
-    for table in ("topics", "clips", "videos", "generations"):
+    for table in ("topics", "clips", "videos", "generations", "schema_info"):
         key = KEYS[table]
         ours = _index(read_snapshot(ours_dir, table), key)
         theirs = _index(read_snapshot(theirs_dir, table), key)

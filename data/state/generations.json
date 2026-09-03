@@ -85,78 +85,15 @@
     },
     {
       "id": 10,
-      "run_id": "run-2",
-      "topic": "5 Small Living Room Tricks That Make Your Space Look Bigger",
-      "started_at": "2026-09-02T17:11:47+00:00",
-      "finished_at": "2026-09-02T17:15:44+00:00",
+      "run_id": "run-22-20260903-135545-77ab775a",
+      "topic": "10 Small Living Room Tricks That Make Your Space Look Bigger",
+      "started_at": "2026-09-03T13:55:45+00:00",
+      "finished_at": "2026-09-03T14:04:04+00:00",
       "status": "success",
-      "details": "{\"title\": \"5 Small Living Room Tricks That Make Your Space Look Bigger\", \"topic\": {\"title\": \"5 Small Living Room Tricks That Make Your Space Look Bigger\", \"category\": \"living rooms\", \"angle\": \"tricks\", \"item_count\": 5, \"slug\": \"5-small-living-room-tricks-that-make-your-space-look-bigger\", \"source\": \"manual\", \"keywords\": [\"small\", \"living\", \"room\", \"tricks\", \"space\", \"look\", \"bigger\"]}, \"video\": \"output/run-2/final_video.mp4\", \"duration_seconds\": 162.11, \"subtitles\": \"output/run-2/subtitles.srt\", \"metadata\": \"output/run-2/metadata.json\", \"sources\": \"output/run-2/video_sources.json\", \"quality_passed\": true, \"editorial_passed\": true, \"unique_source_ratio\": 1.0, \"youtube_id\": \"\"}"
+      "details": "{\"title\": \"5 Small Living Room Tricks That Make Your Space Look Bigger\", \"topic\": {\"title\": \"10 Small Living Room Tricks That Make Your Space Look Bigger\", \"category\": \"living rooms\", \"angle\": \"tricks\", \"item_count\": 10, \"slug\": \"10-small-living-room-tricks-that-make-your-space-look-bigger\", \"source\": \"manual\", \"keywords\": [\"small\", \"living\", \"room\", \"tricks\", \"space\", \"look\", \"bigger\"]}, \"video\": \"output/run-22-20260903-135545-77ab775a/final_video.mp4\", \"duration_seconds\": 244.31, \"subtitles\": \"output/run-22-20260903-135545-77ab775a/subtitles.srt\", \"metadata\": \"output/run-22-20260903-135545-77ab775a/metadata.json\", \"sources\": \"output/run-22-20260903-135545-77ab775a/video_sources.json\", \"generation_id\": \"run-22-20260903-135545-77ab775a\", \"quality_passed\": true, \"editorial_passed\": true, \"artifact_provenance_passed\": true, \"unique_source_ratio\": 1.0, \"youtube_id\": \"\"}"
     },
     {
       "id": 11,
-      "run_id": "run-3",
-      "topic": "5 Small Living Room Tricks That Make Your Space Look Bigger",
-      "started_at": "2026-09-02T17:28:27+00:00",
-      "finished_at": "2026-09-02T17:31:13+00:00",
-      "status": "success",
-      "details": "{\"title\": \"5 Small Living Room Tricks That Make Your Space Look Bigger\", \"topic\": {\"title\": \"5 Small Living Room Tricks That Make Your Space Look Bigger\", \"category\": \"living rooms\", \"angle\": \"tricks\", \"item_count\": 5, \"slug\": \"5-small-living-room-tricks-that-make-your-space-look-bigger\", \"source\": \"manual\", \"keywords\": [\"small\", \"living\", \"room\", \"tricks\", \"space\", \"look\", \"bigger\"]}, \"video\": \"output/run-3/final_video.mp4\", \"duration_seconds\": 165.4, \"subtitles\": \"output/run-3/subtitles.srt\", \"metadata\": \"output/run-3/metadata.json\", \"sources\": \"output/run-3/video_sources.json\", \"quality_passed\": true, \"editorial_passed\": true, \"unique_source_ratio\": 1.0, \"youtube_id\": \"\"}"
-    },
-    {
-      "id": 12,
-      "run_id": "run-4",
-      "topic": "5 Small Living Room Tricks That Make Your Space Look Bigger",
-      "started_at": "2026-09-02T19:22:47+00:00",
-      "finished_at": "2026-09-02T19:26:55+00:00",
-      "status": "success",
-      "details": "{\"title\": \"5 Small Living Room Tricks That Make Your Space Look Bigger\", \"topic\": {\"title\": \"5 Small Living Room Tricks That Make Your Space Look Bigger\", \"category\": \"living rooms\", \"angle\": \"tricks\", \"item_count\": 5, \"slug\": \"5-small-living-room-tricks-that-make-your-space-look-bigger\", \"source\": \"manual\", \"keywords\": [\"small\", \"living\", \"room\", \"tricks\", \"space\", \"look\", \"bigger\"]}, \"video\": \"output/run-4/final_video.mp4\", \"duration_seconds\": 172.83, \"subtitles\": \"output/run-4/subtitles.srt\", \"metadata\": \"output/run-4/metadata.json\", \"sources\": \"output/run-4/video_sources.json\", \"quality_passed\": true, \"editorial_passed\": true, \"unique_source_ratio\": 1.0, \"youtube_id\": \"\"}"
-    },
-    {
-      "id": 13,
-      "run_id": "run-5-20260902-203859-2effaf85",
-      "topic": "Small Living Room Tricks That Make Your Space Look Bigger",
-      "started_at": "2026-09-02T20:38:59+00:00",
-      "finished_at": "2026-09-02T20:40:46+00:00",
-      "status": "success",
-      "details": "{\"title\": \"Small Living Room Tricks That Make Your Space Look Bigger\", \"topic\": {\"title\": \"Small Living Room Tricks That Make Your Space Look Bigger\", \"category\": \"living rooms\", \"angle\": \"tricks\", \"item_count\": 25, \"slug\": \"small-living-room-tricks-that-make-your-space-look-bigger\", \"source\": \"manual\", \"keywords\": [\"small\", \"living\", \"room\", \"tricks\", \"space\", \"look\", \"bigger\"]}, \"video\": \"output/run-5-20260902-203859-2effaf85/final_video.mp4\", \"duration_seconds\": 103.9, \"subtitles\": \"output/run-5-20260902-203859-2effaf85/subtitles.srt\", \"metadata\": \"output/run-5-20260902-203859-2effaf85/metadata.json\", \"sources\": \"output/run-5-20260902-203859-2effaf85/video_sources.json\", \"generation_id\": \"run-5-20260902-203859-2effaf85\", \"quality_passed\": true, \"editorial_passed\": true, \"artifact_provenance_passed\": true, \"unique_source_ratio\": 1.0, \"youtube_id\": \"\"}"
-    },
-    {
-      "id": 14,
-      "run_id": "run-6-20260902-221557-ecad0bcf",
-      "topic": "Small Living Room Tricks That Make Your Space Look Bigger",
-      "started_at": "2026-09-02T22:15:57+00:00",
-      "finished_at": "2026-09-02T22:18:23+00:00",
-      "status": "success",
-      "details": "{\"title\": \"Small Living Room Tricks That Make Your Space Look Bigger\", \"topic\": {\"title\": \"Small Living Room Tricks That Make Your Space Look Bigger\", \"category\": \"living rooms\", \"angle\": \"tricks\", \"item_count\": 25, \"slug\": \"small-living-room-tricks-that-make-your-space-look-bigger\", \"source\": \"manual\", \"keywords\": [\"small\", \"living\", \"room\", \"tricks\", \"space\", \"look\", \"bigger\"]}, \"video\": \"output/run-6-20260902-221557-ecad0bcf/final_video.mp4\", \"duration_seconds\": 105.2, \"subtitles\": \"output/run-6-20260902-221557-ecad0bcf/subtitles.srt\", \"metadata\": \"output/run-6-20260902-221557-ecad0bcf/metadata.json\", \"sources\": \"output/run-6-20260902-221557-ecad0bcf/video_sources.json\", \"generation_id\": \"run-6-20260902-221557-ecad0bcf\", \"quality_passed\": true, \"editorial_passed\": true, \"artifact_provenance_passed\": true, \"unique_source_ratio\": 1.0, \"youtube_id\": \"\"}"
-    },
-    {
-      "id": 15,
-      "run_id": "run-7-20260903-000913-a9ab2c00",
-      "topic": "Small Living Room Tricks That Make Your Space Look Bigger",
-      "started_at": "2026-09-03T00:09:13+00:00",
-      "finished_at": "2026-09-03T00:12:51+00:00",
-      "status": "success",
-      "details": "{\"title\": \"Small Living Room Tricks That Make Your Space Look Bigger\", \"topic\": {\"title\": \"Small Living Room Tricks That Make Your Space Look Bigger\", \"category\": \"living rooms\", \"angle\": \"tricks\", \"item_count\": 25, \"slug\": \"small-living-room-tricks-that-make-your-space-look-bigger\", \"source\": \"manual\", \"keywords\": [\"small\", \"living\", \"room\", \"tricks\", \"space\", \"look\", \"bigger\"]}, \"video\": \"output/run-7-20260903-000913-a9ab2c00/final_video.mp4\", \"duration_seconds\": 122.3, \"subtitles\": \"output/run-7-20260903-000913-a9ab2c00/subtitles.srt\", \"metadata\": \"output/run-7-20260903-000913-a9ab2c00/metadata.json\", \"sources\": \"output/run-7-20260903-000913-a9ab2c00/video_sources.json\", \"generation_id\": \"run-7-20260903-000913-a9ab2c00\", \"quality_passed\": true, \"editorial_passed\": true, \"artifact_provenance_passed\": true, \"unique_source_ratio\": 1.0, \"youtube_id\": \"\"}"
-    },
-    {
-      "id": 16,
-      "run_id": "run-8-20260903-003107-4afebf33",
-      "topic": "Small Living Room Tricks That Make Your Space Look Bigger",
-      "started_at": "2026-09-03T00:31:07+00:00",
-      "finished_at": "2026-09-03T00:34:51+00:00",
-      "status": "success",
-      "details": "{\"title\": \"Small Living Room Tricks That Make Your Space Look Bigger\", \"topic\": {\"title\": \"Small Living Room Tricks That Make Your Space Look Bigger\", \"category\": \"living rooms\", \"angle\": \"tricks\", \"item_count\": 25, \"slug\": \"small-living-room-tricks-that-make-your-space-look-bigger\", \"source\": \"manual\", \"keywords\": [\"small\", \"living\", \"room\", \"tricks\", \"space\", \"look\", \"bigger\"]}, \"video\": \"output/run-8-20260903-003107-4afebf33/final_video.mp4\", \"duration_seconds\": 127.37, \"subtitles\": \"output/run-8-20260903-003107-4afebf33/subtitles.srt\", \"metadata\": \"output/run-8-20260903-003107-4afebf33/metadata.json\", \"sources\": \"output/run-8-20260903-003107-4afebf33/video_sources.json\", \"generation_id\": \"run-8-20260903-003107-4afebf33\", \"quality_passed\": true, \"editorial_passed\": true, \"artifact_provenance_passed\": true, \"unique_source_ratio\": 1.0, \"youtube_id\": \"\"}"
-    },
-    {
-      "id": 17,
-      "run_id": "run-9-20260903-005100-990a9b62",
-      "topic": "Small Living Room Tricks That Make Your Space Look Bigger",
-      "started_at": "2026-09-03T00:51:00+00:00",
-      "finished_at": "2026-09-03T00:55:09+00:00",
-      "status": "success",
-      "details": "{\"title\": \"Small Living Room Tricks That Make Your Space Look Bigger\", \"topic\": {\"title\": \"Small Living Room Tricks That Make Your Space Look Bigger\", \"category\": \"living rooms\", \"angle\": \"tricks\", \"item_count\": 25, \"slug\": \"small-living-room-tricks-that-make-your-space-look-bigger\", \"source\": \"manual\", \"keywords\": [\"small\", \"living\", \"room\", \"tricks\", \"space\", \"look\", \"bigger\"]}, \"video\": \"output/run-9-20260903-005100-990a9b62/final_video.mp4\", \"duration_seconds\": 141.5, \"subtitles\": \"output/run-9-20260903-005100-990a9b62/subtitles.srt\", \"metadata\": \"output/run-9-20260903-005100-990a9b62/metadata.json\", \"sources\": \"output/run-9-20260903-005100-990a9b62/video_sources.json\", \"generation_id\": \"run-9-20260903-005100-990a9b62\", \"quality_passed\": true, \"editorial_passed\": true, \"artifact_provenance_passed\": true, \"unique_source_ratio\": 1.0, \"youtube_id\": \"\"}"
-    },
-    {
-      "id": 18,
       "run_id": "run-23-20260903-142522-442a91b3",
       "topic": "10 Small Living Room Tricks That Make Your Space Look Bigger",
       "started_at": "2026-09-03T14:25:22+00:00",
@@ -165,13 +102,85 @@
       "details": "{\"title\": \"10 Small Living Room Tricks That Make Your Space Look Bigger\", \"topic\": {\"title\": \"10 Small Living Room Tricks That Make Your Space Look Bigger\", \"category\": \"living rooms\", \"angle\": \"tricks\", \"item_count\": 10, \"count_is_explicit\": true, \"slug\": \"10-small-living-room-tricks-that-make-your-space-look-bigger\", \"source\": \"manual\", \"keywords\": [\"small\", \"living\", \"room\", \"tricks\", \"space\", \"look\", \"bigger\"]}, \"video\": \"output/run-23-20260903-142522-442a91b3/final_video.mp4\", \"duration_seconds\": 263.53, \"subtitles\": \"output/run-23-20260903-142522-442a91b3/subtitles.srt\", \"metadata\": \"output/run-23-20260903-142522-442a91b3/metadata.json\", \"sources\": \"output/run-23-20260903-142522-442a91b3/video_sources.json\", \"generation_id\": \"run-23-20260903-142522-442a91b3\", \"quality_passed\": true, \"editorial_passed\": true, \"artifact_provenance_passed\": true, \"unique_source_ratio\": 1.0, \"youtube_id\": \"\"}"
     },
     {
-      "id": 19,
+      "id": 12,
       "run_id": "run-24-20260903-143652-89fae09a",
       "topic": "10 Small Living Room Tricks That Make Your Space Look Bigger",
       "started_at": "2026-09-03T14:36:52+00:00",
       "finished_at": "2026-09-03T14:47:45+00:00",
       "status": "success",
       "details": "{\"title\": \"10 Small Living Room Tricks That Make Your Space Look Bigger\", \"topic\": {\"title\": \"10 Small Living Room Tricks That Make Your Space Look Bigger\", \"category\": \"living rooms\", \"angle\": \"tricks\", \"item_count\": 10, \"count_is_explicit\": true, \"slug\": \"10-small-living-room-tricks-that-make-your-space-look-bigger\", \"source\": \"manual\", \"keywords\": [\"small\", \"living\", \"room\", \"tricks\", \"space\", \"look\", \"bigger\"]}, \"video\": \"output/run-24-20260903-143652-89fae09a/final_video.mp4\", \"duration_seconds\": 304.74, \"subtitles\": \"output/run-24-20260903-143652-89fae09a/subtitles.srt\", \"metadata\": \"output/run-24-20260903-143652-89fae09a/metadata.json\", \"sources\": \"output/run-24-20260903-143652-89fae09a/video_sources.json\", \"generation_id\": \"run-24-20260903-143652-89fae09a\", \"quality_passed\": true, \"editorial_passed\": true, \"artifact_provenance_passed\": true, \"unique_source_ratio\": 1.0, \"youtube_id\": \"\"}"
+    },
+    {
+      "id": 13,
+      "run_id": "run-2",
+      "topic": "5 Small Living Room Tricks That Make Your Space Look Bigger",
+      "started_at": "2026-09-02T17:11:47+00:00",
+      "finished_at": "2026-09-02T17:15:44+00:00",
+      "status": "success",
+      "details": "{\"title\": \"5 Small Living Room Tricks That Make Your Space Look Bigger\", \"topic\": {\"title\": \"5 Small Living Room Tricks That Make Your Space Look Bigger\", \"category\": \"living rooms\", \"angle\": \"tricks\", \"item_count\": 5, \"slug\": \"5-small-living-room-tricks-that-make-your-space-look-bigger\", \"source\": \"manual\", \"keywords\": [\"small\", \"living\", \"room\", \"tricks\", \"space\", \"look\", \"bigger\"]}, \"video\": \"output/run-2/final_video.mp4\", \"duration_seconds\": 162.11, \"subtitles\": \"output/run-2/subtitles.srt\", \"metadata\": \"output/run-2/metadata.json\", \"sources\": \"output/run-2/video_sources.json\", \"quality_passed\": true, \"editorial_passed\": true, \"unique_source_ratio\": 1.0, \"youtube_id\": \"\"}"
+    },
+    {
+      "id": 14,
+      "run_id": "run-3",
+      "topic": "5 Small Living Room Tricks That Make Your Space Look Bigger",
+      "started_at": "2026-09-02T17:28:27+00:00",
+      "finished_at": "2026-09-02T17:31:13+00:00",
+      "status": "success",
+      "details": "{\"title\": \"5 Small Living Room Tricks That Make Your Space Look Bigger\", \"topic\": {\"title\": \"5 Small Living Room Tricks That Make Your Space Look Bigger\", \"category\": \"living rooms\", \"angle\": \"tricks\", \"item_count\": 5, \"slug\": \"5-small-living-room-tricks-that-make-your-space-look-bigger\", \"source\": \"manual\", \"keywords\": [\"small\", \"living\", \"room\", \"tricks\", \"space\", \"look\", \"bigger\"]}, \"video\": \"output/run-3/final_video.mp4\", \"duration_seconds\": 165.4, \"subtitles\": \"output/run-3/subtitles.srt\", \"metadata\": \"output/run-3/metadata.json\", \"sources\": \"output/run-3/video_sources.json\", \"quality_passed\": true, \"editorial_passed\": true, \"unique_source_ratio\": 1.0, \"youtube_id\": \"\"}"
+    },
+    {
+      "id": 15,
+      "run_id": "run-4",
+      "topic": "5 Small Living Room Tricks That Make Your Space Look Bigger",
+      "started_at": "2026-09-02T19:22:47+00:00",
+      "finished_at": "2026-09-02T19:26:55+00:00",
+      "status": "success",
+      "details": "{\"title\": \"5 Small Living Room Tricks That Make Your Space Look Bigger\", \"topic\": {\"title\": \"5 Small Living Room Tricks That Make Your Space Look Bigger\", \"category\": \"living rooms\", \"angle\": \"tricks\", \"item_count\": 5, \"slug\": \"5-small-living-room-tricks-that-make-your-space-look-bigger\", \"source\": \"manual\", \"keywords\": [\"small\", \"living\", \"room\", \"tricks\", \"space\", \"look\", \"bigger\"]}, \"video\": \"output/run-4/final_video.mp4\", \"duration_seconds\": 172.83, \"subtitles\": \"output/run-4/subtitles.srt\", \"metadata\": \"output/run-4/metadata.json\", \"sources\": \"output/run-4/video_sources.json\", \"quality_passed\": true, \"editorial_passed\": true, \"unique_source_ratio\": 1.0, \"youtube_id\": \"\"}"
+    },
+    {
+      "id": 16,
+      "run_id": "run-5-20260902-203859-2effaf85",
+      "topic": "Small Living Room Tricks That Make Your Space Look Bigger",
+      "started_at": "2026-09-02T20:38:59+00:00",
+      "finished_at": "2026-09-02T20:40:46+00:00",
+      "status": "success",
+      "details": "{\"title\": \"Small Living Room Tricks That Make Your Space Look Bigger\", \"topic\": {\"title\": \"Small Living Room Tricks That Make Your Space Look Bigger\", \"category\": \"living rooms\", \"angle\": \"tricks\", \"item_count\": 25, \"slug\": \"small-living-room-tricks-that-make-your-space-look-bigger\", \"source\": \"manual\", \"keywords\": [\"small\", \"living\", \"room\", \"tricks\", \"space\", \"look\", \"bigger\"]}, \"video\": \"output/run-5-20260902-203859-2effaf85/final_video.mp4\", \"duration_seconds\": 103.9, \"subtitles\": \"output/run-5-20260902-203859-2effaf85/subtitles.srt\", \"metadata\": \"output/run-5-20260902-203859-2effaf85/metadata.json\", \"sources\": \"output/run-5-20260902-203859-2effaf85/video_sources.json\", \"generation_id\": \"run-5-20260902-203859-2effaf85\", \"quality_passed\": true, \"editorial_passed\": true, \"artifact_provenance_passed\": true, \"unique_source_ratio\": 1.0, \"youtube_id\": \"\"}"
+    },
+    {
+      "id": 17,
+      "run_id": "run-6-20260902-221557-ecad0bcf",
+      "topic": "Small Living Room Tricks That Make Your Space Look Bigger",
+      "started_at": "2026-09-02T22:15:57+00:00",
+      "finished_at": "2026-09-02T22:18:23+00:00",
+      "status": "success",
+      "details": "{\"title\": \"Small Living Room Tricks That Make Your Space Look Bigger\", \"topic\": {\"title\": \"Small Living Room Tricks That Make Your Space Look Bigger\", \"category\": \"living rooms\", \"angle\": \"tricks\", \"item_count\": 25, \"slug\": \"small-living-room-tricks-that-make-your-space-look-bigger\", \"source\": \"manual\", \"keywords\": [\"small\", \"living\", \"room\", \"tricks\", \"space\", \"look\", \"bigger\"]}, \"video\": \"output/run-6-20260902-221557-ecad0bcf/final_video.mp4\", \"duration_seconds\": 105.2, \"subtitles\": \"output/run-6-20260902-221557-ecad0bcf/subtitles.srt\", \"metadata\": \"output/run-6-20260902-221557-ecad0bcf/metadata.json\", \"sources\": \"output/run-6-20260902-221557-ecad0bcf/video_sources.json\", \"generation_id\": \"run-6-20260902-221557-ecad0bcf\", \"quality_passed\": true, \"editorial_passed\": true, \"artifact_provenance_passed\": true, \"unique_source_ratio\": 1.0, \"youtube_id\": \"\"}"
+    },
+    {
+      "id": 18,
+      "run_id": "run-7-20260903-000913-a9ab2c00",
+      "topic": "Small Living Room Tricks That Make Your Space Look Bigger",
+      "started_at": "2026-09-03T00:09:13+00:00",
+      "finished_at": "2026-09-03T00:12:51+00:00",
+      "status": "success",
+      "details": "{\"title\": \"Small Living Room Tricks That Make Your Space Look Bigger\", \"topic\": {\"title\": \"Small Living Room Tricks That Make Your Space Look Bigger\", \"category\": \"living rooms\", \"angle\": \"tricks\", \"item_count\": 25, \"slug\": \"small-living-room-tricks-that-make-your-space-look-bigger\", \"source\": \"manual\", \"keywords\": [\"small\", \"living\", \"room\", \"tricks\", \"space\", \"look\", \"bigger\"]}, \"video\": \"output/run-7-20260903-000913-a9ab2c00/final_video.mp4\", \"duration_seconds\": 122.3, \"subtitles\": \"output/run-7-20260903-000913-a9ab2c00/subtitles.srt\", \"metadata\": \"output/run-7-20260903-000913-a9ab2c00/metadata.json\", \"sources\": \"output/run-7-20260903-000913-a9ab2c00/video_sources.json\", \"generation_id\": \"run-7-20260903-000913-a9ab2c00\", \"quality_passed\": true, \"editorial_passed\": true, \"artifact_provenance_passed\": true, \"unique_source_ratio\": 1.0, \"youtube_id\": \"\"}"
+    },
+    {
+      "id": 19,
+      "run_id": "run-8-20260903-003107-4afebf33",
+      "topic": "Small Living Room Tricks That Make Your Space Look Bigger",
+      "started_at": "2026-09-03T00:31:07+00:00",
+      "finished_at": "2026-09-03T00:34:51+00:00",
+      "status": "success",
+      "details": "{\"title\": \"Small Living Room Tricks That Make Your Space Look Bigger\", \"topic\": {\"title\": \"Small Living Room Tricks That Make Your Space Look Bigger\", \"category\": \"living rooms\", \"angle\": \"tricks\", \"item_count\": 25, \"slug\": \"small-living-room-tricks-that-make-your-space-look-bigger\", \"source\": \"manual\", \"keywords\": [\"small\", \"living\", \"room\", \"tricks\", \"space\", \"look\", \"bigger\"]}, \"video\": \"output/run-8-20260903-003107-4afebf33/final_video.mp4\", \"duration_seconds\": 127.37, \"subtitles\": \"output/run-8-20260903-003107-4afebf33/subtitles.srt\", \"metadata\": \"output/run-8-20260903-003107-4afebf33/metadata.json\", \"sources\": \"output/run-8-20260903-003107-4afebf33/video_sources.json\", \"generation_id\": \"run-8-20260903-003107-4afebf33\", \"quality_passed\": true, \"editorial_passed\": true, \"artifact_provenance_passed\": true, \"unique_source_ratio\": 1.0, \"youtube_id\": \"\"}"
+    },
+    {
+      "id": 20,
+      "run_id": "run-9-20260903-005100-990a9b62",
+      "topic": "Small Living Room Tricks That Make Your Space Look Bigger",
+      "started_at": "2026-09-03T00:51:00+00:00",
+      "finished_at": "2026-09-03T00:55:09+00:00",
+      "status": "success",
+      "details": "{\"title\": \"Small Living Room Tricks That Make Your Space Look Bigger\", \"topic\": {\"title\": \"Small Living Room Tricks That Make Your Space Look Bigger\", \"category\": \"living rooms\", \"angle\": \"tricks\", \"item_count\": 25, \"slug\": \"small-living-room-tricks-that-make-your-space-look-bigger\", \"source\": \"manual\", \"keywords\": [\"small\", \"living\", \"room\", \"tricks\", \"space\", \"look\", \"bigger\"]}, \"video\": \"output/run-9-20260903-005100-990a9b62/final_video.mp4\", \"duration_seconds\": 141.5, \"subtitles\": \"output/run-9-20260903-005100-990a9b62/subtitles.srt\", \"metadata\": \"output/run-9-20260903-005100-990a9b62/metadata.json\", \"sources\": \"output/run-9-20260903-005100-990a9b62/video_sources.json\", \"generation_id\": \"run-9-20260903-005100-990a9b62\", \"quality_passed\": true, \"editorial_passed\": true, \"artifact_provenance_passed\": true, \"unique_source_ratio\": 1.0, \"youtube_id\": \"\"}"
     }
   ]
 }
