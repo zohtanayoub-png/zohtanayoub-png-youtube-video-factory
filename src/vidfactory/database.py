@@ -389,6 +389,55 @@ class Database:
         )
         return {"moved": affected, "would_move": affected}
 
+    # ------------------------------------------------------- measurements
+    def get_setting(self, key: str) -> str:
+        rows = self.query("SELECT value FROM schema_info WHERE key = ?", (key,))
+        return str(rows[0]["value"]) if rows else ""
+
+    def set_setting(self, key: str, value: Any) -> None:
+        with self.transaction() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO schema_info(key, value) VALUES(?, ?)",
+                (str(key), str(value)),
+            )
+
+    def measured_speech_rate(self, engine: str, voice: str = "") -> float:
+        """Words per minute this voice actually spoke at, or 0.0 if unknown.
+
+        A script is sized before the narration exists, so it has to guess how
+        fast the voice will read it. The engine's declared rate is a constant;
+        this is what the last few renders measured, which is what makes a five
+        minute request come out at five minutes.
+        """
+
+        raw = self.get_setting(f"speech_rate:{engine}:{voice}".rstrip(":"))
+        try:
+            return max(0.0, float(raw))
+        except (TypeError, ValueError):
+            return 0.0
+
+    def record_speech_rate(
+        self, engine: str, voice: str, words: int, seconds: float
+    ) -> float:
+        """Fold one render's measured rate into the running average."""
+
+        if words <= 0 or seconds <= 1.0:
+            return 0.0
+        measured = (float(words) / float(seconds)) * 60.0
+        if not (60.0 <= measured <= 320.0):
+            log.warning("Ignoring an implausible speech rate of %.0f wpm", measured)
+            return 0.0
+        key = f"speech_rate:{engine}:{voice}".rstrip(":")
+        previous = self.measured_speech_rate(engine, voice)
+        # Smoothed, so one odd script cannot swing the next one's length.
+        blended = measured if previous <= 0 else (previous * 0.6 + measured * 0.4)
+        self.set_setting(key, round(blended, 2))
+        log.info(
+            "%s/%s spoke %d words in %.0fs (%.0f wpm); sizing future scripts at %.0f",
+            engine, voice or "default", words, seconds, measured, blended,
+        )
+        return blended
+
     # -------------------------------------------------------------- videos
     def add_video(self, **fields: Any) -> int:
         payload = {

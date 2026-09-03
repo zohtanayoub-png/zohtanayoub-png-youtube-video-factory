@@ -68,6 +68,8 @@ def _overrides_from_args(args: argparse.Namespace) -> dict[str, object]:
         overrides["sources.local"] = True
     if getattr(args, "upload", None) is not None:
         overrides["youtube.upload_enabled"] = parse_bool(args.upload, False)
+    if getattr(args, "items", None) and str(args.items).strip().isdigit():
+        overrides["script.item_count"] = int(str(args.items).strip())
     if getattr(args, "mode", None):
         overrides["generation.mode"] = str(args.mode).strip().lower()
     if getattr(args, "privacy", None):
@@ -405,6 +407,11 @@ def build_parser() -> argparse.ArgumentParser:
         sub.add_argument("--local-clips", default=None, help="use your own clips from this folder")
         sub.add_argument("--only-local", action="store_true", help="disable online providers")
         sub.add_argument("--github-output", action="store_true", help="write GITHUB_OUTPUT values")
+        sub.add_argument(
+            "--items", default=None,
+            help="how many tips; a number in the topic always wins "
+                 "(Automatic, or 5/7/10/15/20)",
+        )
         sub.add_argument(
             "--mode", default=None, choices=["test", "production"],
             help="production renders claim their footage for the cooldown; "

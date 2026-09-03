@@ -185,6 +185,10 @@ class Topic:
     category: str
     angle: str = "ideas"
     item_count: int = 25
+    #: True when the number came from the words the user typed. An explicit
+    #: count is a requirement, not a suggestion: "10 Small Living Room Tricks"
+    #: must produce ten, or fail saying why, rather than quietly becoming five.
+    count_is_explicit: bool = False
     slug: str = ""
     source: str = "generated"
     keywords: list[str] = field(default_factory=list)
@@ -201,6 +205,7 @@ class Topic:
             "category": self.category,
             "angle": self.angle,
             "item_count": self.item_count,
+            "count_is_explicit": self.count_is_explicit,
             "slug": self.slug,
             "source": self.source,
             "keywords": self.keywords,
@@ -331,6 +336,7 @@ class TopicEngine:
                 category=fallback_category,
                 angle=topic.angle,
                 item_count=topic.item_count,
+                count_is_explicit=topic.count_is_explicit,
             )
             suffix += 1
         log.warning("Falling back to a variation title: %s", topic.title)
@@ -344,8 +350,12 @@ class TopicEngine:
         if not title:
             raise ValueError("Topic text is empty")
         category = normalize_category(title) or "living rooms"
-        match = re.match(r"^(\d{1,3})\b", title)
+        # A number the user typed anywhere in the topic is a request, whether
+        # it leads the title ("10 Small Living Room Tricks") or sits inside it
+        # ("Small Living Room: 10 Tricks").
+        match = re.search(r"\b(\d{1,3})\b", title)
         item_count = int(match.group(1)) if match else 0
+        explicit = bool(match)
         angle = "ideas"
         lowered = title.lower()
         if "mistake" in lowered:
@@ -360,7 +370,13 @@ class TopicEngine:
         available = len(tips_for(category, language=self.language.key))
         if not item_count:
             item_count = min(25, available)
-        item_count = max(5, min(item_count, available))
+        if explicit and item_count > available:
+            raise ValueError(
+                f"{item_count} ideas were requested but only {available} exist for "
+                f"{category!r} that support this title. Ask for {available} or fewer, "
+                "or choose a broader topic."
+            )
+        item_count = max(1 if explicit else 5, min(item_count, available))
 
         too_similar, closest, score = is_too_similar(
             title, self.history, self.similarity_threshold
@@ -377,8 +393,14 @@ class TopicEngine:
             category=category,
             angle=angle,
             item_count=item_count,
+            count_is_explicit=explicit,
             source="manual",
         )
+        if explicit:
+            log.info(
+                "The topic asks for %d ideas explicitly; the script will deliver "
+                "that many and size the sections to fit", item_count,
+            )
         log.info("Selected: %s", topic.title)
         return topic
 
