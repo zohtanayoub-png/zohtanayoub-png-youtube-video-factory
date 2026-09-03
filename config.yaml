@@ -166,7 +166,16 @@ visual:
   # weak shots and Pexels rate-limited it into uselessness - five repairs out of
   # seventy-one, every later search a 429. A budget spent worst-first finds more
   # than an unbounded sweep that gets itself throttled.
-  max_repair_searches: 40
+  #
+  # Run 31 then said how big it should be. At 40 a round it spent the whole
+  # budget in all three rounds, reached 59 of 65 weak shots and found a better
+  # replacement for every single one of them - 59 from 59. The shots it left
+  # behind were the ones it never got to, not ones it failed on, and the single
+  # grounding failure that refused the render was among them. Seven transient
+  # 429s, no search lost, no provider retired: the ceiling was the budget.
+  # 120 is three times what run 31 actually spent and a sixth of what run 26
+  # was throttled for.
+  max_repair_searches: 120
   reject_confidence: 0.72       # a visual flag this strong rejects the clip
   penalty_confidence: 0.42      # a visual flag this strong is a heavy penalty
   weights:                      # stage two: relevance first, beauty third

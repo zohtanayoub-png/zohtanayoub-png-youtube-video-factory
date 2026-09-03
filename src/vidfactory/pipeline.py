@@ -938,7 +938,7 @@ class VideoPipeline:
         # search in the last rounds came back 429 and the pass repaired five
         # shots out of seventy-one. A budget spent worst-first finds more than
         # an unbounded sweep that gets itself throttled.
-        budget_per_round = int(self.config.get("visual.max_repair_searches", 40))
+        budget_per_round = int(self.config.get("visual.max_repair_searches", 120))
         live = list(providers)
 
         def search(provider: Any, text: str, page: int) -> list[Any]:
