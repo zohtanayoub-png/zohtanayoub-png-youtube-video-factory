@@ -184,6 +184,25 @@ src/vidfactory/
   the seating floating" and "choose one large enough for the front legs" were
   searched and scored identically. `ShotIntent.search_text` is always English
   and is what CLIP scores the frames against.
+* **Presence could not be measured; displacement could.** Three calibration
+  runs (`vidfactory entity-check`, or the `calibrate-entities` task on the
+  video workflow) decided the shape of this check, and two of them decided it
+  against the obvious design. Best-positive against best-competitor scored
+  sixty clips containing their own object at a median of **0.049** and sixty
+  controls at **0.373** - inverted, because a broad prompt beats a specific
+  one on CLIP similarity against almost any photograph, which is the same
+  generality bias `_clip_semantic` documents. Scoring it scale-free fixed the
+  direction and produced **0.708 against 0.737**: chance. The reason is not
+  the prompts. A living room photograph contains a wall, a floor, a window, a
+  sofa and a lamp at once, so "is the object present" is true of nearly all
+  interior footage and separates nothing; only mirror and storage separated,
+  because those are the two things a living room can actually lack. So the
+  question is now **displacement**: how far the best distractor beats the best
+  description of the object. The threshold is read off a sweep - at 0.20 it
+  culls 8% of good footage and 5% of the control - and the honest reading of
+  that table is that MobileCLIP-S0 can see a frame something else plainly
+  owns and cannot do better. That is the failure that mattered, and all this
+  claims to catch.
 * **Similarity is not presence.** Run 25 averaged 0.569 across the clips on
   screen with not one below the 0.50 floor, and showed colourful ribbons for
   "paint the trim the same colour as the walls" and potted plants for "a rug
@@ -200,7 +219,9 @@ src/vidfactory/
   the advice - the advice is what found the plants - and a replacement must
   improve the semantic score **and** contain the object. Abstract advice
   requires nothing: demanding an object the sentence never promised rejects
-  good footage.
+  good footage. Anything a shot of the object legitimately also contains -
+  "a close-up of furniture" for a rug under a sofa - is not a distractor; it
+  is a false positive waiting to happen.
 * **The subject is the object named first, not the one named most.** "A rug
   too small to reach the sofa leaves the seating floating" names seating twice
   and the rug once. It is rug advice; the sofa is the landmark the rug is

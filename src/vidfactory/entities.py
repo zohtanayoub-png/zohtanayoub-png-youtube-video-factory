@@ -51,9 +51,24 @@ log = get_logger("ENTITY")
 ENTITY_MARGIN_LOW = 0.0
 ENTITY_MARGIN_HIGH = 0.05
 
-#: How much dominance is too much. Set from the calibration run - see
-#: ``vidfactory entity-check`` - not by analogy.
-ENTITY_DOMINANCE_FAIL = 0.5
+#: How much dominance is too much, read off the calibration sweep rather than
+#: chosen. Over sixty real clips against sixty controls:
+#:
+#:     cut    good culled    control culled
+#:     0.05       3%              3%
+#:     0.15       7%              3%
+#:     0.20       8%              5%
+#:     0.25       8%             10%
+#:     0.50      18%             17%
+#:
+#: 0.20 is where the curve stops being free: below it the probe barely fires,
+#: above it the cost to good footage climbs faster than the catch. Even here
+#: the separation is slight, and the honest reading is that MobileCLIP-S0 can
+#: see a frame something else plainly owns and cannot do better than that -
+#: which is the failure that mattered, and is all this claims to catch.
+#: Every culled shot is one the repair pass has to replace, so the eight
+#: percent is a real cost and not a free win.
+ENTITY_DOMINANCE_FAIL = 0.80
 
 
 @dataclass(frozen=True)
