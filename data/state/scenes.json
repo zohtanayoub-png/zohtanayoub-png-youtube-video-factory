@@ -805,7 +805,7 @@
     },
     {
       "id": 90,
-      "video_id": 6,
+      "video_id": 7,
       "scene_id": "intro-000-00",
       "narration": "There is a version of your living room that feels noticeably larger, and reaching it does not involve knocking down a single wall.",
       "duration": null,
@@ -814,7 +814,7 @@
     },
     {
       "id": 91,
-      "video_id": 6,
+      "video_id": 7,
       "scene_id": "intro-000-01",
       "narration": "It involves undoing about six decisions that are quietly costing you space.",
       "duration": null,
@@ -823,7 +823,7 @@
     },
     {
       "id": 92,
-      "video_id": 6,
+      "video_id": 7,
       "scene_id": "intro-000-02",
       "narration": "Over the next 2 minutes we will work through 3 ideas, and for each one I will explain why it works and how to actually do it.",
       "duration": null,
@@ -832,7 +832,7 @@
     },
     {
       "id": 93,
-      "video_id": 6,
+      "video_id": 7,
       "scene_id": "item-001-00",
       "narration": "Number 1. Do not center the ceiling light by default.",
       "duration": null,
@@ -841,7 +841,7 @@
     },
     {
       "id": 94,
-      "video_id": 6,
+      "video_id": 7,
       "scene_id": "item-001-01",
       "narration": "The middle of the ceiling is almost never where the light is needed, which is why so many rooms have a bright empty center and a dim sofa.",
       "duration": null,
@@ -850,7 +850,7 @@
     },
     {
       "id": 95,
-      "video_id": 6,
+      "video_id": 7,
       "scene_id": "item-001-02",
       "narration": "Move or swag the fixture over the actual activity zone, or leave it off entirely and light the room from the perimeter with lamps.",
       "duration": null,
@@ -859,7 +859,7 @@
     },
     {
       "id": 96,
-      "video_id": 6,
+      "video_id": 7,
       "scene_id": "item-001-03",
       "narration": "Light reaching the walls and corners shows your eye exactly where the room ends, and a room whose boundaries are visible reads as larger than one that fades into shadow a few feet in.",
       "duration": null,
@@ -868,7 +868,7 @@
     },
     {
       "id": 97,
-      "video_id": 6,
+      "video_id": 7,
       "scene_id": "item-002-00",
       "narration": "Which of these would you notice if it were missing? Probably this: balance visual weight across the room.",
       "duration": null,
@@ -877,7 +877,7 @@
     },
     {
       "id": 98,
-      "video_id": 6,
+      "video_id": 7,
       "scene_id": "item-002-01",
       "narration": "If all the heavy, dark, tall pieces end up on one side, the room feels like it is tipping, even if nobody can name why.",
       "duration": null,
@@ -886,7 +886,7 @@
     },
     {
       "id": 99,
-      "video_id": 6,
+      "video_id": 7,
       "scene_id": "item-002-02",
       "narration": "Mentally split the room in half and check that each side carries a similar amount of mass. Balance a tall bookcase with a heavy sofa, not with a floor lamp.",
       "duration": null,
@@ -895,7 +895,7 @@
     },
     {
       "id": 100,
-      "video_id": 6,
+      "video_id": 7,
       "scene_id": "item-002-03",
       "narration": "Oversized pieces eat visible floor area and narrow the walking paths, so a small room feels cramped even though its footprint never changed.",
       "duration": null,
@@ -904,7 +904,7 @@
     },
     {
       "id": 101,
-      "video_id": 6,
+      "video_id": 7,
       "scene_id": "item-003-00",
       "narration": "The flip side of that is worth knowing too. Measure the room before you buy anything.",
       "duration": null,
@@ -913,7 +913,7 @@
     },
     {
       "id": 102,
-      "video_id": 6,
+      "video_id": 7,
       "scene_id": "item-003-01",
       "narration": "Furniture almost always looks smaller in a showroom, and returning a sofa is one of the most expensive mistakes in home decorating.",
       "duration": null,
@@ -922,7 +922,7 @@
     },
     {
       "id": 103,
-      "video_id": 6,
+      "video_id": 7,
       "scene_id": "item-003-02",
       "narration": "Tape the outline of a piece on the floor with painter's tape and live with it for two days. Check doorways, stair turns and lift dimensions too.",
       "duration": null,
@@ -931,7 +931,7 @@
     },
     {
       "id": 104,
-      "video_id": 6,
+      "video_id": 7,
       "scene_id": "item-003-03",
       "narration": "This is the sort of thing people cannot name but always notice.",
       "duration": null,
@@ -940,7 +940,7 @@
     },
     {
       "id": 105,
-      "video_id": 6,
+      "video_id": 7,
       "scene_id": "item-003-04",
       "narration": "A piece that is too big for the room steals the floor around it, so what is left over feels cramped even though nothing else changed.",
       "duration": null,
@@ -949,7 +949,7 @@
     },
     {
       "id": 106,
-      "video_id": 6,
+      "video_id": 7,
       "scene_id": "outro-000-00",
       "narration": "That brings us to the end of the list. That is it for today. Thanks for spending the time.",
       "duration": null,
@@ -958,7 +958,7 @@
     },
     {
       "id": 107,
-      "video_id": 7,
+      "video_id": 8,
       "scene_id": "intro-000-00",
       "narration": "Two rooms can have identical dimensions and feel completely different to stand in. The one that feels bigger is almost never the one with less furniture in it, and that surprises people.",
       "duration": null,
@@ -967,7 +967,7 @@
     },
     {
       "id": 108,
-      "video_id": 7,
+      "video_id": 8,
       "scene_id": "intro-000-01",
       "narration": "In this video we are going through 3 of them, one at a time, with the reasoning behind each one and exactly how to apply it in a real home.",
       "duration": null,
@@ -976,7 +976,7 @@
     },
     {
       "id": 109,
-      "video_id": 7,
+      "video_id": 8,
       "scene_id": "item-001-00",
       "narration": "Number 1. Vary the height of everything you place on a surface.",
       "duration": null,
@@ -985,7 +985,7 @@
     },
     {
       "id": 110,
-      "video_id": 7,
+      "video_id": 8,
       "scene_id": "item-001-01",
       "narration": "When objects on a shelf or console are all the same height, the eye skims across them and registers clutter rather than composition.",
       "duration": null,
@@ -994,7 +994,7 @@
     },
     {
       "id": 111,
-      "video_id": 7,
+      "video_id": 8,
       "scene_id": "item-001-02",
       "narration": "Work in loose triangles: something tall like a lamp or a vase of branches, something medium like stacked books, and something low and organic like a bowl or a small plant.",
       "duration": null,
@@ -1003,7 +1003,7 @@
     },
     {
       "id": 112,
-      "video_id": 7,
+      "video_id": 8,
       "scene_id": "item-001-03",
       "narration": "Odd numbers photograph and read better than even ones. Clear surfaces give the eye somewhere to rest, and a room with fewer things competing for attention reads as more spacious.",
       "duration": null,
@@ -1012,7 +1012,7 @@
     },
     {
       "id": 113,
-      "video_id": 7,
+      "video_id": 8,
       "scene_id": "item-002-00",
       "narration": "That takes us to number 2. Ask yourself what your eye lands on first in that room. Then: Do not block the window.",
       "duration": null,
@@ -1021,7 +1021,7 @@
     },
     {
       "id": 114,
-      "video_id": 7,
+      "video_id": 8,
       "scene_id": "item-002-01",
       "narration": "Daylight is the most valuable thing in a room, and a tall piece of furniture in front of the glass costs you light in every direction.",
       "duration": null,
@@ -1030,7 +1030,7 @@
     },
     {
       "id": 115,
-      "video_id": 7,
+      "video_id": 8,
       "scene_id": "item-002-02",
       "narration": "Keep anything above windowsill height away from the window wall. If a piece must go there, choose something low or open in construction.",
       "duration": null,
@@ -1039,7 +1039,7 @@
     },
     {
       "id": 116,
-      "video_id": 7,
+      "video_id": 8,
       "scene_id": "item-002-03",
       "narration": "Light reaching the walls and corners shows your eye exactly where the room ends, and a room whose boundaries are visible reads as larger than one that fades into shadow a few feet in.",
       "duration": null,
@@ -1048,7 +1048,7 @@
     },
     {
       "id": 117,
-      "video_id": 7,
+      "video_id": 8,
       "scene_id": "item-003-00",
       "narration": "This is the one people get wrong most often. Paint the trim the same color as the walls.",
       "duration": null,
@@ -1057,7 +1057,7 @@
     },
     {
       "id": 118,
-      "video_id": 7,
+      "video_id": 8,
       "scene_id": "item-003-01",
       "narration": "Bright white trim against a colored wall draws a hard outline around every door and window, which chops up the room.",
       "duration": null,
@@ -1066,7 +1066,7 @@
     },
     {
       "id": 119,
-      "video_id": 7,
+      "video_id": 8,
       "scene_id": "item-003-02",
       "narration": "Use the same color on walls and woodwork with a satin or eggshell finish on the trim. The room reads taller and much more expensive.",
       "duration": null,
@@ -1075,7 +1075,7 @@
     },
     {
       "id": 120,
-      "video_id": 7,
+      "video_id": 8,
       "scene_id": "item-003-03",
       "narration": "This is the sort of thing people cannot name but always notice.",
       "duration": null,
@@ -1084,7 +1084,7 @@
     },
     {
       "id": 121,
-      "video_id": 7,
+      "video_id": 8,
       "scene_id": "item-003-04",
       "narration": "Low-contrast edges stop chopping the wall into pieces, so the surface reads as one large plane and the room feels bigger for it.",
       "duration": null,
@@ -1093,7 +1093,7 @@
     },
     {
       "id": 122,
-      "video_id": 7,
+      "video_id": 8,
       "scene_id": "outro-000-00",
       "narration": "That is all 3 of them. If you found something here worth trying, there are more videos like this on the channel.",
       "duration": null,
@@ -1102,7 +1102,7 @@
     },
     {
       "id": 123,
-      "video_id": 8,
+      "video_id": 9,
       "scene_id": "intro-000-00",
       "narration": "If your living room feels smaller than it really is, the problem may not be the square footage.",
       "duration": null,
@@ -1111,7 +1111,7 @@
     },
     {
       "id": 124,
-      "video_id": 8,
+      "video_id": 9,
       "scene_id": "intro-000-01",
       "narration": "A handful of ordinary decorating choices can visually shrink a room, and reversing them can make the exact same space feel dramatically bigger.",
       "duration": null,
@@ -1120,7 +1120,7 @@
     },
     {
       "id": 125,
-      "video_id": 8,
+      "video_id": 9,
       "scene_id": "intro-000-02",
       "narration": "Here are 3 ideas worth knowing, each with the principle behind it and a practical way to put it into your own home this week.",
       "duration": null,
@@ -1129,7 +1129,7 @@
     },
     {
       "id": 126,
-      "video_id": 8,
+      "video_id": 9,
       "scene_id": "item-001-00",
       "narration": "Next, number 1. Hang art at eye level and scale it to the furniture, which is easier than it sounds.",
       "duration": null,
@@ -1138,7 +1138,7 @@
     },
     {
       "id": 127,
-      "video_id": 8,
+      "video_id": 9,
       "scene_id": "item-001-01",
       "narration": "Art that floats near the ceiling breaks the visual connection with the furniture below it, and undersized art above a large sofa makes the whole wall look unfinished.",
       "duration": null,
@@ -1147,7 +1147,7 @@
     },
     {
       "id": 128,
-      "video_id": 8,
+      "video_id": 9,
       "scene_id": "item-001-02",
       "narration": "Center the piece about fifty-seven to sixty inches from the floor, and choose something that spans roughly two-thirds of the width of whatever sits beneath it.",
       "duration": null,
@@ -1156,7 +1156,7 @@
     },
     {
       "id": 129,
-      "video_id": 8,
+      "video_id": 9,
       "scene_id": "item-001-03",
       "narration": "Leave six to eight inches between the top of the sofa and the bottom of the frame.",
       "duration": null,
@@ -1165,7 +1165,7 @@
     },
     {
       "id": 130,
-      "video_id": 8,
+      "video_id": 9,
       "scene_id": "item-001-04",
       "narration": "A tiny frame stranded above a three-seat sofa is one of the most common and most avoidable mistakes in a living room.",
       "duration": null,
@@ -1174,7 +1174,7 @@
     },
     {
       "id": 131,
-      "video_id": 8,
+      "video_id": 9,
       "scene_id": "item-001-05",
       "narration": "Oversized pieces eat visible floor area and narrow the walking paths, so a small room feels cramped even though its footprint never changed.",
       "duration": null,
@@ -1183,7 +1183,7 @@
     },
     {
       "id": 132,
-      "video_id": 8,
+      "video_id": 9,
       "scene_id": "item-002-00",
       "narration": "Picture the room before and after this single change. Aim for at least three light sources per room. One ceiling light produces a flat, shadowless, institutional wash.",
       "duration": null,
@@ -1192,7 +1192,7 @@
     },
     {
       "id": 133,
-      "video_id": 8,
+      "video_id": 9,
       "scene_id": "item-002-01",
       "narration": "Multiple pools of light create the depth that makes a room feel considered. Ceiling for general light, a lamp near seating for reading, and something low or wall-mounted for atmosphere.",
       "duration": null,
@@ -1201,7 +1201,7 @@
     },
     {
       "id": 134,
-      "video_id": 8,
+      "video_id": 9,
       "scene_id": "item-002-02",
       "narration": "In the evening, use only the lower two.",
       "duration": null,
@@ -1210,7 +1210,7 @@
     },
     {
       "id": 135,
-      "video_id": 8,
+      "video_id": 9,
       "scene_id": "item-002-03",
       "narration": "Light reaching the walls and corners shows your eye exactly where the room ends, and a room whose boundaries are visible reads as larger than one that fades into shadow a few feet in.",
       "duration": null,
@@ -1219,7 +1219,7 @@
     },
     {
       "id": 136,
-      "video_id": 8,
+      "video_id": 9,
       "scene_id": "item-003-00",
       "narration": "Keep that in mind while we look at this. Number 3, and this one is a favorite. Leave the corners of the room resolved.",
       "duration": null,
@@ -1228,7 +1228,7 @@
     },
     {
       "id": 137,
-      "video_id": 8,
+      "video_id": 9,
       "scene_id": "item-003-01",
       "narration": "Empty, awkward corners are where a room visibly runs out of ideas, and stuffing them with random small objects makes it worse.",
       "duration": null,
@@ -1237,7 +1237,7 @@
     },
     {
       "id": 138,
-      "video_id": 8,
+      "video_id": 9,
       "scene_id": "item-003-02",
       "narration": "A tall plant, a floor lamp, a leaning mirror or a single chair with a small table. One considered object beats three leftovers.",
       "duration": null,
@@ -1246,7 +1246,7 @@
     },
     {
       "id": 139,
-      "video_id": 8,
+      "video_id": 9,
       "scene_id": "item-003-03",
       "narration": "A reflection adds depth your eye reads as real, so the far wall stops behaving like the end of the room and the space feels bigger than it measures.",
       "duration": null,
@@ -1255,7 +1255,7 @@
     },
     {
       "id": 140,
-      "video_id": 8,
+      "video_id": 9,
       "scene_id": "outro-000-00",
       "narration": "That is all 3 of them. If this was useful, subscribing helps you catch the next one.",
       "duration": null,
@@ -1264,7 +1264,7 @@
     },
     {
       "id": 141,
-      "video_id": 9,
+      "video_id": 10,
       "scene_id": "intro-000-00",
       "narration": "Most small rooms are not actually short of space. They are short of sightlines, light and vertical thinking, and all three are things you can fix this weekend. What follows is 3 practical ideas.",
       "duration": null,
@@ -1273,7 +1273,7 @@
     },
     {
       "id": 142,
-      "video_id": 9,
+      "video_id": 10,
       "scene_id": "intro-000-01",
       "narration": "No shopping lists you cannot afford, no renovations, just decisions that change how a room reads.",
       "duration": null,
@@ -1282,7 +1282,7 @@
     },
     {
       "id": 143,
-      "video_id": 9,
+      "video_id": 10,
       "scene_id": "item-001-00",
       "narration": "Here is a mistake worth catching early. Mix at least three materials in every room. Rooms that use one material everywhere read flat, and rooms that use ten read chaotic.",
       "duration": null,
@@ -1291,7 +1291,7 @@
     },
     {
       "id": 144,
-      "video_id": 9,
+      "video_id": 10,
       "scene_id": "item-001-01",
       "narration": "Three or four contrasting textures create the tactile richness people describe as warm.",
       "duration": null,
@@ -1300,7 +1300,7 @@
     },
     {
       "id": 145,
-      "video_id": 9,
+      "video_id": 10,
       "scene_id": "item-001-02",
       "narration": "Pair something soft, something hard, and something natural: a wool rug, a wood or stone table, and a woven basket or linen curtain.",
       "duration": null,
@@ -1309,7 +1309,7 @@
     },
     {
       "id": 146,
-      "video_id": 9,
+      "video_id": 10,
       "scene_id": "item-001-03",
       "narration": "Add one small reflective element, like an aged brass lamp, to catch the light. Do that much and the rest of the room starts to make more sense.",
       "duration": null,
@@ -1318,7 +1318,7 @@
     },
     {
       "id": 147,
-      "video_id": 9,
+      "video_id": 10,
       "scene_id": "item-001-04",
       "narration": "A reflection adds depth your eye reads as real, so the far wall stops behaving like the end of the room and the space feels bigger than it measures.",
       "duration": null,
@@ -1327,7 +1327,7 @@
     },
     {
       "id": 148,
-      "video_id": 9,
+      "video_id": 10,
       "scene_id": "item-002-00",
       "narration": "Number 2. Ask yourself what your eye lands on first in that room. Then: Add one oversized plant instead of five small ones.",
       "duration": null,
@@ -1336,7 +1336,7 @@
     },
     {
       "id": 149,
-      "video_id": 9,
+      "video_id": 10,
       "scene_id": "item-002-01",
       "narration": "A cluster of small pots reads as clutter and needs constant attention. One large plant reads as architecture and softens the hard corners of a room.",
       "duration": null,
@@ -1345,7 +1345,7 @@
     },
     {
       "id": 150,
-      "video_id": 9,
+      "video_id": 10,
       "scene_id": "item-002-02",
       "narration": "A fiddle leaf fig, a bird of paradise, or an olive tree in a floor basket fills vertical space beautifully.",
       "duration": null,
@@ -1354,7 +1354,7 @@
     },
     {
       "id": 151,
-      "video_id": 9,
+      "video_id": 10,
       "scene_id": "item-002-03",
       "narration": "Put it where two walls meet, and if your light is poor, a good-quality faux tree is a completely legitimate choice.",
       "duration": null,
@@ -1363,7 +1363,7 @@
     },
     {
       "id": 152,
-      "video_id": 9,
+      "video_id": 10,
       "scene_id": "item-002-04",
       "narration": "Once you have seen it, you cannot unsee it in other people's homes either.",
       "duration": null,
@@ -1372,7 +1372,7 @@
     },
     {
       "id": 153,
-      "video_id": 9,
+      "video_id": 10,
       "scene_id": "item-002-05",
       "narration": "Oversized pieces eat visible floor area and narrow the walking paths, so a small room feels cramped even though its footprint never changed.",
       "duration": null,
@@ -1381,7 +1381,7 @@
     },
     {
       "id": 154,
-      "video_id": 9,
+      "video_id": 10,
       "scene_id": "item-003-00",
       "narration": "This next one costs nothing at all. Next, number 3. Vary the height of everything you place on a surface.",
       "duration": null,
@@ -1390,7 +1390,7 @@
     },
     {
       "id": 155,
-      "video_id": 9,
+      "video_id": 10,
       "scene_id": "item-003-01",
       "narration": "Work in loose triangles: something tall like a lamp or a vase of branches, something medium like stacked books, and something low and organic like a bowl or a small plant.",
       "duration": null,
@@ -1399,7 +1399,7 @@
     },
     {
       "id": 156,
-      "video_id": 9,
+      "video_id": 10,
       "scene_id": "item-003-02",
       "narration": "Odd numbers photograph and read better than even ones. When objects on a shelf or console are all the same height, the eye skims across them and registers clutter rather than composition.",
       "duration": null,
@@ -1408,7 +1408,7 @@
     },
     {
       "id": 157,
-      "video_id": 9,
+      "video_id": 10,
       "scene_id": "item-003-03",
       "narration": "Clear surfaces give the eye somewhere to rest, and a room with fewer things competing for attention reads as more spacious.",
       "duration": null,
@@ -1417,7 +1417,7 @@
     },
     {
       "id": 158,
-      "video_id": 9,
+      "video_id": 10,
       "scene_id": "outro-000-00",
       "narration": "So that is the full list. If this was useful, subscribing helps you catch the next one.",
       "duration": null,
@@ -1426,7 +1426,7 @@
     },
     {
       "id": 159,
-      "video_id": 10,
+      "video_id": 11,
       "scene_id": "intro-000-00",
       "narration": "If your living room feels smaller than it really is, the problem may not be the square footage.",
       "duration": null,
@@ -1435,7 +1435,7 @@
     },
     {
       "id": 160,
-      "video_id": 10,
+      "video_id": 11,
       "scene_id": "intro-000-01",
       "narration": "A handful of ordinary decorating choices can visually shrink a room, and reversing them can make the exact same space feel dramatically bigger.",
       "duration": null,
@@ -1444,7 +1444,7 @@
     },
     {
       "id": 161,
-      "video_id": 10,
+      "video_id": 11,
       "scene_id": "intro-000-02",
       "narration": "Here are 3 ideas worth knowing, each with the principle behind it and a practical way to put it into your own home this week.",
       "duration": null,
@@ -1453,7 +1453,7 @@
     },
     {
       "id": 162,
-      "video_id": 10,
+      "video_id": 11,
       "scene_id": "item-001-00",
       "narration": "That takes us to number 1. Aim for at least three light sources per room. Ceiling for general light, a lamp near seating for reading, and something low or wall-mounted for atmosphere.",
       "duration": null,
@@ -1462,7 +1462,7 @@
     },
     {
       "id": 163,
-      "video_id": 10,
+      "video_id": 11,
       "scene_id": "item-001-01",
       "narration": "In the evening, use only the lower two. One ceiling light produces a flat, shadowless, institutional wash. Multiple pools of light create the depth that makes a room feel considered.",
       "duration": null,
@@ -1471,7 +1471,7 @@
     },
     {
       "id": 164,
-      "video_id": 10,
+      "video_id": 11,
       "scene_id": "item-001-02",
       "narration": "That single adjustment does more than another round of shopping ever will.",
       "duration": null,
@@ -1480,7 +1480,7 @@
     },
     {
       "id": 165,
-      "video_id": 10,
+      "video_id": 11,
       "scene_id": "item-001-03",
       "narration": "Light reaching the walls and corners shows your eye exactly where the room ends, and a room whose boundaries are visible reads as larger than one that fades into shadow a few feet in.",
       "duration": null,
@@ -1489,7 +1489,7 @@
     },
     {
       "id": 166,
-      "video_id": 10,
+      "video_id": 11,
       "scene_id": "item-002-00",
       "narration": "What would you change first in a room like that? Almost always this: measure the room before you buy anything.",
       "duration": null,
@@ -1498,7 +1498,7 @@
     },
     {
       "id": 167,
-      "video_id": 10,
+      "video_id": 11,
       "scene_id": "item-002-01",
       "narration": "Furniture almost always looks smaller in a showroom, and returning a sofa is one of the most expensive mistakes in home decorating.",
       "duration": null,
@@ -1507,7 +1507,7 @@
     },
     {
       "id": 168,
-      "video_id": 10,
+      "video_id": 11,
       "scene_id": "item-002-02",
       "narration": "Tape the outline of a piece on the floor with painter's tape and live with it for two days. Check doorways, stair turns and lift dimensions too.",
       "duration": null,
@@ -1516,7 +1516,7 @@
     },
     {
       "id": 169,
-      "video_id": 10,
+      "video_id": 11,
       "scene_id": "item-002-03",
       "narration": "This is the sort of thing people cannot name but always notice.",
       "duration": null,
@@ -1525,7 +1525,7 @@
     },
     {
       "id": 170,
-      "video_id": 10,
+      "video_id": 11,
       "scene_id": "item-002-04",
       "narration": "Oversized pieces eat visible floor area and narrow the walking paths, so a small room feels cramped even though its footprint never changed.",
       "duration": null,
@@ -1534,7 +1534,7 @@
     },
     {
       "id": 171,
-      "video_id": 10,
+      "video_id": 11,
       "scene_id": "item-003-00",
       "narration": "Here is where it gets interesting. Number 3. This one is simple: make the window treatments oversized.",
       "duration": null,
@@ -1543,7 +1543,7 @@
     },
     {
       "id": 172,
-      "video_id": 10,
+      "video_id": 11,
       "scene_id": "item-003-01",
       "narration": "Generous fabric is one of the clearest signals of money in a room, because skimpy curtains are the default in every rental.",
       "duration": null,
@@ -1552,7 +1552,7 @@
     },
     {
       "id": 173,
-      "video_id": 10,
+      "video_id": 11,
       "scene_id": "item-003-02",
       "narration": "Panels roughly twice the width of the window so they still look full when closed, hung high and wide, and hemmed to just kiss the floor.",
       "duration": null,
@@ -1561,7 +1561,7 @@
     },
     {
       "id": 174,
-      "video_id": 10,
+      "video_id": 11,
       "scene_id": "item-003-03",
       "narration": "Hanging the fabric high and wide leaves the glass itself uncovered, so more daylight reaches the room and the wall reads taller than it measures.",
       "duration": null,
@@ -1570,7 +1570,7 @@
     },
     {
       "id": 175,
-      "video_id": 10,
+      "video_id": 11,
       "scene_id": "outro-000-00",
       "narration": "So that is the full list. If you have a room you are stuck with, leave it in the comments and it might end up in a future video.",
       "duration": null,
@@ -1579,7 +1579,7 @@
     },
     {
       "id": 176,
-      "video_id": 11,
+      "video_id": 12,
       "scene_id": "intro-000-00",
       "narration": "La mayoría de las habitaciones pequeñas no van cortas de metros. Van cortas de líneas de visión, de luz y de altura aprovechada, y las tres cosas se arreglan en un fin de semana.",
       "duration": null,
@@ -1588,7 +1588,7 @@
     },
     {
       "id": 177,
-      "video_id": 11,
+      "video_id": 12,
       "scene_id": "intro-000-01",
       "narration": "En este vídeo vamos a ver tres, una por una, con el motivo que hay detrás de cada una y cómo aplicarla en una casa real.",
       "duration": null,
@@ -1597,7 +1597,7 @@
     },
     {
       "id": 178,
-      "video_id": 11,
+      "video_id": 12,
       "scene_id": "item-001-00",
       "narration": "Número 1. Pon plantas de verdad, y grandes. Una sola planta de 120 a 180 centímetros en la esquina que más luz recibe hace más que seis macetas pequeñas repartidas.",
       "duration": null,
@@ -1606,7 +1606,7 @@
     },
     {
       "id": 179,
-      "video_id": 11,
+      "video_id": 12,
       "scene_id": "item-001-01",
       "narration": "Ficus lyrata, kentia o monstera si hay luz indirecta abundante. Una planta con volumen aporta una escala vertical que ningún objeto decorativo consigue, y suaviza las esquinas duras de la habitación.",
       "duration": null,
@@ -1615,7 +1615,7 @@
     },
     {
       "id": 180,
-      "video_id": 11,
+      "video_id": 12,
       "scene_id": "item-001-02",
       "narration": "Llevar la mirada hacia arriba hace que la pared se lea más alta, y una pared más alta hace que la habitación entera parezca más grande de lo que dicen sus metros.",
       "duration": null,
@@ -1624,7 +1624,7 @@
     },
     {
       "id": 181,
-      "video_id": 11,
+      "video_id": 12,
       "scene_id": "item-002-00",
       "narration": "Idea número 2. Separa el sofá unos centímetros de la pared.",
       "duration": null,
@@ -1633,7 +1633,7 @@
     },
     {
       "id": 182,
-      "video_id": 11,
+      "video_id": 12,
       "scene_id": "item-002-01",
       "narration": "Pegar todos los muebles al perímetro deja un vacío muerto en el centro y, aunque parezca lo contrario, hace que la habitación se sienta más vacía y menos generosa.",
       "duration": null,
@@ -1642,7 +1642,7 @@
     },
     {
       "id": 183,
-      "video_id": 11,
+      "video_id": 12,
       "scene_id": "item-002-02",
       "narration": "Deja entre 8 y 15 centímetros entre el respaldo y la pared y aprovecha ese hueco con una consola estrecha.",
       "duration": null,
@@ -1651,7 +1651,7 @@
     },
     {
       "id": 184,
-      "video_id": 11,
+      "video_id": 12,
       "scene_id": "item-002-03",
       "narration": "Esa mínima holgura se lee de inmediato como una decisión y no como un descuido.",
       "duration": null,
@@ -1660,7 +1660,7 @@
     },
     {
       "id": 185,
-      "video_id": 11,
+      "video_id": 12,
       "scene_id": "item-002-04",
       "narration": "Una distribución pensada abre los recorridos, así que los pasos libres hacen que una habitación pequeña se sienta más grande al moverte por ella.",
       "duration": null,
@@ -1669,7 +1669,7 @@
     },
     {
       "id": 186,
-      "video_id": 11,
+      "video_id": 12,
       "scene_id": "item-003-00",
       "narration": "Esto nos lleva a la número 3. Imagina entrar dos veces en la misma habitación, una con esto hecho y otra sin ello.",
       "duration": null,
@@ -1678,7 +1678,7 @@
     },
     {
       "id": 187,
-      "video_id": 11,
+      "video_id": 12,
       "scene_id": "item-003-01",
       "narration": "Coloca un espejo grande frente a la ventana, no en la pared del fondo.",
       "duration": null,
@@ -1687,7 +1687,7 @@
     },
     {
       "id": 188,
-      "video_id": 11,
+      "video_id": 12,
       "scene_id": "item-003-02",
       "narration": "Un espejo enfrentado a la ventana devuelve luz y profundidad reales a la habitación, mientras que el mismo espejo en la pared opuesta a la puerta solo refleja el pasillo.",
       "duration": null,
@@ -1696,7 +1696,7 @@
     },
     {
       "id": 189,
-      "video_id": 11,
+      "video_id": 12,
       "scene_id": "item-003-03",
       "narration": "Un espejo de 80 por 120 centímetros o más, apoyado o colgado, en la pared perpendicular a la ventana.",
       "duration": null,
@@ -1705,7 +1705,7 @@
     },
     {
       "id": 190,
-      "video_id": 11,
+      "video_id": 12,
       "scene_id": "item-003-04",
       "narration": "Comprueba antes qué se refleja: lo que se ve en él pasa a formar parte de la decoración.",
       "duration": null,
@@ -1714,7 +1714,7 @@
     },
     {
       "id": 191,
-      "video_id": 11,
+      "video_id": 12,
       "scene_id": "item-003-05",
       "narration": "Repartir tres espejos pequeños por la pared no da profundidad, da la sensación de que faltaba algo que colgar.",
       "duration": null,
@@ -1723,7 +1723,7 @@
     },
     {
       "id": 192,
-      "video_id": 11,
+      "video_id": 12,
       "scene_id": "item-003-06",
       "narration": "Un reflejo añade una profundidad que el ojo lee como real, así que la pared deja de comportarse como el final de la habitación y el espacio parece más grande.",
       "duration": null,
@@ -1732,7 +1732,7 @@
     },
     {
       "id": 193,
-      "video_id": 11,
+      "video_id": 12,
       "scene_id": "outro-000-00",
       "narration": "Esas son las tres. Si te ha servido, suscribirte ayuda a que te llegue el siguiente.",
       "duration": null,
@@ -1741,7 +1741,7 @@
     },
     {
       "id": 194,
-      "video_id": 12,
+      "video_id": 13,
       "scene_id": "intro-000-00",
       "narration": "La mayoría de las habitaciones pequeñas no van cortas de metros. Van cortas de líneas de visión, de luz y de altura aprovechada, y las tres cosas se arreglan en un fin de semana.",
       "duration": null,
@@ -1750,7 +1750,7 @@
     },
     {
       "id": 195,
-      "video_id": 12,
+      "video_id": 13,
       "scene_id": "intro-000-01",
       "narration": "En este vídeo vamos a ver tres, una por una, con el motivo que hay detrás de cada una y cómo aplicarla en una casa real.",
       "duration": null,
@@ -1759,7 +1759,7 @@
     },
     {
       "id": 196,
-      "video_id": 12,
+      "video_id": 13,
       "scene_id": "item-001-00",
       "narration": "Limpia los cristales y despeja el alféizar. Cristales por dentro y por fuera, alféizar vacío o con una sola pieza, y cortinas que al abrirse queden fuera del vano.",
       "duration": null,
@@ -1768,7 +1768,7 @@
     },
     {
       "id": 197,
-      "video_id": 12,
+      "video_id": 13,
       "scene_id": "item-001-01",
       "narration": "Es lo más barato que puedes hacer y lo que más luz devuelve: un cristal sucio y un alféizar lleno roban una parte notable de la luz que entra.",
       "duration": null,
@@ -1777,7 +1777,7 @@
     },
     {
       "id": 198,
-      "video_id": 12,
+      "video_id": 13,
       "scene_id": "item-001-02",
       "narration": "Colgar la tela alta y ancha deja el cristal despejado, así que entra más luz y la pared se lee más alta de lo que mide.",
       "duration": null,
@@ -1786,7 +1786,7 @@
     },
     {
       "id": 199,
-      "video_id": 12,
+      "video_id": 13,
       "scene_id": "item-002-00",
       "narration": "Esta sorprende bastante. La número 2 de la lista. Que se vea el objeto, no la bombilla.",
       "duration": null,
@@ -1795,7 +1795,7 @@
     },
     {
       "id": 200,
-      "video_id": 12,
+      "video_id": 13,
       "scene_id": "item-002-01",
       "narration": "Una bombilla desnuda a la altura de los ojos deslumbra, y el deslumbramiento hace que todo lo que la rodea parezca más oscuro por contraste. Pantalla, difusor o bombilla de filamento de baja intensidad.",
       "duration": null,
@@ -1804,7 +1804,7 @@
     },
     {
       "id": 201,
-      "video_id": 12,
+      "video_id": 13,
       "scene_id": "item-002-02",
       "narration": "Si ves el punto de luz desde el sofá, hay que taparlo.",
       "duration": null,
@@ -1813,7 +1813,7 @@
     },
     {
       "id": 202,
-      "video_id": 12,
+      "video_id": 13,
       "scene_id": "item-002-03",
       "narration": "La luz que llega a las paredes y a las esquinas le enseña al ojo dónde termina la habitación, y una habitación con los límites visibles se lee como más grande que otra que se apaga a dos metros.",
       "duration": null,
@@ -1822,7 +1822,7 @@
     },
     {
       "id": 203,
-      "video_id": 12,
+      "video_id": 13,
       "scene_id": "item-003-00",
       "narration": "Hay una idea relacionada que merece la pena contar aquí. Número 3. Si solo vas a corregir una cosa de la lista, plantéate que sea esta. Repite el mismo metal en toda la estancia.",
       "duration": null,
@@ -1831,7 +1831,7 @@
     },
     {
       "id": 204,
-      "video_id": 12,
+      "video_id": 13,
       "scene_id": "item-003-01",
       "narration": "Mezclar cromo, latón y negro en la misma habitación se lee como decisiones tomadas por separado, que es justo lo contrario de lo que parece caro.",
       "duration": null,
@@ -1840,7 +1840,7 @@
     },
     {
       "id": 205,
-      "video_id": 12,
+      "video_id": 13,
       "scene_id": "item-003-02",
       "narration": "Elige un metal dominante y llévalo a tiradores, lámparas, marcos y grifería. Un segundo metal como acento, y nada más.",
       "duration": null,
@@ -1849,7 +1849,7 @@
     },
     {
       "id": 206,
-      "video_id": 12,
+      "video_id": 13,
       "scene_id": "item-003-03",
       "narration": "Iluminar el perímetro hace visibles los límites del espacio, lo que hace que la habitación entera se perciba más amplia que con un único foco en el centro.",
       "duration": null,
@@ -1858,7 +1858,7 @@
     },
     {
       "id": 207,
-      "video_id": 12,
+      "video_id": 13,
       "scene_id": "outro-000-00",
       "narration": "Ahí lo tienes: tres ideas con las que trabajar. Gracias por verlo, y nos vemos en el siguiente.",
       "duration": null,
@@ -1867,7 +1867,7 @@
     },
     {
       "id": 208,
-      "video_id": 13,
+      "video_id": 14,
       "scene_id": "intro-000-00",
       "narration": "Most small rooms are not actually short of space. They are short of sightlines, light and vertical thinking, and all three are things you can fix this weekend.",
       "duration": null,
@@ -1876,7 +1876,7 @@
     },
     {
       "id": 209,
-      "video_id": 13,
+      "video_id": 14,
       "scene_id": "intro-000-01",
       "narration": "We are going to cover 3 specific changes, why designers rely on them, and what to do if your space does not cooperate.",
       "duration": null,
@@ -1885,7 +1885,7 @@
     },
     {
       "id": 210,
-      "video_id": 13,
+      "video_id": 14,
       "scene_id": "item-001-00",
       "narration": "Idea number 1. Mix at least three materials in every room. Rooms that use one material everywhere read flat, and rooms that use ten read chaotic.",
       "duration": null,
@@ -1894,7 +1894,7 @@
     },
     {
       "id": 211,
-      "video_id": 13,
+      "video_id": 14,
       "scene_id": "item-001-01",
       "narration": "Three or four contrasting textures create the tactile richness people describe as warm.",
       "duration": null,
@@ -1903,7 +1903,7 @@
     },
     {
       "id": 212,
-      "video_id": 13,
+      "video_id": 14,
       "scene_id": "item-001-02",
       "narration": "Pair something soft, something hard, and something natural: a wool rug, a wood or stone table, and a woven basket or linen curtain.",
       "duration": null,
@@ -1912,7 +1912,7 @@
     },
     {
       "id": 213,
-      "video_id": 13,
+      "video_id": 14,
       "scene_id": "item-001-03",
       "narration": "Add one small reflective element, like an aged brass lamp, to catch the light.",
       "duration": null,
@@ -1921,7 +1921,7 @@
     },
     {
       "id": 214,
-      "video_id": 13,
+      "video_id": 14,
       "scene_id": "item-001-04",
       "narration": "A reflection adds depth your eye reads as real, so the far wall stops behaving like the end of the room and the space feels bigger than it measures.",
       "duration": null,
@@ -1930,7 +1930,7 @@
     },
     {
       "id": 215,
-      "video_id": 13,
+      "video_id": 14,
       "scene_id": "item-002-00",
       "narration": "Number 2 on the list. Picture the same room photographed by an estate agent and by a magazine. The difference is often this: do not center the ceiling light by default.",
       "duration": null,
@@ -1939,7 +1939,7 @@
     },
     {
       "id": 216,
-      "video_id": 13,
+      "video_id": 14,
       "scene_id": "item-002-01",
       "narration": "The middle of the ceiling is almost never where the light is needed, which is why so many rooms have a bright empty center and a dim sofa.",
       "duration": null,
@@ -1948,7 +1948,7 @@
     },
     {
       "id": 217,
-      "video_id": 13,
+      "video_id": 14,
       "scene_id": "item-002-02",
       "narration": "Move or swag the fixture over the actual activity zone, or leave it off entirely and light the room from the perimeter with lamps.",
       "duration": null,
@@ -1957,7 +1957,7 @@
     },
     {
       "id": 218,
-      "video_id": 13,
+      "video_id": 14,
       "scene_id": "item-002-03",
       "narration": "Light reaching the walls and corners shows your eye exactly where the room ends, and a room whose boundaries are visible reads as larger than one that fades into shadow a few feet in.",
       "duration": null,
@@ -1966,7 +1966,7 @@
     },
     {
       "id": 219,
-      "video_id": 13,
+      "video_id": 14,
       "scene_id": "item-003-00",
       "narration": "Ever wondered why some rooms get this right and others do not? Make the window treatments oversized.",
       "duration": null,
@@ -1975,7 +1975,7 @@
     },
     {
       "id": 220,
-      "video_id": 13,
+      "video_id": 14,
       "scene_id": "item-003-01",
       "narration": "Generous fabric is one of the clearest signals of money in a room, because skimpy curtains are the default in every rental.",
       "duration": null,
@@ -1984,7 +1984,7 @@
     },
     {
       "id": 221,
-      "video_id": 13,
+      "video_id": 14,
       "scene_id": "item-003-02",
       "narration": "Panels roughly twice the width of the window so they still look full when closed, hung high and wide, and hemmed to just kiss the floor.",
       "duration": null,
@@ -1993,7 +1993,7 @@
     },
     {
       "id": 222,
-      "video_id": 13,
+      "video_id": 14,
       "scene_id": "item-003-03",
       "narration": "Hanging the fabric high and wide leaves the glass itself uncovered, so more daylight reaches the room and the wall reads taller than it measures.",
       "duration": null,
@@ -2002,7 +2002,7 @@
     },
     {
       "id": 223,
-      "video_id": 13,
+      "video_id": 14,
       "scene_id": "outro-000-00",
       "narration": "That is all 3 of them. That is it for today. Thanks for spending the time.",
       "duration": null,
@@ -2011,7 +2011,7 @@
     },
     {
       "id": 224,
-      "video_id": 14,
+      "video_id": 15,
       "scene_id": "intro-000-00",
       "narration": "If your living room feels smaller than it really is, the problem may not be the square footage.",
       "duration": null,
@@ -2020,7 +2020,7 @@
     },
     {
       "id": 225,
-      "video_id": 14,
+      "video_id": 15,
       "scene_id": "intro-000-01",
       "narration": "A handful of ordinary decorating choices can visually shrink a room, and reversing them can make the exact same space feel dramatically bigger.",
       "duration": null,
@@ -2029,7 +2029,7 @@
     },
     {
       "id": 226,
-      "video_id": 14,
+      "video_id": 15,
       "scene_id": "intro-000-02",
       "narration": "Here are 3 ideas worth knowing, each with the principle behind it and a practical way to put it into your own home this week.",
       "duration": null,
@@ -2038,7 +2038,7 @@
     },
     {
       "id": 227,
-      "video_id": 14,
+      "video_id": 15,
       "scene_id": "item-001-00",
       "narration": "That takes us to number 1. Do not center the ceiling light by default.",
       "duration": null,
@@ -2047,7 +2047,7 @@
     },
     {
       "id": 228,
-      "video_id": 14,
+      "video_id": 15,
       "scene_id": "item-001-01",
       "narration": "The middle of the ceiling is almost never where the light is needed, which is why so many rooms have a bright empty center and a dim sofa.",
       "duration": null,
@@ -2056,7 +2056,7 @@
     },
     {
       "id": 229,
-      "video_id": 14,
+      "video_id": 15,
       "scene_id": "item-001-02",
       "narration": "Move or swag the fixture over the actual activity zone, or leave it off entirely and light the room from the perimeter with lamps.",
       "duration": null,
@@ -2065,7 +2065,7 @@
     },
     {
       "id": 230,
-      "video_id": 14,
+      "video_id": 15,
       "scene_id": "item-001-03",
       "narration": "Worth doing even if you change nothing else on this list.",
       "duration": null,
@@ -2074,7 +2074,7 @@
     },
     {
       "id": 231,
-      "video_id": 14,
+      "video_id": 15,
       "scene_id": "item-001-04",
       "narration": "Light reaching the walls and corners shows your eye exactly where the room ends, and a room whose boundaries are visible reads as larger than one that fades into shadow a few feet in.",
       "duration": null,
@@ -2083,7 +2083,7 @@
     },
     {
       "id": 232,
-      "video_id": 14,
+      "video_id": 15,
       "scene_id": "item-002-00",
       "narration": "Here is where it gets interesting. Number 2 on the list. This is the one people get wrong most often. Measure the room before you buy anything.",
       "duration": null,
@@ -2092,7 +2092,7 @@
     },
     {
       "id": 233,
-      "video_id": 14,
+      "video_id": 15,
       "scene_id": "item-002-01",
       "narration": "Furniture almost always looks smaller in a showroom, and returning a sofa is one of the most expensive mistakes in home decorating.",
       "duration": null,
@@ -2101,7 +2101,7 @@
     },
     {
       "id": 234,
-      "video_id": 14,
+      "video_id": 15,
       "scene_id": "item-002-02",
       "narration": "Tape the outline of a piece on the floor with painter's tape and live with it for two days. Check doorways, stair turns and lift dimensions too.",
       "duration": null,
@@ -2110,7 +2110,7 @@
     },
     {
       "id": 235,
-      "video_id": 14,
+      "video_id": 15,
       "scene_id": "item-002-03",
       "narration": "Oversized pieces eat visible floor area and narrow the walking paths, so a small room feels cramped even though its footprint never changed.",
       "duration": null,
@@ -2119,7 +2119,7 @@
     },
     {
       "id": 236,
-      "video_id": 14,
+      "video_id": 15,
       "scene_id": "item-003-00",
       "narration": "Here is something that changes a room faster than most people expect. Number 3, and this one is a favorite. Which of these would you notice if it were missing?",
       "duration": null,
@@ -2128,7 +2128,7 @@
     },
     {
       "id": 237,
-      "video_id": 14,
+      "video_id": 15,
       "scene_id": "item-003-01",
       "narration": "Probably this: make the window treatments oversized. Generous fabric is one of the clearest signals of money in a room, because skimpy curtains are the default in every rental.",
       "duration": null,
@@ -2137,7 +2137,7 @@
     },
     {
       "id": 238,
-      "video_id": 14,
+      "video_id": 15,
       "scene_id": "item-003-02",
       "narration": "Panels roughly twice the width of the window so they still look full when closed, hung high and wide, and hemmed to just kiss the floor.",
       "duration": null,
@@ -2146,7 +2146,7 @@
     },
     {
       "id": 239,
-      "video_id": 14,
+      "video_id": 15,
       "scene_id": "item-003-03",
       "narration": "Hanging the fabric high and wide leaves the glass itself uncovered, so more daylight reaches the room and the wall reads taller than it measures.",
       "duration": null,
@@ -2155,7 +2155,7 @@
     },
     {
       "id": 240,
-      "video_id": 14,
+      "video_id": 15,
       "scene_id": "outro-000-00",
       "narration": "So that is the full list. That is it for today. Thanks for spending the time.",
       "duration": null,
@@ -2164,7 +2164,7 @@
     },
     {
       "id": 241,
-      "video_id": 15,
+      "video_id": 16,
       "scene_id": "intro-000-00",
       "narration": "There is a version of your living room that feels noticeably larger, and reaching it does not involve knocking down a single wall.",
       "duration": null,
@@ -2173,7 +2173,7 @@
     },
     {
       "id": 242,
-      "video_id": 15,
+      "video_id": 16,
       "scene_id": "intro-000-01",
       "narration": "It involves undoing about six decisions that are quietly costing you space. What follows is 3 practical ideas. No shopping lists you cannot afford, no renovations, just decisions that change how a room reads.",
       "duration": null,
@@ -2182,7 +2182,7 @@
     },
     {
       "id": 243,
-      "video_id": 15,
+      "video_id": 16,
       "scene_id": "item-001-00",
       "narration": "Idea number 1. Buy one bigger thing instead of three medium things. Scale is expensive to fake. One oversized mirror, lamp or artwork will always look more considered than a wall of small purchases.",
       "duration": null,
@@ -2191,7 +2191,7 @@
     },
     {
       "id": 244,
-      "video_id": 15,
+      "video_id": 16,
       "scene_id": "item-001-01",
       "narration": "Set the budget you were going to spread across several items and spend it in one place, on the largest piece the wall can carry.",
       "duration": null,
@@ -2200,7 +2200,7 @@
     },
     {
       "id": 245,
-      "video_id": 15,
+      "video_id": 16,
       "scene_id": "item-001-02",
       "narration": "Oversized pieces eat visible floor area and narrow the walking paths, so a small room feels cramped even though its footprint never changed.",
       "duration": null,
@@ -2209,7 +2209,7 @@
     },
     {
       "id": 246,
-      "video_id": 15,
+      "video_id": 16,
       "scene_id": "item-002-00",
       "narration": "Keep that in mind while we look at this. Number 2. Here is a mistake worth catching early. Mix at least three materials in every room.",
       "duration": null,
@@ -2218,7 +2218,7 @@
     },
     {
       "id": 247,
-      "video_id": 15,
+      "video_id": 16,
       "scene_id": "item-002-01",
       "narration": "Rooms that use one material everywhere read flat, and rooms that use ten read chaotic. Three or four contrasting textures create the tactile richness people describe as warm.",
       "duration": null,
@@ -2227,7 +2227,7 @@
     },
     {
       "id": 248,
-      "video_id": 15,
+      "video_id": 16,
       "scene_id": "item-002-02",
       "narration": "Pair something soft, something hard, and something natural: a wool rug, a wood or stone table, and a woven basket or linen curtain.",
       "duration": null,
@@ -2236,7 +2236,7 @@
     },
     {
       "id": 249,
-      "video_id": 15,
+      "video_id": 16,
       "scene_id": "item-002-03",
       "narration": "Add one small reflective element, like an aged brass lamp, to catch the light.",
       "duration": null,
@@ -2245,7 +2245,7 @@
     },
     {
       "id": 250,
-      "video_id": 15,
+      "video_id": 16,
       "scene_id": "item-002-04",
       "narration": "A reflection adds depth your eye reads as real, so the far wall stops behaving like the end of the room and the space feels bigger than it measures.",
       "duration": null,
@@ -2254,7 +2254,7 @@
     },
     {
       "id": 251,
-      "video_id": 15,
+      "video_id": 16,
       "scene_id": "item-003-00",
       "narration": "This next point comes up in almost every home. Number 3, and this one is a favorite. Imagine walking into the same room twice, once with this done and once without.",
       "duration": null,
@@ -2263,7 +2263,7 @@
     },
     {
       "id": 252,
-      "video_id": 15,
+      "video_id": 16,
       "scene_id": "item-003-01",
       "narration": "Buy a rug that is genuinely too big rather than slightly too small. A rug defines the seating zone.",
       "duration": null,
@@ -2272,7 +2272,7 @@
     },
     {
       "id": 253,
-      "video_id": 15,
+      "video_id": 16,
       "scene_id": "item-003-02",
       "narration": "When it is undersized, the furniture floats on the floor with no visual anchor and the whole seating group reads as smaller and more scattered than it actually is.",
       "duration": null,
@@ -2281,7 +2281,7 @@
     },
     {
       "id": 254,
-      "video_id": 15,
+      "video_id": 16,
       "scene_id": "item-003-03",
       "narration": "Aim for a rug wide enough that at least the front legs of every seat sit on it.",
       "duration": null,
@@ -2290,7 +2290,7 @@
     },
     {
       "id": 255,
-      "video_id": 15,
+      "video_id": 16,
       "scene_id": "item-003-04",
       "narration": "In most living rooms that means eight by ten feet, not five by seven, and it should extend roughly six to eight inches past the sides of the sofa.",
       "duration": null,
@@ -2299,7 +2299,7 @@
     },
     {
       "id": 256,
-      "video_id": 15,
+      "video_id": 16,
       "scene_id": "item-003-05",
       "narration": "The classic error is a small rug centered under the coffee table only, which shrinks the room and makes expensive furniture look accidental.",
       "duration": null,
@@ -2308,7 +2308,7 @@
     },
     {
       "id": 257,
-      "video_id": 15,
+      "video_id": 16,
       "scene_id": "item-003-06",
       "narration": "A piece that is too big for the room steals the floor around it, so what is left over feels cramped even though nothing else changed.",
       "duration": null,
@@ -2317,7 +2317,7 @@
     },
     {
       "id": 258,
-      "video_id": 15,
+      "video_id": 16,
       "scene_id": "outro-000-00",
       "narration": "That is all 3 of them. If you found something here worth trying, there are more videos like this on the channel.",
       "duration": null,
@@ -2326,7 +2326,7 @@
     },
     {
       "id": 259,
-      "video_id": 16,
+      "video_id": 17,
       "scene_id": "intro-000-00",
       "narration": "If your living room feels smaller than it really is, the problem may not be the square footage.",
       "duration": null,
@@ -2335,7 +2335,7 @@
     },
     {
       "id": 260,
-      "video_id": 16,
+      "video_id": 17,
       "scene_id": "intro-000-01",
       "narration": "A handful of ordinary decorating choices can visually shrink a room, and reversing them can make the exact same space feel dramatically bigger.",
       "duration": null,
@@ -2344,7 +2344,7 @@
     },
     {
       "id": 261,
-      "video_id": 16,
+      "video_id": 17,
       "scene_id": "intro-000-02",
       "narration": "Over the next 2 minutes we will work through 3 ideas, and for each one I will explain why it works and how to actually do it.",
       "duration": null,
@@ -2353,7 +2353,7 @@
     },
     {
       "id": 262,
-      "video_id": 16,
+      "video_id": 17,
       "scene_id": "item-001-00",
       "narration": "Number 1, and this one is a favorite. Vary the height of everything you place on a surface.",
       "duration": null,
@@ -2362,7 +2362,7 @@
     },
     {
       "id": 263,
-      "video_id": 16,
+      "video_id": 17,
       "scene_id": "item-001-01",
       "narration": "Work in loose triangles: something tall like a lamp or a vase of branches, something medium like stacked books, and something low and organic like a bowl or a small plant.",
       "duration": null,
@@ -2371,7 +2371,7 @@
     },
     {
       "id": 264,
-      "video_id": 16,
+      "video_id": 17,
       "scene_id": "item-001-02",
       "narration": "Odd numbers photograph and read better than even ones. When objects on a shelf or console are all the same height, the eye skims across them and registers clutter rather than composition.",
       "duration": null,
@@ -2380,7 +2380,7 @@
     },
     {
       "id": 265,
-      "video_id": 16,
+      "video_id": 17,
       "scene_id": "item-001-03",
       "narration": "Do that much and the rest of the room starts to make more sense.",
       "duration": null,
@@ -2389,7 +2389,7 @@
     },
     {
       "id": 266,
-      "video_id": 16,
+      "video_id": 17,
       "scene_id": "item-001-04",
       "narration": "Carrying the eye upward makes the walls read taller, and taller walls make the whole room feel bigger than its floor area says it is.",
       "duration": null,
@@ -2398,7 +2398,7 @@
     },
     {
       "id": 267,
-      "video_id": 16,
+      "video_id": 17,
       "scene_id": "item-002-00",
       "narration": "Number 2. The classic error is a small rug centered under the coffee table only, which shrinks the room and makes expensive furniture look accidental.",
       "duration": null,
@@ -2407,7 +2407,7 @@
     },
     {
       "id": 268,
-      "video_id": 16,
+      "video_id": 17,
       "scene_id": "item-002-01",
       "narration": "Get this wrong and everything else you do will fight it. Choose a rug that is generously sized, not undersized.",
       "duration": null,
@@ -2416,7 +2416,7 @@
     },
     {
       "id": 269,
-      "video_id": 16,
+      "video_id": 17,
       "scene_id": "item-002-02",
       "narration": "Aim for a rug wide enough that at least the front legs of every seat sit on it, and keep it proportional to the room: leave a consistent border of floor showing around the edges rather than running it wall to wall.",
       "duration": null,
@@ -2425,7 +2425,7 @@
     },
     {
       "id": 270,
-      "video_id": 16,
+      "video_id": 17,
       "scene_id": "item-002-03",
       "narration": "In most living rooms that means eight by ten feet, not five by seven.",
       "duration": null,
@@ -2434,7 +2434,7 @@
     },
     {
       "id": 271,
-      "video_id": 16,
+      "video_id": 17,
       "scene_id": "item-002-04",
       "narration": "A rug too small to reach the furniture leaves the seating floating in separate pieces, so one large enough to catch the front legs pulls the group into a single zone and the floor reads as more spacious.",
       "duration": null,
@@ -2443,7 +2443,7 @@
     },
     {
       "id": 272,
-      "video_id": 16,
+      "video_id": 17,
       "scene_id": "item-003-00",
       "narration": "And then there is this, which people almost always skip. Number 3 on the list. Ever wondered why some rooms get this right and others do not? Leave the corners of the room resolved.",
       "duration": null,
@@ -2452,7 +2452,7 @@
     },
     {
       "id": 273,
-      "video_id": 16,
+      "video_id": 17,
       "scene_id": "item-003-01",
       "narration": "Empty, awkward corners are where a room visibly runs out of ideas, and stuffing them with random small objects makes it worse.",
       "duration": null,
@@ -2461,7 +2461,7 @@
     },
     {
       "id": 274,
-      "video_id": 16,
+      "video_id": 17,
       "scene_id": "item-003-02",
       "narration": "A tall plant, a floor lamp, a leaning mirror or a single chair with a small table. One considered object beats three leftovers.",
       "duration": null,
@@ -2470,7 +2470,7 @@
     },
     {
       "id": 275,
-      "video_id": 16,
+      "video_id": 17,
       "scene_id": "item-003-03",
       "narration": "A reflection adds depth your eye reads as real, so the far wall stops behaving like the end of the room and the space feels bigger than it measures.",
       "duration": null,
@@ -2479,9 +2479,135 @@
     },
     {
       "id": 276,
-      "video_id": 16,
+      "video_id": 17,
       "scene_id": "outro-000-00",
       "narration": "That brings us to the end of the list. That is it for today. Thanks for spending the time.",
+      "duration": null,
+      "query": "bright styled living room natural light",
+      "category": "living rooms"
+    },
+    {
+      "id": 277,
+      "video_id": 6,
+      "scene_id": "intro-000-00",
+      "narration": "Two rooms can have identical dimensions and feel completely different to stand in. The one that feels bigger is almost never the one with less furniture in it, and that surprises people.",
+      "duration": null,
+      "query": "bright styled living room natural light",
+      "category": "living rooms"
+    },
+    {
+      "id": 278,
+      "video_id": 6,
+      "scene_id": "intro-000-01",
+      "narration": "In this video we are going through 3 of them, one at a time, with the reasoning behind each one and exactly how to apply it in a real home.",
+      "duration": null,
+      "query": "sunlit living room wide shot",
+      "category": "living rooms"
+    },
+    {
+      "id": 279,
+      "video_id": 6,
+      "scene_id": "item-001-00",
+      "narration": "Idea number 1. Do not center the ceiling light by default.",
+      "duration": null,
+      "query": "ceiling light living room interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 280,
+      "video_id": 6,
+      "scene_id": "item-001-01",
+      "narration": "The middle of the ceiling is almost never where the light is needed, which is why so many rooms have a bright empty center and a dim sofa.",
+      "duration": null,
+      "query": "pendant over seating area",
+      "category": "living rooms"
+    },
+    {
+      "id": 281,
+      "video_id": 6,
+      "scene_id": "item-001-02",
+      "narration": "Move or swag the fixture over the actual activity zone, or leave it off entirely and light the room from the perimeter with lamps.",
+      "duration": null,
+      "query": "modern ceiling fixture home",
+      "category": "living rooms"
+    },
+    {
+      "id": 282,
+      "video_id": 6,
+      "scene_id": "item-001-03",
+      "narration": "Try it in the evening rather than in daylight, because that is when the difference is most obvious.",
+      "duration": null,
+      "query": "living room ceiling lamp",
+      "category": "living rooms"
+    },
+    {
+      "id": 283,
+      "video_id": 6,
+      "scene_id": "item-002-00",
+      "narration": "Keep that in mind while we look at this. What is the cheapest fix on this whole list? Arguably this one: paint the trim the same color as the walls.",
+      "duration": null,
+      "query": "walls and trim same color",
+      "category": "living rooms"
+    },
+    {
+      "id": 284,
+      "video_id": 6,
+      "scene_id": "item-002-01",
+      "narration": "Bright white trim against a colored wall draws a hard outline around every door and window, which chops up the room.",
+      "duration": null,
+      "query": "color drenched room interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 285,
+      "video_id": 6,
+      "scene_id": "item-002-02",
+      "narration": "Use the same color on walls and woodwork with a satin or eggshell finish on the trim. The room reads taller and much more expensive.",
+      "duration": null,
+      "query": "painted woodwork matching walls",
+      "category": "living rooms"
+    },
+    {
+      "id": 286,
+      "video_id": 6,
+      "scene_id": "item-002-03",
+      "narration": "Look at it again at three different times of day before you commit, because color shifts more than people expect.",
+      "duration": null,
+      "query": "monochrome painted room",
+      "category": "living rooms"
+    },
+    {
+      "id": 287,
+      "video_id": 6,
+      "scene_id": "item-003-00",
+      "narration": "Number 3, and this one is a favorite. This one is simple: measure the room before you buy anything.",
+      "duration": null,
+      "query": "measuring room floor plan",
+      "category": "living rooms"
+    },
+    {
+      "id": 288,
+      "video_id": 6,
+      "scene_id": "item-003-01",
+      "narration": "Furniture almost always looks smaller in a showroom, and returning a sofa is one of the most expensive mistakes in home decorating.",
+      "duration": null,
+      "query": "tape measure interior planning",
+      "category": "living rooms"
+    },
+    {
+      "id": 289,
+      "video_id": 6,
+      "scene_id": "item-003-02",
+      "narration": "Tape the outline of a piece on the floor with painter's tape and live with it for two days. Check doorways, stair turns and lift dimensions too.",
+      "duration": null,
+      "query": "empty room before furniture",
+      "category": "living rooms"
+    },
+    {
+      "id": 290,
+      "video_id": 6,
+      "scene_id": "outro-000-00",
+      "narration": "That is all 3 of them. That is it for today. Thanks for spending the time.",
       "duration": null,
       "query": "bright styled living room natural light",
       "category": "living rooms"

@@ -315,6 +315,22 @@ def command_state(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_merge_state(args: argparse.Namespace) -> int:
+    """Union two divergent copies of the persistent history.
+
+    git cannot merge ``data/state/*.json`` - both sides rewrite every line -
+    and picking a side deletes real renders. This unions them on the natural
+    keys the schema already declares, then checks the result for orphans.
+    """
+
+    from .state_merge import find_orphans, merge_state
+
+    report = merge_state(args.base, args.ours, args.theirs, args.out)
+    orphans = find_orphans(args.out)
+    print(json.dumps({**report.to_dict(), "orphans": orphans}, indent=2))
+    return 1 if any(orphans.values()) else 0
+
+
 def command_cooldown(args: argparse.Namespace) -> int:
     """Inspect, and if asked repair, the long-term footage cooldown.
 
@@ -436,6 +452,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--dry-run", action="store_true", help="report what would move, change nothing"
     )
     cooldown.set_defaults(func=command_cooldown)
+
+    merge_state_cmd = subparsers.add_parser(
+        "merge-state",
+        help="resolve a data/state conflict by unioning two histories",
+    )
+    merge_state_cmd.add_argument("--base", required=True, help="merge-base snapshot directory")
+    merge_state_cmd.add_argument("--ours", required=True, help="this branch's snapshot directory")
+    merge_state_cmd.add_argument("--theirs", required=True, help="the other branch's directory")
+    merge_state_cmd.add_argument("--out", required=True, help="where to write the merged files")
+    merge_state_cmd.set_defaults(func=command_merge_state)
 
     llm_check = subparsers.add_parser(
         "llm-check", help="download and benchmark the optional local script model"

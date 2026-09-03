@@ -137,6 +137,15 @@ class Database:
     def initialize(self) -> None:
         with self.transaction() as conn:
             conn.executescript(SCHEMA)
+            # Migrations run here, before anything can read or write a row.
+            # They used to run lazily, on the first record_clip_use, which is
+            # after import_state - and import_state builds its column list from
+            # PRAGMA table_info, so every load of the history silently dropped
+            # test_use_count and test_last_used_at. That is how 420 clips ended
+            # up recorded as never used at all: the release moved their count
+            # out of use_count, and the next run's import threw away the column
+            # it had been moved into.
+            self._migrate_clip_modes(conn)
             conn.execute(
                 "INSERT OR REPLACE INTO schema_info(key, value) VALUES('version', ?)",
                 (str(SCHEMA_VERSION),),

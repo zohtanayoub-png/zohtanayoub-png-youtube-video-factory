@@ -57,6 +57,7 @@ src/vidfactory/
   ass_subtitles.py   premium burned-in captions (ASS + libass)
   visual_analysis.py FFmpeg frame sampling + pixel statistics + flags
   visual_model.py    optional ONNX CLIP backend, always optional
+  state_merge.py     union two divergent copies of data/state (see below)
   causal_alignment.py does the written paragraph explain the title's promise
   contradiction.py   does the paragraph argue *for* its own heading
   title_alignment.py what a title promises, and which ideas actually deliver it
@@ -203,6 +204,26 @@ src/vidfactory/
   `vidfactory visual-check` reports what a given machine can actually do.
   Without it, pixel statistics still catch empty rooms, dark scenes and floor
   plans; plastic covers, pets and room types get weaker.
+* **Two branches that both rendered have two histories, and git cannot merge
+  them.** Both sides rewrite every line of `data/state/*.json`, so the conflict
+  is total, and `--ours` or `--theirs` deletes real renders and real cooldown.
+  `vidfactory merge-state --base --ours --theirs --out` unions them on the
+  natural keys the schema already declares - `topics.slug`,
+  `clips(provider, provider_id)`, `videos(created_at, title)`,
+  `generations(run_id, started_at)` - renumbers the ids and carries each scene
+  to its video's new one. Counters use `ours + theirs - base`, the only
+  formula that neither loses a use nor invents one; importing both snapshots
+  instead would key on the autoincrement `id` and let one branch's
+  `videos.id = 3` overwrite the other's different video.
+* **Schema migrations run in `initialize()`, not lazily.** They used to run on
+  the first `record_clip_use`, which is *after* `import_state` - and
+  `import_state` builds its column list from `PRAGMA table_info`, so every
+  load of the history silently dropped `test_use_count` and
+  `test_last_used_at`. That is how 420 clips came to be recorded as never
+  used: `cooldown --release` moved their count out of `use_count`, and the
+  next run's import threw away the column it had been moved into. The merge
+  reconstructs those from the `first_used_at` that survived, as development
+  history so nothing wrongly returns to the production cooldown.
 * **`data/state/*.json` is the durable store; SQLite is the working copy.**
   Runners are ephemeral and a binary `.db` is hostile to git.
 * **`autopilot.videos_per_week` is enforced by the workflow**, which counts
