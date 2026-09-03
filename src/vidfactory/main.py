@@ -436,6 +436,19 @@ def command_entity_check(args: argparse.Namespace) -> int:
         print(f"threshold {1.0 - ENTITY_DOMINANCE_FAIL:.2f}: keeps "
               f"{100.0 * kept / len(present_all):.0f}% of real footage and "
               f"rejects {100.0 * culled / len(absent_all):.0f}% of the control")
+        print()
+        print("sweep (cut = the score at or below which a shot is rejected):")
+        print(f"{'cut':>6}  {'good culled':>12}  {'control culled':>15}")
+        for cut in (0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.40, 0.50, 0.60):
+            good = sum(1 for v in present_all if v <= cut)
+            bad = sum(1 for v in absent_all if v <= cut)
+            print(f"{cut:>6.2f}  {good:>4} ({100.0 * good / len(present_all):>3.0f}%)  "
+                  f"{bad:>6} ({100.0 * bad / len(absent_all):>3.0f}%)")
+        print()
+        print("The control is other interior footage, which usually contains the")
+        print("object too, so 'control culled' is a floor on the false-positive")
+        print("rate rather than a recall figure. What matters is 'good culled':")
+        print("every one of those is a shot the repair pass has to replace.")
     if args.json_out:
         Path(args.json_out).write_text(json.dumps(report, indent=2), encoding="utf-8")
         print(f"raw scores written to {args.json_out}")
