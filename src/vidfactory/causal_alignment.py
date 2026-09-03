@@ -56,6 +56,17 @@ log = get_logger("CAUSAL")
 #: A paragraph must reach this to count as explaining itself.
 PASS_THRESHOLD = 0.85
 
+#: What the *video* has to average, which is a different question. A section
+#: scoring exactly PASS_THRESHOLD passes on its own and cannot be the whole of
+#: a video that has to average more than that - and repair never used to touch
+#: it, because it had passed. A one item render then sat at 0.85 for ever
+#: against a 0.90 gate it could not reach.
+#:
+#: Keep this equal to editorial.min_causal_promise_alignment in config.yaml.
+#: They are the same requirement seen from the two ends: this one decides how
+#: hard the writing tries, that one decides whether the result ships.
+TARGET_AVERAGE = 0.90
+
 #: Words that link an action to its consequence. Contrastive connectives
 #: ("instead of", "rather than") are deliberately absent: they signal a
 #: comparison, not a cause.
@@ -446,4 +457,52 @@ def validate_sections(
             )
         report.contradiction.directions.append(direction)
         report.results.append(result)
+
+    # ------------------------------------------------------------------
+    # Lift the weakest sections until the video clears the average it is
+    # graded on. A section at exactly PASS_THRESHOLD has said the outcome
+    # follows from the action but never named the mechanism, and naming it is
+    # what takes the same paragraph to 1.00 - so this asks for the sentence
+    # the idea already owns rather than settling. Only a strict improvement
+    # is kept, and only when it does not contradict the heading, so this can
+    # raise the score and can never lower it.
+    # ------------------------------------------------------------------
+    if rewrite and report.results:
+        by_index = {int(getattr(s, "index", 0)): s for s in sections
+                    if getattr(s, "kind", "item") == "item"}
+        for result in sorted(report.results, key=lambda r: r.score):
+            if report.overall >= TARGET_AVERAGE:
+                break
+            if result.score >= 1.0 or result.contradictions:
+                continue
+            section = by_index.get(result.index)
+            if section is None:
+                continue
+            improved = repair_text(
+                section.text, promise, getattr(section, "tip", None),
+                used=counters, heading=result.heading,
+            )
+            if not improved:
+                continue
+            candidate = score_paragraph(improved, promise)
+            if candidate.score <= result.score:
+                continue
+            if find_contradictions(
+                result.heading, improved, language=language,
+                direction=result.direction,
+            ):
+                continue
+            section.text = improved
+            log.info(
+                "Item %s reached %.2f by naming its mechanism, lifting the "
+                "video's causal average to %.2f",
+                result.index, candidate.score, report.overall,
+            )
+            result.score = candidate.score
+            result.outcomes = candidate.outcomes
+            result.connectives = candidate.connectives
+            result.mechanisms = candidate.mechanisms
+            result.evidence = candidate.evidence
+            result.repaired = True
+            report.rewrites += 1
     return report

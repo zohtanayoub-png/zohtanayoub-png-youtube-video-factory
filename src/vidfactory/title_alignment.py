@@ -176,7 +176,7 @@ PROMISES: tuple[Promise, ...] = (
             ),
             Mechanism(
                 "clear_sightlines",
-                ("sightline", "sight line", "continuous", "uninterrupted", "unobstructed",
+                ("interrupts the view", "view across", "route through", "runs straight to", "sightline", "sight line", "continuous", "uninterrupted", "unobstructed",
                  "flow", "walkway", "pathway", "circulation", "clear path", "keeps going"),
                 "An uninterrupted line of sight lets your eye travel all the way to "
                 "the far wall without stopping, and a room the eye can cross in one "
@@ -199,7 +199,7 @@ PROMISES: tuple[Promise, ...] = (
             # ------------------------------------------------------------------
             Mechanism(
                 "statement_piece_scale",
-                ("statement piece", "one bigger", "bigger thing", "one large",
+                ("single generous", "a wall of small", "settle on", "statement piece", "one bigger", "bigger thing", "one large",
                  "larger piece", "larger pieces", "fewer, larger", "fewer larger",
                  "one oversized", "one big", "large artwork", "artwork",
                  "substantial", "focal point", "single large"),
@@ -257,7 +257,7 @@ PROMISES: tuple[Promise, ...] = (
             ),
             Mechanism(
                 "less_clutter",
-                ("clutter", "declutter", "negative space", "clear surfaces",
+                ("object on a surface", "clearing them", "fewer things", "clutter", "declutter", "negative space", "clear surfaces",
                  "surfaces stay clear", "empty", "edited", "remove"),
                 "Clear surfaces give the eye somewhere to rest, and a room with "
                 "fewer things competing for attention reads as more spacious.",
@@ -270,7 +270,7 @@ PROMISES: tuple[Promise, ...] = (
             ),
             Mechanism(
                 "visible_floor",
-                ("visible legs", "slim legs", "raised on", "floats", "floating",
+                ("visible floor", "floor you can see", "floor visible", "square foot of floor", "off the ground", "visible legs", "slim legs", "raised on", "floats", "floating",
                  "wall-mount", "wall mounted", "floor continue", "see floor",
                  "sits flat on the ground"),
                 "Every square foot of floor you can actually see is square footage "
@@ -299,7 +299,7 @@ PROMISES: tuple[Promise, ...] = (
             ),
             Mechanism(
                 "light_distribution",
-                ("natural light", "daylight", "sunlight", "bright", "pale",
+                ("light reaching", "light on the walls", "boundaries of the room", "walls and corners", "natural light", "daylight", "sunlight", "bright", "pale",
                  "light colour", "light color", "airy", "window", "perimeter light",
                  "wash the walls", "lamp", "sconce", "lighting", "ceiling light",
                  "overhead light", "downlight", "light fitting", "light source",
@@ -318,7 +318,7 @@ PROMISES: tuple[Promise, ...] = (
             ),
             Mechanism(
                 "window_geometry",
-                ("curtain", "drape", "rod", "panel", "blind"),
+                ("the fabric high", "fabric hung", "the track", "the glass", "the frame", "curtain", "drape", "rod", "panel", "blind"),
                 "Hanging the fabric high and wide leaves the glass itself "
                 "uncovered, so more daylight reaches the room and the wall reads "
                 "taller than it measures.",
@@ -344,7 +344,7 @@ PROMISES: tuple[Promise, ...] = (
             ),
             Mechanism(
                 "continuous_flooring",
-                ("flooring", "same floor", "one continuous", "floor finish"),
+                ("the floor into", "floor running", "different finishes", "flooring", "same floor", "one continuous", "floor finish"),
                 "One continuous floor finish stops the eye counting separate small "
                 "zones, so the whole space reads as larger than a floor broken "
                 "into sections.",
@@ -373,7 +373,7 @@ PROMISES: tuple[Promise, ...] = (
             ),
             Mechanism(
                 "vertical_storage",
-                ("vertical storage", "up to the ceiling", "storage to the ceiling"),
+                ("storage that stops", "height for storage", "carrying it to the ceiling", "vertical storage", "up to the ceiling", "storage to the ceiling"),
                 "Taking storage up to the ceiling uses the height instead of the floor, "
                 "so the same belongings leave more visible floor behind and the "
                 "room feels more spacious.",
@@ -627,7 +627,8 @@ PROMISES: tuple[Promise, ...] = (
                       "Getting the colour temperature and the shade right stops the "
                       "light being swallowed before it reaches the room."),
             Mechanism("unobstructed_windows",
-                      ("curtain", "blind", "clear the sill", "unobstructed"),
+                      ("curtain", "blind", "clear the sill", "unobstructed",
+                       "clearing the window"),
                       "Clearing the window itself is the single largest change you can "
                       "make, so the room receives far more daylight and stops "
                       "feeling dark by mid-afternoon."),
@@ -1031,7 +1032,7 @@ PROMISES_ES: tuple[Promise, ...] = (
                "habitación pequeña, y usarla hace que se vea más grande sin tocar "
                "un solo tabique."),
             _m("clear_sightlines",
-               ("línea de visión", "líneas de visión", "despejado", "despejada",
+               ("interrumpe la vista", "hasta la pared del fondo", "línea de visión", "líneas de visión", "despejado", "despejada",
                 "ininterrumpid", "sin obstáculos", "paso", "recorrido",
                 "circulación", "camino", "continuo", "continua"),
                "Cuando nada interrumpe la vista, el ojo llega de una vez hasta la "
@@ -1058,7 +1059,7 @@ PROMISES_ES: tuple[Promise, ...] = (
                "algo libre hace que la habitación parezca más grande sin sacar un "
                "solo mueble."),
             _m("visible_floor",
-               ("patas", "suelo visible", "ver suelo", "se ve suelo", "volad",
+               ("suelo que se ve", "suelo a la vista", "suelo continuo y visible", "patas", "suelo visible", "ver suelo", "se ve suelo", "volad",
                 "colgad", "elevad", "levantad", "apoya en el suelo"),
                "Cada metro de suelo que se ve es un metro que el ojo cuenta, así "
                "que dejar el suelo a la vista bajo los muebles hace que la "
@@ -1085,7 +1086,7 @@ PROMISES_ES: tuple[Promise, ...] = (
                "que hace que la habitación entera se perciba más amplia que con un "
                "único foco en el centro."),
             _m("window_geometry",
-               ("cortina", "cortinas", "barra", "estor", "persiana", "visillo"),
+               ("la tela alta", "el cristal", "cortina", "cortinas", "barra", "estor", "persiana", "visillo"),
                "Colgar la tela alta y ancha deja el cristal despejado, así que "
                "entra más luz y la pared se lee más alta de lo que mide.",
                "Sacar las cortinas fuera del vano deja la ventana entera libre, lo "
@@ -1099,7 +1100,7 @@ PROMISES_ES: tuple[Promise, ...] = (
                "Dónde se coloca cada mueble decide por dónde se puede andar, y una "
                "habitación que se cruza sin esquivar nada se percibe más amplia."),
             _m("continuous_flooring",
-               ("mismo suelo", "suelo continuo", "tarima", "pavimento",
+               ("cambiar de material", "mantenerlo igual", "mismo suelo", "suelo continuo", "tarima", "pavimento",
                 "un solo suelo", "flooring"),
                "Un único suelo continuo evita que el ojo cuente zonas pequeñas por "
                "separado, así que el conjunto se lee como más grande que un suelo "
@@ -1115,7 +1116,7 @@ PROMISES_ES: tuple[Promise, ...] = (
                "Cuando la carpintería desaparece en la pared, el ojo deja de contar "
                "bordes y el muro entero se percibe más grande."),
             _m("vertical_storage",
-               ("almacenaje vertical", "hasta el techo", "hasta arriba",
+               ("guardar en vertical", "deja el suelo libre", "almacenaje vertical", "hasta el techo", "hasta arriba",
                 "estantería alta", "armario alto", "sube el almacenaje"),
                "Subir el almacenaje hasta el techo usa la altura en lugar del "
                "suelo, así que las mismas cosas dejan más suelo visible y la "
@@ -1168,7 +1169,7 @@ PROMISES_ES: tuple[Promise, ...] = (
                                   "más ancho", "escala", "amplio"),
                "Las proporciones generosas se leen como elegidas para la casa y no "
                "para el presupuesto, lo que hace que el conjunto parezca más caro."),
-            _m("layered_light", ("regulador", "aplique", "capas de luz", "luz cálida",
+            _m("layered_light", ("regulador", "aplique", "capas de luz", "luz cálida", "luz repartida",
                                  "lámpara", "luz indirecta"),
                "La luz repartida y regulable modela la habitación como lo hace un "
                "escaparate, así que el espacio se percibe bastante más caro."),
@@ -1230,7 +1231,7 @@ PROMISES_ES: tuple[Promise, ...] = (
                                 "tapiza", "borreguito"),
                "La textura suave invita a tocar, y eso hace que una habitación se "
                "sienta cálida en lugar de solo amueblada."),
-            _m("natural_material", ("madera", "roble", "material natural", "fibra"),
+            _m("natural_material", ("madera", "roble", "material natural", "materiales naturales", "fibra"),
                "Los materiales naturales llevan el color cálido en el propio "
                "material, así que la habitación entera se siente menos fría."),
             _m("enclosure", ("rincón", "esquina", "resguard", "respaldo", "íntimo",
@@ -1272,7 +1273,7 @@ PROMISES_ES: tuple[Promise, ...] = (
             _m("daylight", ("luz natural", "luz del día", "ventana", "cristal", "sol"),
                "Todo lo que deja entrar más luz natural sube el nivel de luz de la "
                "habitación entera sin gastar nada."),
-            _m("reflection", ("espejo", "reflej", "brillo", "satinado"),
+            _m("reflection", ("espejo", "reflej", "brillo", "satinado", "superficies reflectantes"),
                "Las superficies reflectantes devuelven a la habitación la luz que "
                "ya tienes, de modo que las mismas bombillas dejan el espacio "
                "notablemente más luminoso."),
