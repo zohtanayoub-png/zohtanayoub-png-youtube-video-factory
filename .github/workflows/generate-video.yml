@@ -444,14 +444,16 @@ jobs:
         # not something a report can answer after the fact; the frame has to
         # come out through the log. Five small JPEGs, taken at the moment each
         # topic is actually being narrated.
-        # OUTPUT_DIR is a step output, not job env, so `env.OUTPUT_DIR` in a
-        # condition is always empty - which is exactly how run 33 skipped this
-        # silently and produced no frames at all.
-        if: always() && steps.generate.outputs.output_dir != ''
+        # Unconditional on purpose. The step output naming the directory is
+        # not set when the render step fails, and a refused render is exactly
+        # the one worth looking at - run 37 was refused over one lighting shot
+        # and produced no frames for the failure it was run to investigate.
+        # The tool falls back to finding the newest output directory itself.
+        if: always()
         continue-on-error: true
         env:
           OUTPUT_DIR: ${{ steps.generate.outputs.output_dir }}
-        run: python tools/inspect_frames.py "$OUTPUT_DIR"
+        run: python tools/inspect_frames.py "${OUTPUT_DIR:-output}"
 
       - name: Verify the caption file renders
         # Two separate facts, checked two separate ways, because guessing at

@@ -62,8 +62,31 @@ def cues(srt: Path) -> list[tuple[float, float, str]]:
     return out
 
 
+def newest_output(root: Path) -> Path | None:
+    """The most recent run directory that actually holds a render."""
+
+    candidates = [
+        d for d in root.glob("run-*") if (d / "final_video.mp4").exists()
+    ]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda d: d.stat().st_mtime)
+
+
 def main(directory: str) -> int:
     root = Path(directory)
+    # A refused render is exactly the one worth looking at, and the pipeline
+    # writes the video and the report before editorial QC refuses it - but the
+    # workflow step output that names the directory is never set when the step
+    # fails, so run 37 produced no frames at all for the failure it was run to
+    # investigate. Find the directory instead of being told it.
+    if not (root / "final_video.mp4").exists():
+        found = newest_output(root if root.name else Path("output"))
+        if found is None:
+            found = newest_output(Path("output"))
+        if found is not None:
+            print(f"looking at {found}")
+            root = found
     video = root / "final_video.mp4"
     srt = root / "subtitles.srt"
     if not video.exists() or not srt.exists():
