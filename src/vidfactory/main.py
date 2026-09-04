@@ -329,7 +329,13 @@ def command_entity_check(args: argparse.Namespace) -> int:
     few hundred kilobytes rather than a few hundred megabytes.
     """
 
-    from .entities import ENTITIES, BY_NAME, grounding_prompts, score_from_similarities
+    from .entities import (
+        BY_NAME,
+        ENTITIES,
+        ENTITY_DOMINANCE_FAIL,
+        grounding_prompts,
+        score_from_similarities,
+    )
     from .stock.registry import build_providers
     from .visual_analysis import PROMPT_TEMPLATE, VisualAnalyzer, _cosine, _ramp
     from .visual_model import load_model
@@ -397,6 +403,39 @@ def command_entity_check(args: argparse.Namespace) -> int:
                 out.append(grounding.score)
         return out
 
+    # ---- targeted probe --------------------------------------------------
+    # "Does the trim probe reject ornate patterned decoration?" is a question
+    # about one clip type and one entity, and running a thirty minute render
+    # and hoping that clip turns up again is not a way to answer it. This asks
+    # it directly, and --without re-scores the same frames with a distractor
+    # removed so its contribution is a measured difference rather than a claim.
+    if args.probe_query:
+        from dataclasses import replace
+
+        dropped = [d for d in str(args.without or "").split("::") if d.strip()]
+        for entity in entities:
+            variants = [("with the current distractors", entity)]
+            if dropped:
+                kept = tuple(c for c in entity.competitors if c not in dropped)
+                if len(kept) != len(entity.competitors):
+                    variants.append(
+                        ("without " + ", ".join(repr(d) for d in dropped),
+                         replace(entity, competitors=kept))
+                    )
+            print(f"\n{entity.name} probed against {args.probe_query!r}")
+            for label, variant in variants:
+                scores = scores_for(variant, args.probe_query)
+                if not scores:
+                    print(f"  {label}: no samples")
+                    continue
+                scores.sort()
+                rejected = sum(1 for v in scores if v <= 1.0 - ENTITY_DOMINANCE_FAIL)
+                print(f"  {label}: n={len(scores)} "
+                      f"min={scores[0]:.3f} median={scores[len(scores) // 2]:.3f} "
+                      f"rejected={rejected}/{len(scores)} "
+                      f"(cut {1.0 - ENTITY_DOMINANCE_FAIL:.2f})")
+        return 0
+
     report: dict[str, Any] = {}
     for index, entity in enumerate(entities):
         # A different entity each time, so the control is genuinely footage of
@@ -415,8 +454,6 @@ def command_entity_check(args: argparse.Namespace) -> int:
                     f"median={values[len(values) // 2]:.2f} max={values[-1]:.2f}")
         print(f"{entity.name:16} containing it : {summary(present)}")
         print(f"{'':16} something else: {summary(absent)}")
-
-    from .entities import ENTITY_DOMINANCE_FAIL
 
     present_all = sorted(v for r in report.values() for v in r["present"])
     absent_all = sorted(v for r in report.values() for v in r["absent"])
@@ -640,6 +677,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     entity_check.add_argument("--samples", type=int, default=6)
     entity_check.add_argument("--json-out", default="")
+    entity_check.add_argument(
+        "--probe-query", default="",
+        help="score footage from THIS search with the named entity's probes, "
+             "to ask whether a specific observed failure would now be rejected",
+    )
+    entity_check.add_argument(
+        "--without", default="",
+        help="competitor prompts to drop (double-colon separated), so the "
+             "contribution of a newly added distractor can be isolated",
+    )
     entity_check.set_defaults(func=command_entity_check)
 
     return parser

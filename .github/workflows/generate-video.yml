@@ -69,6 +69,27 @@ on:
         type: choice
         default: "test"
         options: [test, production]
+      probe_query:
+        description: >-
+          calibrate-entities only: score footage from THIS search with the
+          named entity's probes, to ask whether one observed failure would now
+          be rejected. Blank runs the full calibration instead.
+        required: false
+        type: string
+        default: ""
+      probe_entities:
+        description: "calibrate-entities only: comma-separated entity names"
+        required: false
+        type: string
+        default: ""
+      probe_without:
+        description: >-
+          calibrate-entities only: competitor prompts to drop (double-colon
+          separated), so a new distractor's contribution is a measured
+          difference rather than a claim.
+        required: false
+        type: string
+        default: ""
       task:
         description: >-
           render, or calibrate the required-entity probes against real footage.
@@ -703,6 +724,9 @@ jobs:
         run: |
           python -m vidfactory entity-check \
             --samples 6 --json-out entity-calibration.json \
+            --entities "${{ inputs.probe_entities }}" \
+            --probe-query "${{ inputs.probe_query }}" \
+            --without "${{ inputs.probe_without }}" \
             | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Upload the raw scores
