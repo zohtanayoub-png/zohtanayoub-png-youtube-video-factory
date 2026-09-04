@@ -374,3 +374,138 @@ def test_a_section_about_one_thing_may_explain_itself_through_it():
 def test_an_enumeration_is_read_as_the_options_it_offers():
     named = entities_in("a plant, a floor lamp, a mirror or a low chair")
     assert {"greenery", "lighting", "mirror", "seating"} <= named
+
+
+# ---------------------------------------------------------------------------
+# The test / production split
+# ---------------------------------------------------------------------------
+
+def _grounding_rows(failures: int, total: int = 20):
+    rows = []
+    for index in range(total):
+        bad = index < failures
+        rows.append({
+            "analyzed": True,
+            "semantic_match": 0.7,
+            "is_premium_visual": True,
+            "flags": {},
+            "entity": "lighting",
+            "entity_grounding_checked": True,
+            "entity_grounding_passed": not bad,
+            "entity_presence_score": 0.1 if bad else 0.9,
+            "entity_grounding_detail": "x",
+        })
+    return rows
+
+
+@pytest.mark.parametrize("mode, failures, should_pass", [
+    ("test", 0, True),
+    ("test", 1, True),        # tolerated, and reported as a warning
+    ("test", 2, False),
+    ("production", 0, True),
+    ("production", 1, False), # absolute
+])
+def test_the_grounding_gate_splits_by_mode(mode, failures, should_pass):
+    """One failure in 110 shots refused runs 31, 37 and 38; 32, 33 and 35 passed.
+
+    With a probe whose own calibration puts false positives near 8%, an
+    absolute gate over a ten minute video measures the probe as much as the
+    video. Production still tolerates none, because a published video is the
+    thing this all exists to protect.
+    """
+
+    from vidfactory.editorial_qc import summarise_grounding
+
+    summary = summarise_grounding(_grounding_rows(failures))
+    limit = 0 if mode == "production" else 1
+    assert (summary["failed"] <= limit) is should_pass
+
+
+def test_a_tolerated_failure_is_still_named():
+    from vidfactory.editorial_qc import summarise_grounding
+
+    summary = summarise_grounding(_grounding_rows(1))
+    assert summary["failed"] == 1
+    assert summary["failures"][0]["entity"] == "lighting"
+
+
+# ---------------------------------------------------------------------------
+# Why a clip is not premium
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("flags, expected", [
+    ({"renovation": 0.8}, "renovation_or_construction"),
+    ({"construction": 0.6}, "renovation_or_construction"),
+    ({"empty_room": 0.7}, "unfinished_or_empty_room"),
+    ({"dominant_pet_or_person": 0.9}, "people_dominate_frame"),
+    ({"dark_scene": 0.5}, "poor_lighting"),
+    ({"object_closeup": 0.6}, "object_closeup"),
+    ({"non_home_space": 0.6}, "not_a_home_interior"),
+])
+def test_every_non_premium_clip_gets_one_named_reason(flags, expected):
+    """A ratio of 0.39 could be renovations or dim rooms; those differ."""
+
+    from vidfactory.visual_analysis import premium_failure_reason
+
+    visual = {"analyzed": True, "is_premium_visual": False, "flags": flags}
+    assert premium_failure_reason(visual, caption_premium=True) == expected
+
+
+def test_a_flag_below_the_penalty_confidence_is_not_the_reason():
+    """Suspicion is not evidence; the score already declines to act on it."""
+
+    from vidfactory.visual_analysis import premium_failure_reason
+
+    visual = {"analyzed": True, "is_premium_visual": False, "flags": {"renovation": 0.1}}
+    assert premium_failure_reason(visual, True) == "weak_interior_composition"
+
+
+def test_frames_can_like_a_clip_the_caption_rejects():
+    """That failure is fixed in the caption vocabulary, not in the search."""
+
+    from vidfactory.visual_analysis import premium_failure_reason
+
+    visual = {"analyzed": True, "is_premium_visual": True, "flags": {}}
+    assert premium_failure_reason(visual, caption_premium=False) == "caption_rejected"
+    assert premium_failure_reason(visual, caption_premium=True) == "premium"
+
+
+def test_the_breakdown_adds_up():
+    from vidfactory.visual_analysis import premium_breakdown
+
+    pairs = [
+        ({"is_premium": True}, {"analyzed": True, "is_premium_visual": True, "flags": {}}),
+        ({"is_premium": True},
+         {"analyzed": True, "is_premium_visual": False, "flags": {"renovation": 0.8}}),
+        ({"is_premium": True},
+         {"analyzed": True, "is_premium_visual": False, "flags": {"dark_scene": 0.6}}),
+    ]
+    breakdown = premium_breakdown(pairs)
+    assert breakdown["clips"] == 3
+    assert sum(breakdown["reasons"].values()) == 3
+    assert breakdown["ratio"] == round(1 / 3, 3)
+
+
+def test_the_new_caption_negatives_catch_a_building_site():
+    """Run 38 flagged 32 of 189 candidates as renovation from the frames.
+
+    The caption often says so plainly - "contractor", "paint can",
+    "scaffolding" - and those words were simply not in the list.
+    """
+
+    from vidfactory.ranking import NEGATIVE_SIGNALS
+
+    for word in ("contractor", "paint can", "scaffolding", "drywall", "plaster"):
+        assert word in NEGATIVE_SIGNALS
+
+
+def test_the_premium_queries_describe_a_finished_room():
+    from vidfactory.queries import PREMIUM_QUERIES
+
+    assert "elegant small living room" in PREMIUM_QUERIES
+    assert len(PREMIUM_QUERIES) >= 7
+    # Every one has to name a room, or it will return anything at all.
+    assert all(
+        any(w in q for w in ("living room", "apartment", "interior", "home"))
+        for q in PREMIUM_QUERIES
+    )

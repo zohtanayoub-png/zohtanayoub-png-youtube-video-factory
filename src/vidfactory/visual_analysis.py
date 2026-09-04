@@ -1352,3 +1352,76 @@ class VisualAnalyzer:
                 0.65 * position + 0.35 * _ramp(margin, SEMANTIC_MARGIN_LOW, SEMANTIC_MARGIN_HIGH)
             )
         return round(_mean(scores), 3)
+
+
+#: Why a clip is not premium, in the words a reviewer would use. Ordered by
+#: severity: a frame can carry several flags at once and the report needs one
+#: answer per clip, so the first match wins.
+PREMIUM_FAILURE_REASONS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("renovation_or_construction", ("renovation", "construction")),
+    ("unfinished_or_empty_room", ("empty_room", "plastic_covered_furniture")),
+    ("floor_plan_or_document", ("floor_plan_or_document",)),
+    ("people_dominate_frame", ("dominant_pet_or_person",)),
+    ("poor_lighting", ("dark_scene",)),
+    ("not_a_home_interior", ("non_home_space", "unrelated_room")),
+    ("object_closeup", ("object_closeup",)),
+)
+
+
+def premium_failure_reason(
+    visual: Mapping[str, Any],
+    caption_premium: bool | None = None,
+    penalty_confidence: float = PENALTY_CONFIDENCE,
+) -> str:
+    """The one thing most responsible for a clip not counting as premium.
+
+    ``final_shot_premium_visual_ratio`` is a single number, and a single
+    number cannot be acted on: 39% could be thirty renovations or thirty
+    dim rooms, and those have opposite fixes. This names the dominant cause
+    per clip so the ratio can be broken down by what to do about it.
+
+    A clip that the frames like but the caption does not is its own category,
+    because the fix there is the caption vocabulary rather than the search.
+    """
+
+    if not visual.get("analyzed"):
+        return "not_inspected" if caption_premium is not False else "caption_rejected"
+
+    flags = {k: float(v) for k, v in dict(visual.get("flags") or {}).items()}
+    acting = {k: v for k, v in flags.items() if v >= penalty_confidence}
+    for reason, names in PREMIUM_FAILURE_REASONS:
+        if any(name in acting for name in names):
+            return reason
+
+    if not bool(visual.get("is_premium_visual")):
+        # No single flag was strong enough, so what failed is the composition
+        # itself: the frame simply does not look much like a furnished room.
+        return "weak_interior_composition"
+    if caption_premium is False:
+        return "caption_rejected"
+    return "premium"
+
+
+def premium_breakdown(
+    pairs: Sequence[tuple[Mapping[str, Any], Mapping[str, Any]]],
+    penalty_confidence: float = PENALTY_CONFIDENCE,
+) -> dict[str, Any]:
+    """Count each reason over ``(caption_report, visual_report)`` pairs."""
+
+    counts: dict[str, int] = {}
+    for caption, visual in pairs:
+        reason = premium_failure_reason(
+            visual, bool(caption.get("is_premium", False)), penalty_confidence
+        )
+        counts[reason] = counts.get(reason, 0) + 1
+    total = sum(counts.values()) or 1
+    return {
+        "clips": sum(counts.values()),
+        "premium": counts.get("premium", 0),
+        "ratio": round(counts.get("premium", 0) / total, 3),
+        "reasons": dict(sorted(counts.items(), key=lambda kv: kv[1], reverse=True)),
+        "percentages": {
+            k: round(100.0 * v / total, 1)
+            for k, v in sorted(counts.items(), key=lambda kv: kv[1], reverse=True)
+        },
+    }

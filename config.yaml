@@ -176,6 +176,13 @@ visual:
   # 120 is three times what run 31 actually spent and a sixth of what run 26
   # was throttled for.
   max_repair_searches: 120
+  # What a frame-level flag costs a candidate in the second ranking stage,
+  # multiplied by that flag's damage weight and its confidence. Run 38 shipped
+  # a 0.39 premium ratio with renovation the single largest cause, so a
+  # flagged clip has to lose decisively to a clean one rather than merely
+  # slip a place: at 60 a renovation at half confidence cost 25 points against
+  # a semantic dimension worth 45, which a pretty building site could out-earn.
+  flag_penalty: 110.0
   reject_confidence: 0.72       # a visual flag this strong rejects the clip
   penalty_confidence: 0.42      # a visual flag this strong is a heavy penalty
   weights:                      # stage two: relevance first, beauty third

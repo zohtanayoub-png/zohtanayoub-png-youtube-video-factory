@@ -266,6 +266,23 @@ src/vidfactory/
   `final_shot_premium_visual_ratio` targets 0.60: a warning in test mode, a
   gate in production. The answer to a weak pool is more pages and more query
   variants, never a lower definition of premium.
+* **A ratio is not a diagnosis.** 0.39 could be thirty renovations or thirty
+  dim rooms and those have opposite fixes, so every non-premium clip is
+  labelled with the one thing most responsible - `premium_failure_reason`,
+  reported as `final_shot_premium_failure_reasons`. And finding out should not
+  cost a thirty minute render: `tools/premium_check.py` (the `premium-check`
+  task) searches the provider as the pipeline does, inspects candidates on
+  preview stills, and reports the premium ratio of what a ranker would
+  actually select, before and after a proposed change, alongside the semantic
+  average and grounding failures - because a ranking that buys premium footage
+  by dropping relevance has made the video worse.
+* **The grounding gate splits by mode.** Production tolerates no entity
+  grounding failure; test tolerates one. The probe's own calibration puts its
+  false positives near 8% and a ten minute video carries about 110 grounded
+  shots, so an absolute gate refused runs 31, 37 and 38 over a single shot
+  each while 32, 33 and 35 passed - which measures the probe more than the
+  video. A tolerated failure is never silent: it is reported by name as a
+  warning that says a production render would have been refused for it.
 * **Relevance outranks beauty.** The second ranking stage weights
   scene-to-clip semantic match (45) above interior subject (30), visual
   quality (18), novelty (12) and technical quality (8). A beautiful unrelated

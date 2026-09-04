@@ -72,6 +72,22 @@ QUALITY_MODIFIERS = (
     "bright",
 )
 
+#: Whole phrases rather than single modifiers, for when the pool is weak.
+#: Run 38 finished at a 0.39 premium ratio with 32 of 189 inspected candidates
+#: flagged as renovation - the search was returning building sites because
+#: "paint the trim" and "shelving" are things that happen during building
+#: work. These describe the finished room a decorating channel wants, and
+#: stock libraries index them heavily.
+PREMIUM_QUERIES: tuple[str, ...] = (
+    "elegant small living room",
+    "bright modern living room interior",
+    "cozy scandinavian living room",
+    "premium apartment living room",
+    "stylish small apartment interior",
+    "beautiful home interior daylight",
+    "interior design living room",
+)
+
 _NOISE = {"the", "a", "an", "of", "and", "with", "for", "in", "on", "to"}
 
 

@@ -64,6 +64,13 @@ NEGATIVE_SIGNALS: tuple[str, ...] = (
     "moving box", "cardboard box", "packing", "moving house", "relocation",
     "renovate", "renovation", "remodel", "paint roller", "painting wall",
     "drill", "hammer", "tool", "ladder", "dust sheet", "drop cloth",
+    # Run 38 flagged 32 of 189 inspected candidates as renovation. The caption
+    # often says so plainly and these were simply not in the list.
+    "contractor", "builder", "handyman", "workman", "worker",
+    "paint can", "paint bucket", "paint tin", "paint tray", "toolbox",
+    "scaffold", "scaffolding", "plaster", "plastering", "drywall",
+    "sanding", "sander", "putty", "primer", "masking tape", "wallpapering",
+    "extreme close up", "macro", "closeup detail", "swatch", "colour swatch", "color swatch",
     "clutter", "cluttered", "untidy", "old furniture", "worn",
     "empty room", "bare room", "vacant", "warehouse", "office cubicle",
     "remote control", "television screen", "watching tv", "magazine",

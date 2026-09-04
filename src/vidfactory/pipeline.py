@@ -1158,6 +1158,7 @@ class VideoPipeline:
             novelty=float(weights.get("novelty", 12)),
             technical=float(weights.get("technical", 8)),
             min_semantic=float(self.config.get("visual.min_semantic_match", 0.28)),
+            flag_penalty=float(self.config.get("visual.flag_penalty", 60.0)),
         )
 
     @staticmethod
