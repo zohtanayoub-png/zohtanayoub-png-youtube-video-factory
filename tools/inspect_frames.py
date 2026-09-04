@@ -21,15 +21,22 @@ import subprocess
 import sys
 from pathlib import Path
 
-#: What to look for, and the narration that means we have found it.
+#: What to look for, as whole words. "picture" is deliberately absent from
+#: artwork: run 34 matched "Picture the same room photographed by an estate
+#: agent" - a hook sentence - and sampled a frame that had nothing to do with
+#: hanging art.
 TOPICS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("trim-wall", ("trim", "skirting", "baseboard", "paint the wall", "wall color",
-                   "wall colour", "same color as the wall", "moulding", "molding")),
-    ("rug", ("rug", "carpet")),
-    ("curtains", ("curtain", "drape", "blind")),
-    ("artwork", ("art", "artwork", "frame", "gallery wall", "picture")),
-    ("lighting", ("lamp", "sconce", "light source", "lighting", "pendant")),
+    ("trim-wall", (r"trim", r"skirting", r"baseboard", r"moulding", r"molding",
+                   r"same colou?r as the walls?", r"paint(ing)? the walls?")),
+    ("rug", (r"rugs?", r"carpet")),
+    ("curtains", (r"curtains?", r"drapes?", r"curtain rods?")),
+    ("artwork", (r"art", r"artwork", r"framed", r"gallery wall", r"canvas")),
+    ("lighting", (r"lamps?", r"sconces?", r"pendant", r"light sources?", r"lighting")),
 )
+
+#: How far either side of a cue to look when deciding whether it sits inside
+#: the section that teaches this topic.
+NEIGHBOURHOOD = 6
 
 _TIME = re.compile(
     r"(\d\d):(\d\d):(\d\d),(\d\d\d)\s*-->\s*(\d\d):(\d\d):(\d\d),(\d\d\d)"
@@ -64,14 +71,37 @@ def main(directory: str) -> int:
         return 0
 
     timeline = cues(srt)
-    for name, words in TOPICS:
-        hit = next(
-            (c for c in timeline if any(w in c[2].lower() for w in words)), None
-        )
-        if hit is None:
+    patterns = {
+        name: [re.compile(rf"\b{w}\b", re.I) for w in words]
+        for name, words in TOPICS
+    }
+
+    def mentions(name: str, text: str) -> int:
+        return sum(1 for p in patterns[name] if p.search(text))
+
+    for name, _ in TOPICS:
+        # The densest run of mentions, not the first one. A section that
+        # teaches rugs says "rug" several times over consecutive cues; the
+        # word turning up once inside "balance a bookcase with a sofa, not
+        # with a floor lamp" is a different section talking about something
+        # else, and run 34 sampled exactly that for lighting.
+        best: tuple[int, int] | None = None
+        for index, cue in enumerate(timeline):
+            if not mentions(name, cue[2]):
+                continue
+            window = timeline[max(0, index - NEIGHBOURHOOD):index + NEIGHBOURHOOD + 1]
+            density = sum(mentions(name, c[2]) for c in window)
+            # Cues that also talk about other topics are weaker evidence.
+            noise = sum(
+                mentions(other, cue[2]) for other, _ in TOPICS if other != name
+            )
+            score = density - 2 * noise
+            if best is None or score > best[0]:
+                best = (score, index)
+        if best is None:
             print(f"::warning::no narration found for {name}")
             continue
-        start, end, text = hit
+        start, end, text = timeline[best[1]]
         at = start + (end - start) / 2.0
         frame = root / f"inspect-{name}.jpg"
         subprocess.run(
@@ -82,6 +112,27 @@ def main(directory: str) -> int:
         if not frame.exists():
             print(f"::warning::could not extract a frame for {name}")
             continue
+        # The caption band at full resolution as well, for the first topic
+        # only. A 640-wide downscale shrinks a 2.2px outline to under a pixel
+        # and makes perfectly good captions look washed out, so legibility
+        # cannot honestly be judged from the frames above.
+        if name == TOPICS[0][0]:
+            band = root / "inspect-caption-band.jpg"
+            subprocess.run(
+                ["ffmpeg", "-y", "-loglevel", "error", "-ss", f"{at:.2f}",
+                 "-i", str(video), "-frames:v", "1",
+                 "-vf", "crop=1920:260:0:820", "-q:v", "4", str(band)],
+                check=False,
+            )
+            if band.exists():
+                blob = base64.b64encode(band.read_bytes()).decode("ascii")
+                print(f"FRAME-BEGIN caption-band at={at:.1f}s "
+                      f"bytes={band.stat().st_size}")
+                print(f"FRAME-TEXT caption-band {text}")
+                for i in range(0, len(blob), 200):
+                    print(f"FRAME-DATA caption-band {blob[i:i + 200]}")
+                print("FRAME-END caption-band")
+
         payload = base64.b64encode(frame.read_bytes()).decode("ascii")
         print(f"FRAME-BEGIN {name} at={at:.1f}s bytes={frame.stat().st_size}")
         print(f"FRAME-TEXT {name} {text}")
