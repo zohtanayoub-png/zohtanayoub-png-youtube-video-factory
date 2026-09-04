@@ -300,6 +300,19 @@
       "created_at": "2026-09-04T01:41:09+00:00",
       "youtube_id": null,
       "status": "rendered"
+    },
+    {
+      "id": 24,
+      "topic_slug": "15-small-living-room-tricks-that-make-your-space-look-bigger",
+      "title": "15 Small Living Room Tricks That Make Your Space Look Bigger",
+      "filename": "final_video.mp4",
+      "duration": 583.944,
+      "word_count": 1775,
+      "scene_count": 71,
+      "clip_count": 184,
+      "created_at": "2026-09-04T02:09:11+00:00",
+      "youtube_id": null,
+      "status": "rendered"
     }
   ]
 }

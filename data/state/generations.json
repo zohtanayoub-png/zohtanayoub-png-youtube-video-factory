@@ -208,6 +208,15 @@
       "finished_at": "2026-09-04T01:41:09+00:00",
       "status": "success",
       "details": "{\"title\": \"15 Small Living Room Tricks That Make Your Space Look Bigger\", \"topic\": {\"title\": \"15 Small Living Room Tricks That Make Your Space Look Bigger\", \"category\": \"living rooms\", \"angle\": \"tricks\", \"item_count\": 15, \"count_is_explicit\": true, \"slug\": \"15-small-living-room-tricks-that-make-your-space-look-bigger\", \"source\": \"manual\", \"keywords\": [\"small\", \"living\", \"room\", \"tricks\", \"space\", \"look\", \"bigger\"]}, \"video\": \"output/run-34-20260904-010914-36ad8baf/final_video.mp4\", \"duration_seconds\": 602.37, \"subtitles\": \"output/run-34-20260904-010914-36ad8baf/subtitles.srt\", \"metadata\": \"output/run-34-20260904-010914-36ad8baf/metadata.json\", \"sources\": \"output/run-34-20260904-010914-36ad8baf/video_sources.json\", \"generation_id\": \"run-34-20260904-010914-36ad8baf\", \"quality_passed\": true, \"editorial_passed\": true, \"artifact_provenance_passed\": true, \"unique_source_ratio\": 1.0, \"youtube_id\": \"\"}"
+    },
+    {
+      "id": 24,
+      "run_id": "run-35-20260904-014741-0e0cad61",
+      "topic": "15 Small Living Room Tricks That Make Your Space Look Bigger",
+      "started_at": "2026-09-04T01:47:41+00:00",
+      "finished_at": "2026-09-04T02:09:12+00:00",
+      "status": "success",
+      "details": "{\"title\": \"15 Small Living Room Tricks That Make Your Space Look Bigger\", \"topic\": {\"title\": \"15 Small Living Room Tricks That Make Your Space Look Bigger\", \"category\": \"living rooms\", \"angle\": \"tricks\", \"item_count\": 15, \"count_is_explicit\": true, \"slug\": \"15-small-living-room-tricks-that-make-your-space-look-bigger\", \"source\": \"manual\", \"keywords\": [\"small\", \"living\", \"room\", \"tricks\", \"space\", \"look\", \"bigger\"]}, \"video\": \"output/run-35-20260904-014741-0e0cad61/final_video.mp4\", \"duration_seconds\": 583.94, \"subtitles\": \"output/run-35-20260904-014741-0e0cad61/subtitles.srt\", \"metadata\": \"output/run-35-20260904-014741-0e0cad61/metadata.json\", \"sources\": \"output/run-35-20260904-014741-0e0cad61/video_sources.json\", \"generation_id\": \"run-35-20260904-014741-0e0cad61\", \"quality_passed\": true, \"editorial_passed\": true, \"artifact_provenance_passed\": true, \"unique_source_ratio\": 1.0, \"youtube_id\": \"\"}"
     }
   ]
 }
