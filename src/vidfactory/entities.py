@@ -436,6 +436,11 @@ class EntityGrounding:
     score: float = 0.0
     passed: bool = True
     detail: str = ""
+    #: Which competing prompt came closest, and by how much. Recorded so a
+    #: reviewer can tell whether a particular distractor is doing anything;
+    #: it takes no part in the verdict.
+    top_distractor: str = ""
+    top_distractor_margin: float = 0.0
 
     @property
     def required(self) -> bool:
@@ -455,6 +460,8 @@ class EntityGrounding:
             "entity_grounding_checked": self.checked,
             "entity_grounding_passed": self.passed,
             "entity_grounding_detail": self.detail,
+            "entity_top_distractor": self.top_distractor,
+            "entity_top_distractor_margin": round(self.top_distractor_margin, 3),
         }
 
 
@@ -512,11 +519,19 @@ def score_from_similarities(
 
     offset = len(entity.positives)
     scores: list[float] = []
+    # Which competitor led, and by how much, per frame. Reporting only: the
+    # score and the verdict below are computed exactly as before.
+    leaders: list[tuple[float, str]] = []
     for similarities in per_frame:
         if len(similarities) <= offset:
             continue
         best_positive = max(similarities[:offset])
-        best_distractor = max(similarities[offset:])
+        competitors = similarities[offset:]
+        best_distractor = max(competitors)
+        leaders.append((
+            best_distractor - best_positive,
+            entity.competitors[competitors.index(best_distractor)],
+        ))
         scores.append(
             ramp(best_distractor - best_positive, ENTITY_MARGIN_LOW, ENTITY_MARGIN_HIGH)
         )
@@ -524,6 +539,8 @@ def score_from_similarities(
         return EntityGrounding(entity=entity.name, labels=entity.labels)
     scores.sort()
     dominance = scores[len(scores) // 2]
+    leaders.sort(key=lambda item: item[0], reverse=True)
+    top_margin, top_name = leaders[0]
     passed = dominance < ENTITY_DOMINANCE_FAIL
     return EntityGrounding(
         entity=entity.name,
@@ -532,10 +549,13 @@ def score_from_similarities(
         # Reported the way the field reads: 1.0 is "the object owns the frame".
         score=round(1.0 - dominance, 3),
         passed=passed,
+        top_distractor=top_name,
+        top_distractor_margin=top_margin,
         detail=(
-            f"{entity.labels[0]} not displaced ({1.0 - dominance:.2f})" if passed
+            f"{entity.labels[0]} not displaced ({1.0 - dominance:.2f}; "
+            f"closest competitor {top_name!r} at {top_margin:+.3f})" if passed
             else f"the frame is about something else, not {entity.labels[0]} "
-                 f"({1.0 - dominance:.2f})"
+                 f"({1.0 - dominance:.2f}; {top_name!r} at {top_margin:+.3f})"
         ),
     )
 
@@ -562,10 +582,40 @@ def summarise(groundings: Iterable[Any]) -> dict[str, Any]:
                 "entity": dict(g).get("entity"),
                 "score": dict(g).get("entity_presence_score"),
                 "detail": dict(g).get("entity_grounding_detail"),
+                "top_distractor": dict(g).get("entity_top_distractor"),
             }
             for g in failed[:8]
         ],
+        # Per entity, including the shots that passed. A failure list alone
+        # cannot answer "what did the trim shots actually score" or "is that
+        # new distractor doing anything", and both are questions a reviewer
+        # asks after watching the video.
+        "by_entity": _by_entity(checked),
     }
+
+
+def _by_entity(rows: Sequence[Any]) -> dict[str, Any]:
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        grouped.setdefault(str(dict(row).get("entity") or "?"), []).append(dict(row))
+    out: dict[str, Any] = {}
+    for name, items in sorted(grouped.items()):
+        scores = sorted(float(i.get("entity_presence_score") or 0.0) for i in items)
+        distractors: dict[str, int] = {}
+        for item in items:
+            key = str(item.get("entity_top_distractor") or "")
+            if key:
+                distractors[key] = distractors.get(key, 0) + 1
+        out[name] = {
+            "shots": len(items),
+            "failed": sum(1 for i in items if not i.get("entity_grounding_passed")),
+            "min_score": round(scores[0], 3),
+            "median_score": round(scores[len(scores) // 2], 3),
+            "closest_competitors": dict(
+                sorted(distractors.items(), key=lambda kv: kv[1], reverse=True)[:4]
+            ),
+        }
+    return out
 
 
 def entities_in(text: str) -> set[str]:

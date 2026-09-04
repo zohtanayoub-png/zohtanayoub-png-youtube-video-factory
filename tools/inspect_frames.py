@@ -70,6 +70,25 @@ def main(directory: str) -> int:
         print(f"nothing to inspect in {root}")
         return 0
 
+    # The grounding numbers belong next to the picture they describe.
+    report = root / "editorial_quality_report.json"
+    if report.exists():
+        import json
+
+        try:
+            data = json.loads(report.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            data = {}
+        grounding = data.get("final_shot_entity_grounding") or {}
+        print("GROUNDING checked=%s failed=%s pass=%s%%" % (
+            grounding.get("checked"), grounding.get("failed"),
+            grounding.get("pass_percentage"),
+        ))
+        for name, row in (grounding.get("by_entity") or {}).items():
+            print(f"GROUNDING {name}: {row}")
+        for failure in grounding.get("failures") or []:
+            print(f"GROUNDING failure: {failure}")
+
     timeline = cues(srt)
     patterns = {
         name: [re.compile(rf"\b{w}\b", re.I) for w in words]
