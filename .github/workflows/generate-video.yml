@@ -437,6 +437,17 @@ jobs:
                   print(f"- `{check['name']}` ({check['severity']}): {check['detail']}")
           PY
 
+      - name: Carry a frame from each concrete section out of the runner
+        # The finished video never leaves this job - it is an artifact behind
+        # blob storage, and the environment this repository is developed from
+        # can reach neither that nor Pexels. So "look at the rug section" is
+        # not something a report can answer after the fact; the frame has to
+        # come out through the log. Five small JPEGs, taken at the moment each
+        # topic is actually being narrated.
+        if: always() && env.OUTPUT_DIR != ''
+        continue-on-error: true
+        run: python tools/inspect_frames.py "$OUTPUT_DIR"
+
       - name: Verify the caption file renders
         # Two separate facts, checked two separate ways, because guessing at
         # one of them from the other is how the previous version of this step
