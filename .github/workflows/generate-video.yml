@@ -444,8 +444,13 @@ jobs:
         # not something a report can answer after the fact; the frame has to
         # come out through the log. Five small JPEGs, taken at the moment each
         # topic is actually being narrated.
-        if: always() && env.OUTPUT_DIR != ''
+        # OUTPUT_DIR is a step output, not job env, so `env.OUTPUT_DIR` in a
+        # condition is always empty - which is exactly how run 33 skipped this
+        # silently and produced no frames at all.
+        if: always() && steps.generate.outputs.output_dir != ''
         continue-on-error: true
+        env:
+          OUTPUT_DIR: ${{ steps.generate.outputs.output_dir }}
         run: python tools/inspect_frames.py "$OUTPUT_DIR"
 
       - name: Verify the caption file renders
