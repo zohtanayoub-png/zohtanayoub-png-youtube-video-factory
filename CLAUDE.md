@@ -207,6 +207,22 @@ src/vidfactory/
   walls" at `entity_grounding_failure_count = 0`, because a painted ornamental
   surface genuinely is a painted surface. The distractor list is where an
   observed failure goes; it is not a substitute for looking at the frames.
+
+  Three prompts were added for that failure, and
+  ``entity-check --probe-query ... --without ...`` measured what they do by
+  scoring the same frames twice. On six real clips from an ornate-pattern
+  search: **3 of 6 rejected with them, 0 of 6 without**, median 0.428 against
+  1.000. So the failure class is now visible where it was invisible. But the
+  control matters as much: on six clips from a plain "painted wall trim"
+  search they reject **2 of 6** as well. They are aggressive, not selective.
+
+  What saves that in practice is that the pipeline does not ship raw search
+  results - run 38's eighteen ``wall_finish`` shots, chosen through the full
+  ranking, sat at a minimum of 0.465 against a 0.20 cut and none were
+  rejected. Read all three numbers together before touching this list: a
+  distractor that catches a failure on a hostile search and costs nothing on
+  selected footage is worth having, and the second half of that sentence is
+  the half that needs re-checking every time one is added.
 * **Similarity is not presence.** Run 25 averaged 0.569 across the clips on
   screen with not one below the 0.50 floor, and showed colourful ribbons for
   "paint the trim the same colour as the walls" and potted plants for "a rug
