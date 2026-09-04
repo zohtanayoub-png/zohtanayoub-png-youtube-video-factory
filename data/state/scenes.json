@@ -3484,6 +3484,645 @@
       "duration": null,
       "query": "elegant living room morning light",
       "category": "living rooms"
+    },
+    {
+      "id": 388,
+      "video_id": 21,
+      "scene_id": "intro-000-00",
+      "narration": "Most small rooms are not actually short of space. They are short of sightlines, light and vertical thinking, and all three are things you can fix this weekend.",
+      "duration": null,
+      "query": "bright styled living room natural light",
+      "category": "living rooms"
+    },
+    {
+      "id": 389,
+      "video_id": 21,
+      "scene_id": "intro-000-01",
+      "narration": "The living room is usually the largest shared space in a home and the one that gets photographed, which is exactly why its problems are so visible.",
+      "duration": null,
+      "query": "sunlit living room wide shot",
+      "category": "living rooms"
+    },
+    {
+      "id": 390,
+      "video_id": 21,
+      "scene_id": "intro-000-02",
+      "narration": "We are going to cover 15 specific changes, why designers rely on them, and what to do if your space does not cooperate. Take the ones that fit your home and ignore the rest.",
+      "duration": null,
+      "query": "elegant living room morning light",
+      "category": "living rooms"
+    },
+    {
+      "id": 391,
+      "video_id": 21,
+      "scene_id": "item-001-00",
+      "narration": "Number 1 on the list. Here is the one: do not block the window.",
+      "duration": null,
+      "query": "clear window living room interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 392,
+      "video_id": 21,
+      "scene_id": "item-001-01",
+      "narration": "Daylight is the most valuable thing in a room, and a tall piece of furniture in front of the glass costs you light in every direction.",
+      "duration": null,
+      "query": "low furniture under window",
+      "category": "living rooms"
+    },
+    {
+      "id": 393,
+      "video_id": 21,
+      "scene_id": "item-001-02",
+      "narration": "Keep anything above windowsill height away from the window wall. If a piece must go there, choose something low or open in construction.",
+      "duration": null,
+      "query": "bright window natural light room",
+      "category": "living rooms"
+    },
+    {
+      "id": 394,
+      "video_id": 21,
+      "scene_id": "item-001-03",
+      "narration": "Light reaching the walls and corners shows your eye exactly where the room ends, and a room whose boundaries are visible reads as larger than one that fades into shadow a few feet in.",
+      "duration": null,
+      "query": "unobstructed window interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 395,
+      "video_id": 21,
+      "scene_id": "item-002-00",
+      "narration": "Maximize the daylight you already have. No fixture competes with a clean window.",
+      "duration": null,
+      "query": "bright sunlit living room window",
+      "category": "living rooms"
+    },
+    {
+      "id": 396,
+      "video_id": 21,
+      "scene_id": "item-002-01",
+      "narration": "Clean the windows, cut back anything blocking them outside, mount curtain rods wide so panels clear the glass, and keep sills clear.",
+      "duration": null,
+      "query": "natural daylight interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 397,
+      "video_id": 21,
+      "scene_id": "item-002-02",
+      "narration": "It is a small change that changes the whole read of the room.",
+      "duration": null,
+      "query": "clean window sunlight room",
+      "category": "living rooms"
+    },
+    {
+      "id": 398,
+      "video_id": 21,
+      "scene_id": "item-002-03",
+      "narration": "Hanging the fabric high and wide leaves the glass itself uncovered, so more daylight reaches the room and the wall reads taller than it measures.",
+      "duration": null,
+      "query": "airy bright home interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 399,
+      "video_id": 21,
+      "scene_id": "item-003-00",
+      "narration": "The classic error is a small rug centered under the coffee table only, which shrinks the room and makes expensive furniture look accidental. Here is a mistake worth catching early.",
+      "duration": null,
+      "query": "large living room rug sofa",
+      "category": "living rooms"
+    },
+    {
+      "id": 400,
+      "video_id": 21,
+      "scene_id": "item-003-01",
+      "narration": "Choose a rug that is generously sized, not undersized.",
+      "duration": null,
+      "query": "sofa front legs on rug",
+      "category": "living rooms"
+    },
+    {
+      "id": 401,
+      "video_id": 21,
+      "scene_id": "item-003-02",
+      "narration": "Aim for a rug wide enough that at least the front legs of every seat sit on it, and keep it proportional to the room: leave a consistent border of floor showing around the edges rather than running it wall to wall.",
+      "duration": null,
+      "query": "properly sized living room rug",
+      "category": "living rooms"
+    },
+    {
+      "id": 402,
+      "video_id": 21,
+      "scene_id": "item-003-03",
+      "narration": "In most living rooms that means eight by ten feet, not five by seven.",
+      "duration": null,
+      "query": "modern living room carpet interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 403,
+      "video_id": 21,
+      "scene_id": "item-003-04",
+      "narration": "A rug too small to reach the furniture leaves the seating floating in separate pieces, so one large enough to catch the front legs pulls the group into a single zone and the floor reads as more spacious.",
+      "duration": null,
+      "query": "area rug under coffee table",
+      "category": "living rooms"
+    },
+    {
+      "id": 404,
+      "video_id": 21,
+      "scene_id": "item-004-00",
+      "narration": "Next, number 4. Buy one bigger thing instead of three medium things, which is easier than it sounds. Scale is expensive to fake.",
+      "duration": null,
+      "query": "oversized mirror living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 405,
+      "video_id": 21,
+      "scene_id": "item-004-01",
+      "narration": "One oversized mirror, lamp or artwork will always look more considered than a wall of small purchases.",
+      "duration": null,
+      "query": "large statement lamp interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 406,
+      "video_id": 21,
+      "scene_id": "item-004-02",
+      "narration": "Set the budget you were going to spread across several items and spend it in one place, on the largest piece the wall can carry.",
+      "duration": null,
+      "query": "big artwork above sofa",
+      "category": "living rooms"
+    },
+    {
+      "id": 407,
+      "video_id": 21,
+      "scene_id": "item-004-03",
+      "narration": "Worth doing even if you change nothing else on this list.",
+      "duration": null,
+      "query": "large scale decor interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 408,
+      "video_id": 21,
+      "scene_id": "item-004-04",
+      "narration": "A dozen small objects give the eye a dozen things to process, so swapping them for one substantial piece cuts the visual clutter and the room reads as calmer and more spacious.",
+      "duration": null,
+      "query": "oversized mirror living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 409,
+      "video_id": 21,
+      "scene_id": "item-005-00",
+      "narration": "The next one follows directly from that. Number 5. Try this as a thought experiment before you try it as a project. Hang art at eye level and scale it to the furniture.",
+      "duration": null,
+      "query": "large art above sofa living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 410,
+      "video_id": 21,
+      "scene_id": "item-005-01",
+      "narration": "Art that floats near the ceiling breaks the visual connection with the furniture below it, and undersized art above a large sofa makes the whole wall look unfinished.",
+      "duration": null,
+      "query": "gallery wall living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 411,
+      "video_id": 21,
+      "scene_id": "item-005-02",
+      "narration": "Center the piece about fifty-seven to sixty inches from the floor, and choose something that spans roughly two-thirds of the width of whatever sits beneath it.",
+      "duration": null,
+      "query": "framed artwork interior wall",
+      "category": "living rooms"
+    },
+    {
+      "id": 412,
+      "video_id": 21,
+      "scene_id": "item-005-03",
+      "narration": "Artwork scaled to the furniture beneath it anchors the wall instead of floating on it, so the eye reads one composed surface and the room feels larger and more deliberate.",
+      "duration": null,
+      "query": "minimalist wall art living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 413,
+      "video_id": 21,
+      "scene_id": "item-006-00",
+      "narration": "This one is less obvious, but it matters just as much. That takes us to number 6. Ever wondered why some rooms get this right and others do not?",
+      "duration": null,
+      "query": "floating sofa living room layout",
+      "category": "living rooms"
+    },
+    {
+      "id": 414,
+      "video_id": 21,
+      "scene_id": "item-006-01",
+      "narration": "Pull the sofa off the wall by a few inches. Pushing every piece flat against the perimeter is what designers call the skating rink layout.",
+      "duration": null,
+      "query": "console table behind sofa",
+      "category": "living rooms"
+    },
+    {
+      "id": 415,
+      "video_id": 21,
+      "scene_id": "item-006-02",
+      "narration": "It leaves a dead void in the middle and, counterintuitively, makes the room feel emptier and less generous.",
+      "duration": null,
+      "query": "spacious modern living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 416,
+      "video_id": 21,
+      "scene_id": "item-006-03",
+      "narration": "Float the sofa three to six inches off the wall and let the rug and a console table fill the gap behind it. Even that small amount of breathing room instantly reads as intentional.",
+      "duration": null,
+      "query": "living room furniture arrangement",
+      "category": "living rooms"
+    },
+    {
+      "id": 417,
+      "video_id": 21,
+      "scene_id": "item-006-04",
+      "narration": "A deliberate arrangement opens up the routes you walk, so clear pathways make a small room feel bigger to move through.",
+      "duration": null,
+      "query": "floating sofa living room layout",
+      "category": "living rooms"
+    },
+    {
+      "id": 418,
+      "video_id": 21,
+      "scene_id": "item-007-00",
+      "narration": "Here is where it gets interesting. Number 7, and this one is a favorite. Aim for at least three light sources per room, and it matters more than it sounds like it should.",
+      "duration": null,
+      "query": "layered lighting living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 419,
+      "video_id": 21,
+      "scene_id": "item-007-01",
+      "narration": "One ceiling light produces a flat, shadowless, institutional wash. Multiple pools of light create the depth that makes a room feel considered.",
+      "duration": null,
+      "query": "multiple lamps interior evening",
+      "category": "living rooms"
+    },
+    {
+      "id": 420,
+      "video_id": 21,
+      "scene_id": "item-007-02",
+      "narration": "Ceiling for general light, a lamp near seating for reading, and something low or wall-mounted for atmosphere. In the evening, use only the lower two.",
+      "duration": null,
+      "query": "floor lamp and table lamp",
+      "category": "living rooms"
+    },
+    {
+      "id": 421,
+      "video_id": 21,
+      "scene_id": "item-007-03",
+      "narration": "It is one of those details you only notice when it is missing.",
+      "duration": null,
+      "query": "ambient home lighting",
+      "category": "living rooms"
+    },
+    {
+      "id": 422,
+      "video_id": 21,
+      "scene_id": "item-007-04",
+      "narration": "A room lit only in the middle fades out at the edges, so lighting the perimeter shows the eye where the walls are and the space reads as larger.",
+      "duration": null,
+      "query": "layered lighting living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 423,
+      "video_id": 21,
+      "scene_id": "item-008-00",
+      "narration": "Idea number 8. Picture the same room photographed by an estate agent and by a magazine. The difference is often this: vary the height of everything you place on a surface.",
+      "duration": null,
+      "query": "styled console table decor",
+      "category": "living rooms"
+    },
+    {
+      "id": 424,
+      "video_id": 21,
+      "scene_id": "item-008-01",
+      "narration": "When objects on a shelf or console are all the same height, the eye skims across them and registers clutter rather than composition.",
+      "duration": null,
+      "query": "living room shelf styling",
+      "category": "living rooms"
+    },
+    {
+      "id": 425,
+      "video_id": 21,
+      "scene_id": "item-008-02",
+      "narration": "Work in loose triangles: something tall like a lamp or a vase of branches, something medium like stacked books, and something low and organic like a bowl or a small plant.",
+      "duration": null,
+      "query": "vase books coffee table styling",
+      "category": "living rooms"
+    },
+    {
+      "id": 426,
+      "video_id": 21,
+      "scene_id": "item-008-03",
+      "narration": "Odd numbers photograph and read better than even ones. Carrying the eye upward makes the walls read taller, and taller walls make the whole room feel bigger than its floor area says it is.",
+      "duration": null,
+      "query": "decorative objects interior shelf",
+      "category": "living rooms"
+    },
+    {
+      "id": 427,
+      "video_id": 21,
+      "scene_id": "item-009-00",
+      "narration": "Leave the corners of the room resolved. Empty, awkward corners are where a room visibly runs out of ideas, and stuffing them with random small objects makes it worse.",
+      "duration": null,
+      "query": "corner plant floor lamp living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 428,
+      "video_id": 21,
+      "scene_id": "item-009-01",
+      "narration": "A tall plant, a floor lamp, a leaning mirror or a single chair with a small table. One considered object beats three leftovers.",
+      "duration": null,
+      "query": "styled room corner interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 429,
+      "video_id": 21,
+      "scene_id": "item-009-02",
+      "narration": "If you choose the mirror, a mirror gives the eye somewhere further to look, so the room stops ending at the wall and feels bigger.",
+      "duration": null,
+      "query": "reading nook corner chair",
+      "category": "living rooms"
+    },
+    {
+      "id": 430,
+      "video_id": 21,
+      "scene_id": "item-010-00",
+      "narration": "Next, number 10. Do not center the ceiling light by default.",
+      "duration": null,
+      "query": "ceiling light living room interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 431,
+      "video_id": 21,
+      "scene_id": "item-010-01",
+      "narration": "Move or swag the fixture over the actual activity zone, or leave it off entirely and light the room from the perimeter with lamps.",
+      "duration": null,
+      "query": "pendant over seating area",
+      "category": "living rooms"
+    },
+    {
+      "id": 432,
+      "video_id": 21,
+      "scene_id": "item-010-02",
+      "narration": "A room lit only in the middle fades out at the edges, so lighting the perimeter shows the eye where the walls are and the space reads as larger.",
+      "duration": null,
+      "query": "modern ceiling fixture home",
+      "category": "living rooms"
+    },
+    {
+      "id": 433,
+      "video_id": 21,
+      "scene_id": "item-011-00",
+      "narration": "This next one surprises people. Number 11. Light the walls, not just the middle of the room.",
+      "duration": null,
+      "query": "wall sconce lighting interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 434,
+      "video_id": 21,
+      "scene_id": "item-011-01",
+      "narration": "Illuminated walls read as expanded space, while a bright center with dark edges makes a room feel like a cave.",
+      "duration": null,
+      "query": "picture light artwork wall",
+      "category": "living rooms"
+    },
+    {
+      "id": 435,
+      "video_id": 21,
+      "scene_id": "item-011-02",
+      "narration": "Use wall sconces, picture lights, or simply aim a lamp so it washes a wall. Once you have seen it, you cannot unsee it in other people's homes either.",
+      "duration": null,
+      "query": "wall wash lighting home",
+      "category": "living rooms"
+    },
+    {
+      "id": 436,
+      "video_id": 21,
+      "scene_id": "item-011-03",
+      "narration": "Light on the walls makes the boundaries of the room visible, which makes the whole space feel bigger than a single pool of light in the centre.",
+      "duration": null,
+      "query": "illuminated wall living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 437,
+      "video_id": 21,
+      "scene_id": "item-012-00",
+      "narration": "The next idea is where a lot of rooms go wrong. Number 12 on the list. Think about the last home you walked into that felt genuinely finished.",
+      "duration": null,
+      "query": "floor to ceiling curtains living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 438,
+      "video_id": 21,
+      "scene_id": "item-012-01",
+      "narration": "It almost certainly did this: hang your curtains close to the ceiling, not to the window frame.",
+      "duration": null,
+      "query": "tall curtains modern interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 439,
+      "video_id": 21,
+      "scene_id": "item-012-02",
+      "narration": "The eye reads the top of the curtain rod as the top of the wall, so mounting the rod high stretches the whole room upward and makes a standard eight-foot ceiling feel far taller than it is.",
+      "duration": null,
+      "query": "elegant living room window drapes",
+      "category": "living rooms"
+    },
+    {
+      "id": 440,
+      "video_id": 21,
+      "scene_id": "item-012-03",
+      "narration": "Mount the rod four to six inches below the ceiling line and let the panels break just barely on the floor.",
+      "duration": null,
+      "query": "linen curtains sunlight living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 441,
+      "video_id": 21,
+      "scene_id": "item-012-04",
+      "narration": "Buy the longest ready-made length you can find, usually ninety-six or one hundred and eight inches, and widen the rod so the panels stack off the glass.",
+      "duration": null,
+      "query": "floor to ceiling curtains living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 442,
+      "video_id": 21,
+      "scene_id": "item-012-05",
+      "narration": "Short panels that stop at the windowsill are the single fastest way to make a living room look like a rental you never unpacked in.",
+      "duration": null,
+      "query": "tall curtains modern interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 443,
+      "video_id": 21,
+      "scene_id": "item-013-00",
+      "narration": "This next point comes up in almost every home. That takes us to number 13. So what actually makes the difference here? Add one oversized plant instead of five small ones.",
+      "duration": null,
+      "query": "large indoor plant living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 444,
+      "video_id": 21,
+      "scene_id": "item-013-01",
+      "narration": "A cluster of small pots reads as clutter and needs constant attention. One large plant reads as architecture and softens the hard corners of a room.",
+      "duration": null,
+      "query": "fiddle leaf fig interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 445,
+      "video_id": 21,
+      "scene_id": "item-013-02",
+      "narration": "A fiddle leaf fig, a bird of paradise, or an olive tree in a floor basket fills vertical space beautifully.",
+      "duration": null,
+      "query": "olive tree indoor pot",
+      "category": "living rooms"
+    },
+    {
+      "id": 446,
+      "video_id": 21,
+      "scene_id": "item-013-03",
+      "narration": "Put it where two walls meet, and if your light is poor, a good-quality faux tree is a completely legitimate choice.",
+      "duration": null,
+      "query": "green plants modern living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 447,
+      "video_id": 21,
+      "scene_id": "item-013-04",
+      "narration": "One piece the eye can settle on beats a wall of small ones it has to count, which is why a single generous object makes a room feel more spacious rather than busier.",
+      "duration": null,
+      "query": "large indoor plant living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 448,
+      "video_id": 21,
+      "scene_id": "item-014-00",
+      "narration": "Here is something that changes a room faster than most people expect. Idea number 14. This one is simple: paint the trim the same color as the walls.",
+      "duration": null,
+      "query": "walls and trim same color",
+      "category": "living rooms"
+    },
+    {
+      "id": 449,
+      "video_id": 21,
+      "scene_id": "item-014-01",
+      "narration": "Bright white trim against a colored wall draws a hard outline around every door and window, which chops up the room.",
+      "duration": null,
+      "query": "color drenched room interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 450,
+      "video_id": 21,
+      "scene_id": "item-014-02",
+      "narration": "Use the same color on walls and woodwork with a satin or eggshell finish on the trim. The room reads taller and much more expensive.",
+      "duration": null,
+      "query": "painted woodwork matching walls",
+      "category": "living rooms"
+    },
+    {
+      "id": 451,
+      "video_id": 21,
+      "scene_id": "item-014-03",
+      "narration": "Low-contrast edges stop chopping the wall into pieces, so the surface reads as one large plane and the room feels bigger for it.",
+      "duration": null,
+      "query": "monochrome painted room",
+      "category": "living rooms"
+    },
+    {
+      "id": 452,
+      "video_id": 21,
+      "scene_id": "item-015-00",
+      "narration": "The flip side of that is worth knowing too. Number 15, and this one is a favorite. Worth pausing on, because the fix is easy and the mistake is expensive.",
+      "duration": null,
+      "query": "measuring room floor plan",
+      "category": "living rooms"
+    },
+    {
+      "id": 453,
+      "video_id": 21,
+      "scene_id": "item-015-01",
+      "narration": "Measure the room before you buy anything. Furniture almost always looks smaller in a showroom, and returning a sofa is one of the most expensive mistakes in home decorating.",
+      "duration": null,
+      "query": "tape measure interior planning",
+      "category": "living rooms"
+    },
+    {
+      "id": 454,
+      "video_id": 21,
+      "scene_id": "item-015-02",
+      "narration": "Tape the outline of a piece on the floor with painter's tape and live with it for two days. Check doorways, stair turns and lift dimensions too. It sounds minor written down.",
+      "duration": null,
+      "query": "empty room before furniture",
+      "category": "living rooms"
+    },
+    {
+      "id": 455,
+      "video_id": 21,
+      "scene_id": "item-015-03",
+      "narration": "It is not minor in the room. Oversized furniture eats visible floor area and narrows the walking paths, so a small room feels cramped even though its footprint never changed.",
+      "duration": null,
+      "query": "room layout planning",
+      "category": "living rooms"
+    },
+    {
+      "id": 456,
+      "video_id": 21,
+      "scene_id": "outro-000-00",
+      "narration": "So that is the full list. None of this needs to happen at once.",
+      "duration": null,
+      "query": "bright styled living room natural light",
+      "category": "living rooms"
+    },
+    {
+      "id": 457,
+      "video_id": 21,
+      "scene_id": "outro-000-01",
+      "narration": "Pick the two changes that felt most relevant to your own home, do those properly, and then live with the room for a couple of weeks before deciding what is next.",
+      "duration": null,
+      "query": "sunlit living room wide shot",
+      "category": "living rooms"
+    },
+    {
+      "id": 458,
+      "video_id": 21,
+      "scene_id": "outro-000-02",
+      "narration": "If you have a room you are stuck with, leave it in the comments and it might end up in a future video.",
+      "duration": null,
+      "query": "elegant living room morning light",
+      "category": "living rooms"
     }
   ]
 }
