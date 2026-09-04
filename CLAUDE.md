@@ -202,7 +202,11 @@ src/vidfactory/
   culls 8% of good footage and 5% of the control - and the honest reading of
   that table is that MobileCLIP-S0 can see a frame something else plainly
   owns and cannot do better. That is the failure that mattered, and all this
-  claims to catch.
+  claims to catch - and run 35 showed the limit is real, passing a close-up of
+  ornate patterned decoration under "paint the trim the same colour as the
+  walls" at `entity_grounding_failure_count = 0`, because a painted ornamental
+  surface genuinely is a painted surface. The distractor list is where an
+  observed failure goes; it is not a substitute for looking at the frames.
 * **Similarity is not presence.** Run 25 averaged 0.569 across the clips on
   screen with not one below the 0.50 floor, and showed colourful ribbons for
   "paint the trim the same colour as the walls" and potted plants for "a rug

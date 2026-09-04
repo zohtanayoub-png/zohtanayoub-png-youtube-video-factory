@@ -168,6 +168,13 @@ ENTITIES: tuple[VisualEntity, ...] = (
         ),
         competitors=(
             "colourful clothing and ribbons",
+            # Run 35 shipped a close-up of ornate patterned decoration under
+            # "paint the trim the same colour as the walls" and grounding
+            # passed it, because a painted ornamental surface genuinely is a
+            # painted surface. The distractors are what actually turns up.
+            "a close-up of an ornate decorative pattern",
+            "colourful printed textile",
+            "a patterned tiled surface",
             "indoor potted plants",
             "an outdoor street scene",
             "a person at a desk",

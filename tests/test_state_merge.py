@@ -320,9 +320,14 @@ def test_the_merged_history_in_the_repository_kept_both_sides(tmp_path):
     assert stats["clips"] >= 490
     development_uses = database.query("SELECT SUM(test_use_count) AS n FROM clips")[0]["n"]
     production_uses = database.query("SELECT SUM(use_count) AS n FROM clips")[0]["n"]
-    # 639 development uses on this branch + 544 on main - 465 they shared.
-    assert int(development_uses) == 718
-    # No development render ever claimed production footage, on either side.
+    # The merge itself produced 639 + 544 - 465 = 718 development uses, and
+    # every render since has added more. Asserting that exact number pinned a
+    # moment rather than a property, and duly broke on the next render; what
+    # has to stay true is that the union never lost any of it.
+    assert int(development_uses) >= 718
+    # And that no development render ever claimed production footage. The 34
+    # production uses predate the test/production split and must not grow
+    # while renders run in test mode.
     assert int(production_uses) == 34
     assert stats["production"] == 34
     assert database.measured_speech_rate("piper", "en_US-hfc_female-medium") > 150.0
