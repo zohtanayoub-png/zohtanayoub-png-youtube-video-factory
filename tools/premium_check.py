@@ -131,7 +131,35 @@ def measure(name: str, clips: Sequence[Any]) -> dict[str, Any]:
         dict(c.visual or {}).get("entity_grounding_checked")
     ]
     failed = [g for g in grounded if not g.get("entity_grounding_passed")]
+
+    # Which of the four caption signals actually says no. is_premium needs
+    # people < 0.5, empty < 0.5, dark < 0.5 AND interior relevance >= 0.5, and
+    # that last one starts at 0.25 and buys 0.15 per interior word - so a clip
+    # captioned "living room" scores 0.40 and is rejected, while a clip with
+    # no caption at all returns exactly 0.50 and passes.
+    caption_causes: dict[str, int] = {}
+    thin_captions = 0
+    for caption, visual in pairs:
+        if caption.get("is_premium"):
+            continue
+        for name, key in (
+            ("caption: not interior enough", "interior_relevance_score"),
+            ("caption: people dominant", "people_dominance_penalty"),
+            ("caption: empty room", "empty_room_penalty"),
+            ("caption: dark", "dark_scene_penalty"),
+        ):
+            value = float(caption.get(key, 0.0))
+            bad = value < 0.5 if key == "interior_relevance_score" else value >= 0.5
+            if bad:
+                caption_causes[name] = caption_causes.get(name, 0) + 1
+        if 0.35 <= float(caption.get("interior_relevance_score", 0.0)) < 0.5:
+            thin_captions += 1
+
     return {
+        "caption_causes": dict(
+            sorted(caption_causes.items(), key=lambda kv: kv[1], reverse=True)
+        ),
+        "thin_caption_near_misses": thin_captions,
         "name": name,
         "clips": len(clips),
         "premium_ratio": breakdown["ratio"],
@@ -152,6 +180,12 @@ def show(row: dict[str, Any]) -> None:
     print(f"  below 0.50 relevance {row['low_relevance']}")
     print(f"  grounding            {row['grounding_failed']} failed "
           f"of {row['grounding_checked']} checked")
+    if row.get("caption_causes"):
+        print("  of the caption rejections, what said no:")
+        for cause, count in row["caption_causes"].items():
+            print(f"    {cause:34} {count:>4}")
+        print(f"    near misses (0.35-0.49 interior)  "
+              f"{row['thin_caption_near_misses']:>4}")
     print("  why not premium:")
     for reason, count in row["reasons"].items():
         print(f"    {reason:32} {count:>4}  {row['percentages'][reason]:>5.1f}%")
