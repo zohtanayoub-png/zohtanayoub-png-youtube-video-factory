@@ -142,7 +142,7 @@ def measure(name: str, clips: Sequence[Any]) -> dict[str, Any]:
     for caption, visual in pairs:
         if caption.get("is_premium"):
             continue
-        for name, key in (
+        for cause, key in (
             ("caption: not interior enough", "interior_relevance_score"),
             ("caption: people dominant", "people_dominance_penalty"),
             ("caption: empty room", "empty_room_penalty"),
@@ -151,7 +151,7 @@ def measure(name: str, clips: Sequence[Any]) -> dict[str, Any]:
             value = float(caption.get(key, 0.0))
             bad = value < 0.5 if key == "interior_relevance_score" else value >= 0.5
             if bad:
-                caption_causes[name] = caption_causes.get(name, 0) + 1
+                caption_causes[cause] = caption_causes.get(cause, 0) + 1
         if 0.35 <= float(caption.get("interior_relevance_score", 0.0)) < 0.5:
             thin_captions += 1
 
