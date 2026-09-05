@@ -509,3 +509,67 @@ def test_the_premium_queries_describe_a_finished_room():
         any(w in q for w in ("living room", "apartment", "interior", "home"))
         for q in PREMIUM_QUERIES
     )
+
+
+# ---------------------------------------------------------------------------
+# Absence of evidence is neutral
+# ---------------------------------------------------------------------------
+
+def _captioned(text: str):
+    from vidfactory.stock.base import StockClip
+
+    return StockClip(provider="pexels", provider_id="1", download_url="d",
+                     width=1920, height=1080, duration=10.0, description=text)
+
+
+def test_a_short_compatible_caption_is_neutral_not_evidence_against():
+    """Silence used to beat a short description, which is backwards.
+
+    The old scoring started at 0.25 and charged 0.15 per interior phrase, so
+    two were needed to clear the 0.5 bar is_premium applies - while an empty
+    caption returned exactly 0.5 and passed. Measured over 293 real
+    candidates, 28 of the 40 selected clips failed on the caption against 1 on
+    the frames, and 15 of those sat in the 0.35-0.49 band.
+    """
+
+    from vidfactory.ranking import interior_relevance_score
+
+    assert interior_relevance_score(_captioned(""))[0] == 0.5
+    assert interior_relevance_score(_captioned("small apartment"))[0] >= 0.5
+    assert interior_relevance_score(_captioned("beautiful morning"))[0] == 0.5
+
+
+def test_a_richer_interior_caption_scores_above_neutral():
+    from vidfactory.ranking import interior_relevance_score
+
+    rich = interior_relevance_score(
+        _captioned("bright modern living room with sofa and rug and lamp")
+    )[0]
+    assert rich > interior_relevance_score(_captioned("small apartment"))[0]
+    assert rich > 0.5
+
+
+@pytest.mark.parametrize("caption", [
+    "office desk workspace",
+    "portrait of a woman",
+    "hotel lobby interior",
+    "construction site living room renovation",
+])
+def test_a_negative_caption_is_still_rejected(caption):
+    """Raising a floor without this lets a building site through on "room".
+
+    Every one of these carries an interior word, so the neutral floor alone
+    would have passed them. The negative signals keep their full weight, and
+    renovation and construction were added for exactly this reason.
+    """
+
+    from vidfactory.ranking import interior_relevance_score
+
+    assert interior_relevance_score(_captioned(caption))[0] < 0.5
+
+
+def test_the_incompatible_list_covers_what_was_asked_for():
+    from vidfactory.ranking import INTERIOR_INCOMPATIBLE_SIGNALS
+
+    for word in ("renovation", "construction", "unfinished", "contractor"):
+        assert word in INTERIOR_INCOMPATIBLE_SIGNALS

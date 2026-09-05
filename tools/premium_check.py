@@ -113,11 +113,46 @@ def select(
     return with_vision[:wanted]
 
 
-def measure(name: str, clips: Sequence[Any]) -> dict[str, Any]:
-    pairs = [
-        (premium_visual_report(c, getattr(c, "query", "")), dict(c.visual or {}))
-        for c in clips
-    ]
+def legacy_interior_relevance(clip: Any, query: str = "") -> float:
+    """The caption scoring as it stood before the neutral floor.
+
+    Kept here rather than in the library so the two arms can be compared on
+    the *same* frames: searching twice would compare two different Pexels
+    result sets and call the difference a result.
+    """
+
+    from vidfactory.ranking import (
+        INTERIOR_SUBJECT_SIGNALS, NON_HOME_SIGNALS, _phrase_hits, _words,
+    )
+
+    if not clip.content_text.strip():
+        return 0.5
+    subject = _phrase_hits(clip.content_text, INTERIOR_SUBJECT_SIGNALS)
+    score = 0.25 + min(0.6, 0.15 * len(subject))
+    if _phrase_hits(clip.content_text, NON_HOME_SIGNALS):
+        score -= 0.45
+    if query:
+        overlap = _words(query) & _words(clip.content_text)
+        if overlap:
+            score += min(0.25, 0.08 * len(overlap))
+    return max(0.0, min(1.0, round(score, 3)))
+
+
+def measure(name: str, clips: Sequence[Any], legacy: bool = False) -> dict[str, Any]:
+    pairs = []
+    for c in clips:
+        caption = premium_visual_report(c, getattr(c, "query", ""))
+        if legacy:
+            relevance = legacy_interior_relevance(c, getattr(c, "query", ""))
+            caption = dict(caption)
+            caption["interior_relevance_score"] = relevance
+            caption["is_premium"] = (
+                caption["people_dominance_penalty"] < 0.5
+                and caption["empty_room_penalty"] < 0.5
+                and caption["dark_scene_penalty"] < 0.5
+                and relevance >= 0.5
+            )
+        pairs.append((caption, dict(c.visual or {})))
     breakdown = premium_breakdown(pairs)
 
     semantics = [
@@ -265,21 +300,14 @@ def main(argv: list[str] | None = None) -> int:
             flag_penalty=penalty,
         )
 
+    chosen = select(list(combined.values()), context, ranker,
+                    settings(args.proposed_flag_penalty), args.select)
     rows = [
-        measure("pool: baseline queries only", list(baseline_pool.values())),
-        measure("pool: baseline + premium queries", list(combined.values())),
-        measure(
-            f"SELECTED before (baseline queries, flag penalty "
-            f"{args.baseline_flag_penalty:.0f})",
-            select(list(baseline_pool.values()), context, ranker,
-                   settings(args.baseline_flag_penalty), args.select),
-        ),
-        measure(
-            f"SELECTED after (+premium queries, flag penalty "
-            f"{args.proposed_flag_penalty:.0f})",
-            select(list(combined.values()), context, ranker,
-                   settings(args.proposed_flag_penalty), args.select),
-        ),
+        measure("pool BEFORE (legacy caption scoring)",
+                list(combined.values()), legacy=True),
+        measure("pool AFTER (neutral floor)", list(combined.values())),
+        measure("SELECTED BEFORE (legacy caption scoring)", chosen, legacy=True),
+        measure("SELECTED AFTER (neutral floor)", chosen),
     ]
     for row in rows:
         show(row)

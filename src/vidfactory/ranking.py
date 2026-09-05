@@ -94,6 +94,14 @@ OFF_TOPIC_SIGNALS: tuple[str, ...] = (
     "beach", "forest", "mountain", "ocean", "street", "traffic", "city skyline",
     "portrait", "face", "close up of a person", "business meeting", "laptop screen",
     "food", "cooking", "restaurant", "cafe", "hotel lobby", "car", "animal",
+    # Not a photograph of a room at all. Named here rather than left to the
+    # neutral floor, because "abstract motion graphic" carries no interior
+    # word and no negative one, and absence of evidence is only neutral when
+    # the caption is genuinely saying nothing - this one is saying plenty.
+    # Deliberately not bare "abstract": decor captions say "abstract painting"
+    # about exactly the wall art these videos are meant to show.
+    "abstract motion", "motion graphic", "animation", "3d render", "cgi",
+    "screensaver", "loop background",
 )
 
 
@@ -216,20 +224,60 @@ def dark_scene_penalty(clip: StockClip) -> tuple[float, list[str]]:
     return 0.7, hits[:2]
 
 
+#: Evidence that a clip is not the *finished* interior a decorating channel
+#: shows. Used only by :func:`interior_relevance_score`, and only because the
+#: neutral floor was raised to 0.5: without it a clip captioned "construction
+#: site living room" would clear the bar on its one subject hit, which is the
+#: opposite of the point. NON_HOME and OFF_TOPIC keep their own penalties.
+INTERIOR_INCOMPATIBLE_SIGNALS: tuple[str, ...] = (
+    "renovation", "renovate", "remodel", "under construction", "construction",
+    "building site", "demolition", "unfinished", "contractor", "builder",
+    "scaffold", "drywall", "plaster", "gutted", "stripped",
+)
+
+
 def interior_relevance_score(clip: StockClip, query: str = "") -> tuple[float, list[str]]:
-    """0.0 - 1.0. How clearly the clip is showing an interior worth looking at."""
+    """0.0 - 1.0. How clearly the clip is showing an interior worth looking at.
+
+    **Absence of evidence is neutral.** A caption is not evidence against a
+    clip for being short, and the previous scoring said otherwise: it started
+    at 0.25 and charged 0.15 per interior phrase, so two were needed to clear
+    the 0.5 bar `is_premium` applies - while an empty caption returned exactly
+    0.5 and passed. A Pexels slug reading "living room" scored 0.40 and was
+    rejected. Silence beat a short description.
+
+    That was not a quality judgement, it was a vocabulary test, and it was the
+    binding constraint on `final_shot_premium_visual_ratio`: measured over 293
+    real candidates, 28 of the 40 clips a ranker selects failed on the caption
+    against 1 on the frames, and 15 of those sat in the 0.35-0.49 band.
+
+    So the floor is where "nothing is known" belongs, and the caption moves it
+    in whichever direction it carries evidence. Every negative signal keeps
+    its full weight, and one more is added, because raising a floor without
+    that would let a building site through on the word "room".
+    """
 
     if not clip.content_text.strip():
         return 0.5, ["no caption"]
 
     subject = _phrase_hits(clip.content_text, INTERIOR_SUBJECT_SIGNALS)
     non_home = _phrase_hits(clip.content_text, NON_HOME_SIGNALS)
+    off_topic = _phrase_hits(clip.content_text, OFF_TOPIC_SIGNALS)
+    incompatible = _phrase_hits(clip.content_text, INTERIOR_INCOMPATIBLE_SIGNALS)
 
-    score = 0.25 + min(0.6, 0.15 * len(subject))
+    # One interior phrase is a short compatible caption: neutral, like silence.
+    # The second and later ones are the caption actually telling us something.
+    score = 0.5 + min(0.3, 0.1 * max(0, len(subject) - 1))
     reasons = [f"+{w}" for w in subject[:3]]
     if non_home:
         score -= 0.45
         reasons.extend(f"-{w}" for w in non_home[:2])
+    if off_topic:
+        score -= 0.45
+        reasons.extend(f"-{w}" for w in off_topic[:2])
+    if incompatible:
+        score -= 0.30
+        reasons.extend(f"-{w}" for w in incompatible[:2])
     # The words of the query itself appearing in the caption is the strongest
     # evidence that this clip illustrates the sentence being narrated.
     if query:

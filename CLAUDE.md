@@ -281,8 +281,19 @@ src/vidfactory/
   description. That is the shape of a false negative, not of a quality
   judgement, and it is why the ratio sits near 0.39 while the frames are fine.
 
-  Note what this means for fixes: **searching and ranking cannot move this
-  number much**, because the clips are already being selected on their pixels
+  Fixed by putting the floor where "nothing is known" belongs:
+  `interior_relevance_score` now starts at 0.5 and the caption moves it in
+  whichever direction it carries evidence. One interior phrase is a short
+  compatible caption and stays neutral; the second and later ones earn above
+  it. Every negative keeps its full weight and two lists were widened, because
+  raising a floor without that lets "construction site living room" through on
+  the word "room" - `INTERIOR_INCOMPATIBLE_SIGNALS` for renovation and
+  construction, and the off-topic list for footage that is not a photograph of
+  a room at all. Deliberately not bare "abstract": decor captions say
+  "abstract painting" about the wall art these videos exist to show.
+
+  Note what this means for the *other* fixes: **searching and ranking cannot
+  move this number much**, because the clips are already being selected on their pixels
   and their pixels already pass. Adding seven premium query phrases doubled
   the *pool's* ratio (0.135 to 0.270) and moved the *selected* ratio from
   0.250 to 0.275. Raising the frame-flag penalty from 60 to 110 moved it
