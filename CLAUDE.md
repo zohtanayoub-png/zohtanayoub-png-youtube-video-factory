@@ -266,6 +266,29 @@ src/vidfactory/
   `final_shot_premium_visual_ratio` targets 0.60: a warning in test mode, a
   gate in production. The answer to a weak pool is more pages and more query
   variants, never a lower definition of premium.
+* **The premium ratio is mostly measuring caption vocabulary, not footage.**
+  Measured, not guessed: over 293 real candidates, on the forty clips a ranker
+  actually selects, **28 of 40 fail on the caption and 1 on the frames**. Of
+  those 28, twenty-seven fail `interior_relevance_score >= 0.5` and **fifteen
+  sit in the 0.35-0.49 band** - one interior word short. Renovation, dark and
+  people-dominant, which dominate the *pool*, are already filtered out by
+  ranking and appear zero times among the selected.
+
+  The mechanism is arithmetic. `interior_relevance_score` starts at 0.25 and
+  buys 0.15 per interior phrase, so a clip needs two of them to clear 0.5 -
+  while an empty caption returns exactly 0.5 and passes. A Pexels slug reading
+  "living room" scores 0.40 and is rejected; silence beats a short
+  description. That is the shape of a false negative, not of a quality
+  judgement, and it is why the ratio sits near 0.39 while the frames are fine.
+
+  Note what this means for fixes: **searching and ranking cannot move this
+  number much**, because the clips are already being selected on their pixels
+  and their pixels already pass. Adding seven premium query phrases doubled
+  the *pool's* ratio (0.135 to 0.270) and moved the *selected* ratio from
+  0.250 to 0.275. Raising the frame-flag penalty from 60 to 110 moved it
+  nothing, because frames were never the constraint. Both were worth keeping -
+  the semantic average held at 0.686 to 0.691 and grounding was unchanged -
+  and neither is a route to 0.60.
 * **A ratio is not a diagnosis.** 0.39 could be thirty renovations or thirty
   dim rooms and those have opposite fixes, so every non-premium clip is
   labelled with the one thing most responsible - `premium_failure_reason`,
