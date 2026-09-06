@@ -125,6 +125,28 @@ def _title_style(font: str) -> str:
     return ",".join(parts)
 
 
+#: Codepoint ranges libass will not draw with a text font. Inter, Montserrat
+#: and DejaVu carry no emoji glyphs, and libass does not fall back to a
+#: colour-emoji font the way a browser does - so the first real render put a
+#: "missing glyph" box where the strawberry should have been, in the one
+#: element that is on screen for the entire reel.
+_EMOJI = re.compile(
+    "[\U0001F000-\U0001FAFF\U00002600-\U000027BF\U0001F1E6-\U0001F1FF"
+    "\U00002190-\U000021FF\U00002B00-\U00002BFF\uFE0F\u200D]"
+)
+
+
+def strip_emoji(text: str) -> str:
+    """The title as libass can actually draw it.
+
+    The emoji stays in the topic and in the caption, where the platform
+    renders it natively. It is only removed from the burned-in title, because
+    a tofu box is worse than no emoji at all.
+    """
+
+    return re.sub(r"\s{2,}", " ", _EMOJI.sub("", str(text or ""))).strip()
+
+
 def accented(title: str, accent: str, style: SubtitleStyle = REEL_TITLE) -> str:
     """The title with one word in the accent colour.
 
@@ -132,7 +154,7 @@ def accented(title: str, accent: str, style: SubtitleStyle = REEL_TITLE) -> str:
     somewhere first, and colouring half the line defeats it.
     """
 
-    text = str(title or "").strip()
+    text = strip_emoji(title)
     word = str(accent or "").strip()
     if not word or word.lower() not in text.lower():
         return text
@@ -215,3 +237,9 @@ def safe_area_report(events: Sequence[AssEvent]) -> dict[str, Any]:
         "caption_font_size": REEL_CAPTIONS.font_size,
         "title_font_size": REEL_TITLE.font_size,
     }
+
+
+def title_renders(title: str) -> bool:
+    """Whether every character of this title has a glyph in a text font."""
+
+    return strip_emoji(title) == str(title or "").strip()

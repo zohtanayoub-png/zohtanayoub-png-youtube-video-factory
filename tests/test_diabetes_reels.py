@@ -19,6 +19,7 @@ import pytest
 from vidfactory.reels import hooks, safety
 from vidfactory.reels.captions import (
     BOTTOM_UNSAFE,
+    title_renders,
     REEL_CAPTIONS,
     REEL_HEIGHT,
     REEL_TITLE,
@@ -313,6 +314,36 @@ def test_reel_captions_are_bigger_and_shorter_than_long_form():
     assert REEL_CAPTIONS.font_size > PREMIUM.font_size
     assert REEL_CAPTIONS.max_words < PREMIUM.max_words
     assert REEL_CAPTIONS.margin_v > PREMIUM.margin_v
+
+
+def test_the_burned_in_title_carries_no_emoji():
+    """The first real render put a missing-glyph box where the strawberry
+    should have been. Inter, Montserrat and DejaVu carry no emoji, and libass
+    does not fall back to a colour-emoji font the way a browser does - so a
+    tofu box sat in the one element that is on screen for the whole reel.
+
+    The emoji stays in the topic and in the caption, where the platform draws
+    it natively.
+    """
+
+    from vidfactory.reels.captions import strip_emoji, title_renders
+
+    assert strip_emoji("FRUTAS Y GLUCOSA 🍓") == "FRUTAS Y GLUCOSA"
+    assert strip_emoji("CUIDADO CON ESTAS FRUTAS ⚠️") == "CUIDADO CON ESTAS FRUTAS"
+    assert not title_renders("FRUTAS Y GLUCOSA 🍓")
+    assert title_renders("DESAYUNOS Y GLUCOSA")
+    for topic in TOPICS:
+        assert "\U0001F300" not in accented(topic.top_title, topic.accent)
+    assert "🍓" not in accented("FRUTAS Y GLUCOSA 🍓", "GLUCOSA")
+
+
+def test_the_emoji_survives_where_it_can_be_drawn():
+    """Only the burned-in title loses it."""
+
+    emoji_topics = [t for t in TOPICS if not title_renders(t.top_title)]
+    assert emoji_topics, "no topic uses an emoji, so this test proves nothing"
+    script = build(emoji_topics[0], target_seconds=45)
+    assert any(ord(c) > 0x1F000 for c in script.top_title)
 
 
 def test_one_word_of_the_title_takes_the_accent_colour():
