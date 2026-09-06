@@ -264,19 +264,39 @@ src/vidfactory/
   measured chance is that **both sides are now equally specific**: "a dragonfly
   resting on a windowpane" against "a sofa placed clear of a bright living room
   window" gives the generality bias no generality gap to exploit.
-  `instruction_grounding_failure_count` is an **error**, additional to entity
-  grounding and a replacement for nothing, and it splits by mode exactly as
-  entity grounding does - one tolerated in test, none in production. A failed
-  shot is repaired by searching for the *relationship*; searching for the
-  object is what returned the dragonfly.
+  Whether MobileCLIP-S0 can see this is a measurement, not an argument, and
+  **the measurement came back no.** `vidfactory instruction-check` (the
+  `instruction-check` task on the video workflow) scores each claim's own
+  searches against the searches that reproduce the run 44 failures. Runs 45
+  and 46, over 48 valid clips and 72 from the failure searches: **keeps 96% of
+  the valid footage and rejects 1% of the failures**, with no crossing point
+  anywhere in the sweep from 0.05 to 0.60 - past 0.30 it culls the valid side
+  faster than the failures.
 
-  Whether MobileCLIP-S0 can see this is a measurement, not an argument.
-  `vidfactory instruction-check` (the `instruction-check` task on the video
-  workflow) scores each claim's own searches against the searches that
-  reproduce the run 44 failures, and prints how much of each side it keeps. A
-  probe that rejects both is a probe that rejects everything, and that number
-  is printed next to the catch rate because it is the one that decides whether
-  a heavier verifier is needed.
+  The raw margins say why, and it is not the aggregation. On ribbon and
+  ornate-pattern footage the model *does* rank a forbidden prompt first on
+  almost every clip, so the signal is not absent - but the margin is +0.001 to
+  +0.05 and valid painted-wall footage produces the same margins, ranking "a
+  patterned tiled surface" first just as often. Median margins: valid +0.012,
+  ribbons +0.008, ornate +0.013, and only "flowers in front of a wall"
+  separates at +0.028. Window footage is negative on both sides.
+
+  So `CLAIM_PROBE_VALIDATED` is **False**, and this layer reports rather than
+  gates: `instruction_grounding_failure_count` and the per-claim rows are in
+  the report, and nothing fails a render, marks a shot weak or spends the
+  repair budget on them. A check that catches one percent of the failures
+  while culling eight percent of good footage makes the video worse and the
+  report dishonest, and a threshold nudged until the numbers improve only
+  hides that. A test pins the flag so it cannot drift to True without the
+  measurement that justifies it. The wiring is all there - claim-first repair
+  searches, the three-condition replacement rule, the mode split - and turns
+  on the day a verifier separates.
+
+  One lead that is not a prompt list: the run 44 trim frame measures
+  **colourfulness 104.2** against 27-36 for every other frame in that render.
+  "Paint the trim the same colour as the walls" is advice *about* colour
+  uniformity, so a physical statistic contradicts it directly, with no
+  vocabulary involved. That is where the next measurement should go.
 * **The subject is the object named first, not the one named most.** "A rug
   too small to reach the sofa leaves the seating floating" names seating twice
   and the rug once. It is rug advice; the sofa is the landmark the rug is
