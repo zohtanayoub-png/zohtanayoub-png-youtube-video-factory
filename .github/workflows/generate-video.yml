@@ -807,10 +807,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install -e .
-          # onnxruntime for the frame scoring, pytest for the safety check
-          # below - neither is a runtime dependency of the package, and the
-          # pre-flight check duly died on "No module named pytest".
-          pip install onnxruntime pytest
+          # onnxruntime for the frame scoring, and the project's own dev
+          # extra for the pre-flight safety check. Installing bare pytest is
+          # not enough: addopts carries --timeout=900, so without
+          # pytest-timeout pytest exits 4 on an unknown option.
+          pip install onnxruntime
+          pip install -e ".[dev]"
 
       - name: Restore the cached model and voice files
         uses: actions/cache@v4
