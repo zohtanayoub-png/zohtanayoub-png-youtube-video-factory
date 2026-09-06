@@ -44,7 +44,9 @@ from .principles import (
     OptionalExampleLeakage,
     PrincipleContamination,
     condition_sentence,
+    find_false_conditioning,
     find_optional_example_leakage,
+    mechanism_fits,
     find_principle_contamination,
 )
 from .contradiction import (
@@ -310,6 +312,15 @@ def repair_text(
     for family in candidates:
         options = family.explanations
         if not options:
+            continue
+        # Refuse the family, not the wording. A rephrased furniture-footprint
+        # sentence is still a furniture-footprint explanation, and the
+        # vocabulary check below cannot see that.
+        if heading and not mechanism_fits(heading, family.name, tip):
+            log.debug(
+                "Skipped the %s family for %r: it explains a different "
+                "principle", family.name, heading,
+            )
             continue
         start = counters.get(family.name, 0)
         for offset in range(len(options)):
@@ -682,6 +693,13 @@ def validate_sections(
                     heading, section.text, tip,
                     connectives=connectives, language=language,
                 )
+
+        # A repair that conditions the sentence on something the section never
+        # offered has not fixed anything, and satisfies the check above
+        # because the condition is there. Read the finished paragraph again.
+        leaks = list(leaks) + find_false_conditioning(
+            heading, section.text, tip, language=language
+        )
 
         if leaks:
             for item in leaks:

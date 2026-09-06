@@ -99,6 +99,13 @@ class VisualEntity:
     positives: tuple[str, ...]
     competitors: tuple[str, ...]
     queries: tuple[str, ...]
+    #: Phrases where a trigger word is part of something else entirely.
+    #: "Something low or wall-mounted for atmosphere" is a sentence about
+    #: lamps, and reading ``wall`` out of ``wall-mounted`` is what made run
+    #: 44 condition a lighting section on "if you choose the wall finish".
+    #: The phrase is blanked out of the text before the triggers are matched,
+    #: so the word only counts when it is doing its own job.
+    excluded: tuple[str, ...] = ()
 
 
 #: Ordered by specificity: "wall art" is art before it is a wall, and a
@@ -183,6 +190,11 @@ ENTITIES: tuple[VisualEntity, ...] = (
             "painted wall trim same color as wall",
             "interior wall and baseboard painted one color",
             "person painting interior wall roller",
+        ),
+        excluded=(
+            "wall mounted", "wall mount", "wall sconce", "wall sconces",
+            "wall light", "wall lights", "wall lamp", "wall lamps",
+            "wall hung", "wall art", "wall mirror",
         ),
     ),
     VisualEntity(
@@ -352,7 +364,16 @@ def _normalise(text: str) -> str:
     return f" {re.sub(r'[^a-z0-9 ]+', ' ', str(text or '').lower())} "
 
 
+def _without_exclusions(entity: VisualEntity, haystack: str) -> str:
+    """The text with this entity's false-friend phrases blanked out."""
+
+    for phrase in entity.excluded:
+        haystack = re.sub(rf"\b{re.escape(phrase)}\b", " ", haystack)
+    return haystack
+
+
 def _hits(entity: VisualEntity, haystack: str) -> int:
+    haystack = _without_exclusions(entity, haystack)
     return sum(
         1 for word in entity.triggers
         if re.search(rf"\b{re.escape(word)}\b", haystack)
@@ -382,9 +403,10 @@ def required_entity(text: str) -> VisualEntity | None:
         count = _hits(entity, haystack)
         if not count:
             continue
+        cleaned = _without_exclusions(entity, haystack)
         first = min(
             (m.start() for word in entity.triggers
-             if (m := re.search(rf"\b{re.escape(word)}\b", haystack))),
+             if (m := re.search(rf"\b{re.escape(word)}\b", cleaned))),
             default=len(haystack),
         )
         scored.append((first, -count, entity))

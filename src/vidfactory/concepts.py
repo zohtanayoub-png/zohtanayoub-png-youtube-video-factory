@@ -56,8 +56,18 @@ CONCEPTS: tuple[Concept, ...] = (
     )),
     Concept("window_dressing", (
         "curtain", "curtains", "drape", "drapes", "blind", "blinds",
-        "curtain rod", "the track", "valance", "sheer", "window", "windows",
-        "the glass", "windowsill", "sill",
+        "curtain rod", "the track", "valance", "sheer",
+        # The phrase, never bare "fabric": upholstery and texture advice talks
+        # about fabric all the time and is not about curtains.
+        "the fabric", "fabric hung", "hanging the fabric",
+    )),
+    # The aperture, not what hangs on it. Run 44 explained "do not block the
+    # window" - advice about where a tall piece of furniture goes - with
+    # "hanging the fabric high and wide leaves the glass itself uncovered",
+    # and this check allowed it because a bare "window" was read as curtain
+    # advice. It is the same mistake the wall/wall-art ordering above avoids.
+    Concept("window", (
+        "window", "windows", "the glass", "windowsill", "sill",
     )),
     Concept("rug", ("rug", "rugs", "carpet", "runner", "area rug")),
     Concept("lighting", (
@@ -89,9 +99,13 @@ CONCEPTS: tuple[Concept, ...] = (
 #: mistake. A mirror hung to bounce daylight is legitimately about the window
 #: too, and lighting advice legitimately talks about daylight.
 COMPATIBLE: dict[str, frozenset[str]] = {
-    "mirror": frozenset({"window_dressing", "lighting", "wall_art"}),
-    "lighting": frozenset({"window_dressing"}),
-    "window_dressing": frozenset({"lighting"}),
+    "mirror": frozenset({"window_dressing", "window", "lighting", "wall_art"}),
+    "lighting": frozenset({"window_dressing", "window"}),
+    # A curtain section may talk about the window it hangs on. A window
+    # section may not be explained through curtains: what stands in front of
+    # the glass and what hangs beside it are two pieces of advice.
+    "window_dressing": frozenset({"lighting", "window"}),
+    "window": frozenset({"lighting"}),
     "wall_art": frozenset({"mirror"}),
     "seating": frozenset({"tables", "rug"}),
     "tables": frozenset({"seating", "rug"}),

@@ -82,7 +82,11 @@ PRINCIPLES: tuple[Principle, ...] = (
             "heavier", "heaviest", "dark", "darker", "bulk", "one side",
             "both sides", "each side", "either side", "opposite side",
             "distribute", "distributed", "distribution", "spread", "evenly",
-            "even", "equilibrium", "anchor", "anchors", "counterweight",
+            # Deliberately not bare "even": "even though its footprint never
+            # changed" is not a sentence about balance, and treating it as
+            # one is why run 44's furniture-footprint explanation walked into
+            # the balance section at a contamination count of zero.
+            "equilibrium", "anchor", "anchors", "counterweight",
             "balance", "balanced", "lopsided", "overloaded", "top heavy",
             "settles", "settle",
         ),
@@ -172,6 +176,60 @@ PRINCIPLES: tuple[Principle, ...] = (
         ),
     ),
     Principle(
+        name="focal_point_layout",
+        triggers=(
+            "focal point", "focal", "work outward", "work out from",
+            "start from the", "layout", "arrangement", "arrange",
+            "furniture placement", "place the largest",
+        ),
+        vocabulary=(
+            "focal point", "focal", "fireplace", "the view", "facing",
+            "faces", "face the", "orient", "oriented", "orientation",
+            "outward", "outwards", "largest seat", "layout", "arrangement",
+            "arrange", "arranged", "placement", "starts with", "begin with",
+            "begins with", "work outward",
+        ),
+    ),
+    Principle(
+        name="statement_piece_scale",
+        triggers=(
+            "one large", "one big", "single large", "statement piece",
+            "fewer larger", "one generous", "buy one bigger",
+        ),
+        vocabulary=(
+            "single", "one piece", "one large", "one big", "statement",
+            "generous", "fewer", "larger", "small ones", "many small",
+            "three medium", "busier", "busy", "count", "fragment",
+            "fragmented", "fragmentation", "one object",
+        ),
+    ),
+    Principle(
+        name="window_dressing",
+        triggers=(
+            "curtain", "curtains", "drape", "drapes", "blind", "blinds",
+            "valance", "sheer", "window treatment",
+        ),
+        vocabulary=(
+            "curtain", "curtains", "drape", "drapes", "fabric", "rod",
+            "track", "hem", "panel", "panels", "blind", "blinds", "sheer",
+            "pooling", "puddle", "hang the fabric", "hanging the fabric",
+        ),
+    ),
+    Principle(
+        name="window_daylight",
+        # Deliberately not "daylight" or "light": a heading about daylight in
+        # general is lighting advice and belongs to light_reflection. This
+        # principle is the window itself - what stands in front of the glass.
+        triggers=("window", "windows", "windowsill", "the glass"),
+        vocabulary=(
+            "window", "windows", "windowsill", "sill", "glass", "pane",
+            "daylight", "sunlight", "natural light", "outside", "the view",
+            "block", "blocks", "blocked", "blocking", "obstruct",
+            "obstructed", "obstructs", "in front of", "let in", "lets in",
+            "letting in",
+        ),
+    ),
+    Principle(
         name="floor_visibility",
         triggers=(
             "floor", "legs", "exposed legs", "raised", "float", "floating",
@@ -196,9 +254,90 @@ COMPATIBLE: dict[str, frozenset[str]] = {
     "sightline_depth": frozenset({"floor_visibility", "furniture_footprint"}),
     "light_reflection": frozenset({"color_continuity"}),
     "color_continuity": frozenset({"light_reflection"}),
-    "vertical_emphasis": frozenset({"sightline_depth"}),
+    # Curtain advice is explained by height, by colour and by light; a
+    # heading that says "hang" picks vertical_emphasis before it picks
+    # curtains, so the two have to be able to borrow each other's language.
+    "vertical_emphasis": frozenset({"sightline_depth", "window_dressing"}),
+    "window_dressing": frozenset({
+        "vertical_emphasis", "light_reflection", "color_continuity",
+        "window_daylight",
+    }),
     "corner_treatment": frozenset({"light_reflection", "floor_visibility"}),
+    # A window is where the daylight comes from, so a window section may
+    # reason about daylight - and it does, through this principle's own
+    # vocabulary. It may not reason about lamps: "light the perimeter with
+    # lamps" is a different piece of advice, and run 44 ended "do not block
+    # the window" with exactly that. So light_reflection is not listed here.
+    "window_daylight": frozenset({"sightline_depth"}),
+    "focal_point_layout": frozenset({"sightline_depth"}),
+    # Where you start a layout and how many objects you own are different
+    # questions; statement_piece_scale is not compatible with either.
+    "statement_piece_scale": frozenset({"clutter_editing"}),
+    "clutter_editing": frozenset({"statement_piece_scale"}),
 }
+
+#: Which principle each mechanism family in :mod:`vidfactory.title_alignment`
+#: is an explanation *of*.
+#:
+#: The vocabulary check below reads the sentence that was written. This reads
+#: the family it came from, which is a fact rather than an inference, and it
+#: is the half that holds when the repair simply rephrases: run 44's balance
+#: section refused "oversized furniture ... narrows the walking paths" and
+#: then accepted "a sofa that is too big for the room steals the floor around
+#: it" from the same family, because the second wording happens to contain
+#: none of the first one's words. A family is refused as a family.
+MECHANISM_PRINCIPLES: dict[str, str] = {
+    "furniture_footprint_scale": "furniture_footprint",
+    "statement_piece_scale": "statement_piece_scale",
+    "less_clutter": "clutter_editing",
+    "restraint": "clutter_editing",
+    "concealment": "clutter_editing",
+    "clear_sightlines": "sightline_depth",
+    "vertical_emphasis": "vertical_emphasis",
+    "vertical_storage": "vertical_emphasis",
+    "visible_floor": "floor_visibility",
+    "continuous_flooring": "floor_visibility",
+    "rug_scale": "floor_visibility",
+    "light_distribution": "light_reflection",
+    "more_light_sources": "light_reflection",
+    "layered_light": "light_reflection",
+    "warm_low_light": "light_reflection",
+    "colour_temperature": "light_reflection",
+    "mirrors_and_reflection": "light_reflection",
+    "reflection": "light_reflection",
+    "pale_surfaces": "color_continuity",
+    "low_contrast_edges": "color_continuity",
+    "daylight": "window_daylight",
+    "unobstructed_windows": "window_daylight",
+    # Every sentence in this family is about hanging fabric - "the fabric
+    # high", "mounting the track", "beyond the frame". It is curtain advice
+    # that happens to be *named* after the window, and run 44 closed "do not
+    # block the window" with it.
+    "window_geometry": "window_dressing",
+    "furniture_placement": "focal_point_layout",
+    "window_dressing": "window_dressing",
+    "visual_balance": "visual_weight_balance",
+}
+
+
+def mechanism_principle(family: str) -> str:
+    return MECHANISM_PRINCIPLES.get(str(family or ""), "")
+
+
+def mechanism_fits(heading: str, family: str, tip: Mapping[str, Any] | None = None) -> bool:
+    """May this section be explained by this mechanism family at all?
+
+    Unknown families are allowed: the map covers the ones that have actually
+    caused a contamination, and refusing everything unmapped would silently
+    starve the repair pass.
+    """
+
+    principle = primary_principle(heading, tip)
+    other = mechanism_principle(family)
+    if principle is None or not other:
+        return True
+    return is_compatible(principle.name, other)
+
 
 #: A sentence that admits it only covers one option is not leakage.
 CONDITIONAL_MARKERS: tuple[str, ...] = (
@@ -295,8 +434,17 @@ class OptionalExampleLeakage:
     options: list[str] = field(default_factory=list)
     used: str = ""
     sentence: str = ""
+    #: "leakage" - the explanation covers one of the options offered.
+    #: "false_condition" - it was conditioned on something never offered.
+    kind: str = "leakage"
 
     def explain(self) -> str:
+        if self.kind == "false_condition":
+            offered = ", ".join(sorted(self.options)) or "no alternatives"
+            return (
+                f"the explanation is conditioned on {self.used}, which the "
+                f"section never offers (it offers {offered})"
+            )
         return (
             f"the section offers {', '.join(sorted(self.options))} but the "
             f"explanation only holds for {self.used}"
@@ -308,6 +456,7 @@ class OptionalExampleLeakage:
             "heading": self.heading,
             "options": sorted(self.options),
             "used": self.used,
+            "kind": self.kind,
             "sentence": self.sentence[:200],
             "why": self.explain(),
         }
@@ -364,6 +513,29 @@ def find_principle_contamination(
     return found
 
 
+def _offered_options(
+    heading: str, text: str, tip: Mapping[str, Any] | None = None
+) -> set[str]:
+    """The alternatives the section actually puts on the table.
+
+    An enumeration joined by "or" naming two or more different things, less
+    whatever the heading is already about - a section called "leave the
+    corners resolved" offering a plant, a lamp, a mirror or a chair offers
+    four options, not five.
+    """
+
+    sentences = [s.strip() for s in _SENTENCE_SPLIT.split(str(text or "")) if s.strip()]
+    options: set[str] = set()
+    for sentence in sentences:
+        lowered = sentence.lower()
+        if " or " not in lowered and " o " not in f" {lowered} ":
+            continue
+        named = entities_in(sentence)
+        if len(named) >= 2:
+            options |= named
+    return options - entities_in(f"{heading} {(tip or {}).get('title', '')}")
+
+
 def find_optional_example_leakage(
     heading: str,
     text: str,
@@ -380,18 +552,8 @@ def find_optional_example_leakage(
     this section have been given a reason that does not apply to them.
     """
 
-    sentences = [s.strip() for s in _SENTENCE_SPLIT.split(str(text or "")) if s.strip()]
     heading_entities = entities_in(f"{heading} {(tip or {}).get('title', '')}")
-
-    options: set[str] = set()
-    for sentence in sentences:
-        lowered = sentence.lower()
-        if " or " not in lowered and " o " not in f" {lowered} ":
-            continue
-        named = entities_in(sentence)
-        if len(named) >= 2:
-            options |= named
-    options -= heading_entities
+    options = _offered_options(heading, text, tip)
     if len(options) < 2:
         return []
 
@@ -412,6 +574,73 @@ def find_optional_example_leakage(
                 options=sorted(options),
                 used=subject.name,
                 sentence=sentence,
+            )
+        )
+    return found
+
+
+#: What :func:`condition_sentence` writes, so a wrong one can be found again.
+_CONDITION_RE = re.compile(r"\bif you choose the ([a-z][a-z ]{1,28}?)\s*,", re.I)
+_CONDITION_RE_ES = re.compile(r"\bsi eliges el ([a-zá-ú][a-zá-ú ]{1,28}?)\s*,", re.I)
+
+
+def find_false_conditioning(
+    heading: str,
+    text: str,
+    tip: Mapping[str, Any] | None = None,
+    language: str = "en",
+) -> list[OptionalExampleLeakage]:
+    """A conditional clause offering a choice the section never offered.
+
+    :func:`condition_sentence` is honest only when the option it names is one
+    the section actually put on the table. Run 44 shipped
+
+        Aim for at least three light sources per room
+        ... something low or wall-mounted for atmosphere ...
+        If you choose the wall finish, light on the walls makes the
+        boundaries of the room visible ...
+
+    at ``optional_example_leakage_count = 0``, because the leakage check had
+    repaired it and its own repair satisfied it. The section offers a ceiling
+    light, a lamp and a wall-mounted fitting; it never offers a wall finish.
+    ``wall-mounted`` was read as the wall itself, and the reader is now being
+    asked to choose something that was never a choice.
+
+    The trigger word is fixed at source - :data:`vidfactory.entities.
+    VisualEntity.excluded` keeps ``wall-mounted`` out of ``wall_finish`` - and
+    this is the net under it, because the conditioner will always be able to
+    name something the paragraph does not offer.
+    """
+
+    pattern = _CONDITION_RE_ES if language == "es" else _CONDITION_RE
+    matches = list(pattern.finditer(str(text or "")))
+    if not matches:
+        return []
+
+    offered = _offered_options(heading, text, tip)
+    heading_entities = entities_in(f"{heading} {(tip or {}).get('title', '')}")
+    allowed = offered | heading_entities
+
+    found: list[OptionalExampleLeakage] = []
+    for match in matches:
+        named = required_entity(match.group(1))
+        if named is None or named.name in allowed:
+            continue
+        sentence = next(
+            (
+                s.strip()
+                for s in _SENTENCE_SPLIT.split(str(text or ""))
+                if match.group(0).lower() in s.lower()
+            ),
+            match.group(0),
+        )
+        found.append(
+            OptionalExampleLeakage(
+                heading=str(heading or ""),
+                options=sorted(offered),
+                used=named.name,
+                sentence=sentence,
+                kind="false_condition",
             )
         )
     return found
@@ -440,6 +669,9 @@ def summarise(
     contamination: Iterable[PrincipleContamination],
     leakage: Iterable[OptionalExampleLeakage],
 ) -> dict[str, Any]:
+    """Both are errors. False conditioning arrives inside ``leakage``,
+    because it is the same defect seen after a repair rather than before."""
+
     contamination, leakage = list(contamination), list(leakage)
     return {
         "primary_concept_contamination_count": len(contamination),

@@ -188,6 +188,29 @@ PROMISES: tuple[Promise, ...] = (
                 "go, which makes even a narrow space feel bigger.",
                 ),
             ),
+            Mechanism(
+                "visual_balance",
+                ("balance", "balanced", "visual weight", "one side",
+                 "each side", "evenly", "distribute", "distributed",
+                 "lopsided", "tipping", "symmetry"),
+                # Balance has a real route to "bigger" and until run 44 it had
+                # no mechanism of its own, so the repair pass reached for the
+                # furniture-footprint sentence instead - a different piece of
+                # advice, which is what shipped. An idea that cannot be
+                # explained from its own mechanism is dropped, and dropping a
+                # good idea for want of one sentence is the wrong repair.
+                "Mass piled on one side of a room pulls the eye straight to it "
+                "and the rest reads as leftover, so spreading the weight evenly "
+                "lets the eye take the whole room in at once and it feels bigger.",
+                also_because=(
+                    "When one side of a room carries all the heavy pieces, the eye stops "
+                "there and never reaches the rest, so an evenly weighted room reads as "
+                "larger than a lopsided one of the same size.",
+                    "Spreading the weight evenly across both halves means the room is read as one "
+                "space rather than a crowded end and an empty end, so it feels bigger "
+                "than it measures.",
+                ),
+            ),
             # ------------------------------------------------------------------
             # Two different things that both used to be called "scale".
             #
