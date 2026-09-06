@@ -1,0 +1,199 @@
+# DIABETES REELS
+#
+# A separate workflow from generate-video.yml on purpose. The two products
+# share the machinery underneath and none of the editorial logic, so they
+# should not share a run, a concurrency group or a failure. A broken reel must
+# not be able to stop a long-form render, and vice versa.
+#
+# Test and production histories cannot mix here, and not because a flag says
+# so: the reel pipeline never calls record_clip_use, so it neither reads nor
+# writes the 45-day footage cooldown that the long-form product depends on.
+# What the mode does change is the quality gate - in production a single
+# medical-claim risk or unsupported claim fails the run.
+name: Generate Reel
+
+on:
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: "Topic (slug or title). Blank uses the fruit/glucose reel."
+        required: false
+        type: string
+        default: "5 frutas que suelen tener un impacto mas moderado en la glucosa"
+      duration_seconds:
+        description: "Reel length"
+        required: false
+        type: choice
+        default: "45"
+        options: ["20", "30", "45", "60"]
+      content_format:
+        description: "Shape of the reel"
+        required: false
+        type: choice
+        default: "automatic"
+        options:
+          - automatic
+          - list
+          - error_solution
+          - comparison
+          - ranking
+          - myth
+          - combination
+      number_of_items:
+        description: "How many items (0 = as many as the duration allows)"
+        required: false
+        type: choice
+        default: "0"
+        options: ["0", "3", "4", "5", "6", "7", "10"]
+      voice:
+        description: "Piper voice. Blank = es_ES-sharvard-medium (female, Castilian)"
+        required: false
+        type: string
+        default: ""
+      generation_mode:
+        description: "test reports the gates; production enforces them"
+        required: false
+        type: choice
+        default: "test"
+        options: [test, production]
+
+# Least privilege: this workflow reads the code and writes nothing back.
+permissions:
+  contents: read
+
+concurrency:
+  group: reel-generation
+  cancel-in-progress: false
+
+jobs:
+  reel:
+    name: Render one vertical reel
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install FFmpeg
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ffmpeg
+          ffmpeg -version | head -1
+
+      - name: Install eSpeak NG (narration fallback)
+        run: sudo apt-get install -y --no-install-recommends espeak-ng
+
+      - name: Install caption fonts
+        # libass substitutes silently for a missing family, so the title would
+        # quietly stop being ExtraBold. All OFL, all from the Ubuntu archive.
+        continue-on-error: true
+        run: |
+          sudo apt-get install -y --no-install-recommends \
+            fonts-inter fonts-noto-core fonts-noto-color-emoji fonts-liberation2 || \
+            sudo apt-get install -y --no-install-recommends fonts-liberation2
+          fc-cache -f >/dev/null 2>&1 || true
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+          pip install onnxruntime
+
+      - name: Restore the cached model and voice files
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: vidfactory-reel-cache-v1
+
+      - name: Check the script before spending a render on it
+        # The safety layer runs offline and in a second. A reel that would
+        # fail its medical gate should never reach the TTS stage.
+        run: python -m pytest -q tests/test_diabetes_reels.py
+
+      - name: Generate the reel
+        id: reel
+        env:
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+          # Through the environment, never interpolated into the shell.
+          REEL_TOPIC: ${{ inputs.topic }}
+          REEL_SECONDS: ${{ inputs.duration_seconds }}
+          REEL_FORMAT: ${{ inputs.content_format }}
+          REEL_ITEMS: ${{ inputs.number_of_items }}
+          REEL_VOICE: ${{ inputs.voice }}
+          REEL_MODE: ${{ inputs.generation_mode }}
+        run: |
+          set -euo pipefail
+          FORMAT="$REEL_FORMAT"
+          [ "$FORMAT" = "automatic" ] && FORMAT=""
+          python -m vidfactory reel \
+            --topic "$REEL_TOPIC" \
+            --seconds "$REEL_SECONDS" \
+            --format "$FORMAT" \
+            --items "$REEL_ITEMS" \
+            --voice "$REEL_VOICE" \
+            --mode "$REEL_MODE" \
+            --output output/reels \
+            --github-output
+
+      - name: Report what was produced
+        if: always()
+        run: |
+          set -euo pipefail
+          DIR=$(ls -dt output/reels/*/ 2>/dev/null | head -1 || true)
+          [ -z "$DIR" ] && { echo "no reel directory"; exit 0; }
+          {
+            echo "## Reel"
+            echo '```'
+            ffprobe -v error -show_entries \
+              stream=codec_name,width,height,avg_frame_rate:format=duration \
+              -of default=nw=1 "$DIR/reel.mp4" || true
+            echo '```'
+            echo "### Quality report"
+            echo '```json'
+            cat "$DIR/reel_quality_report.json"
+            echo '```'
+            echo "### Script"
+            echo '```'
+            cat "$DIR/guion.txt"
+            echo '```'
+            echo "### Caption"
+            echo '```'
+            cat "$DIR/caption.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Inspect real frames from the finished reel
+        # The lesson from the long-form side, applied from the first render:
+        # metrics describe a file, and only a frame shows what is on screen.
+        if: always()
+        continue-on-error: true
+        run: python tools/inspect_reel_frames.py output/reels
+
+      - name: Upload the reel and everything beside it
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diabetes-reel
+          path: |
+            output/reels/*/reel.mp4
+            output/reels/*/subtitles.srt
+            output/reels/*/subtitles.ass
+            output/reels/*/guion.txt
+            output/reels/*/caption.txt
+            output/reels/*/metadata.json
+            output/reels/*/fuentes.json
+            output/reels/*/reel_quality_report.json
+            output/reels/*/script.json
+          retention-days: 30
+          if-no-files-found: warn

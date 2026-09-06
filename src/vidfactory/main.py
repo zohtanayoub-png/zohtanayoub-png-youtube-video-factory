@@ -310,6 +310,57 @@ def command_visual_check(args: argparse.Namespace) -> int:
     return 1
 
 
+def command_reel(args: argparse.Namespace) -> int:
+    """DIABETES REELS: one vertical Spanish reel, start to finish.
+
+    A separate entry point on purpose. It shares the machinery underneath -
+    TTS, stock search, ranking, frame inspection, the editor - and none of
+    the long-form editorial logic, so nothing here can change what a
+    twenty-five minute home decor video does.
+    """
+
+    from .reels.pipeline import ReelPipeline
+
+    config = load_config(args.config)
+    database = None
+    if args.database:
+        database = Database(args.database)
+        try:
+            database.import_state(Path(args.state))
+        except Exception as exc:                          # pragma: no cover
+            log.warning("could not load history for the reel: %s", exc)
+
+    pipeline = ReelPipeline(
+        config, output_dir=args.output, database=database
+    )
+    result = pipeline.run(
+        topic=args.topic or "",
+        seconds=float(args.seconds or 0) or 45.0,
+        content_format=args.format or "",
+        items=int(args.items or 0),
+        voice=args.voice or "",
+        mode=args.mode,
+    )
+
+    report = result.report.to_dict() if result.report else {}
+    summary = {
+        **result.to_dict(),
+        "hook": report.get("hook", ""),
+        "hook_strength_score": report.get("hook_strength_score"),
+        "medical_claim_risk_count": report.get("medical_claim_risk_count"),
+        "unsupported_claim_count": report.get("unsupported_claim_count"),
+    }
+    print(json.dumps(summary, indent=2, ensure_ascii=False))
+
+    if args.github_output and os.environ.get("GITHUB_OUTPUT"):
+        with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
+            handle.write(f"reel_path={result.video or ''}\n")
+            handle.write(f"output_dir={result.output_dir}\n")
+            handle.write(f"duration_seconds={result.duration:.1f}\n")
+            handle.write(f"passed={'true' if result.ok else 'false'}\n")
+    return 0 if result.ok else 3
+
+
 def command_instruction_check(args: argparse.Namespace) -> int:
     """Does the claim probe reject the exact footage run 44 shipped?
 
@@ -949,6 +1000,26 @@ def build_parser() -> argparse.ArgumentParser:
     instruction_check.add_argument("--model-text", default="")
     instruction_check.add_argument("--model-image-size", default="")
     instruction_check.set_defaults(func=command_instruction_check)
+
+    reel = subparsers.add_parser(
+        "reel", help="generate one DIABETES REELS vertical short (Spanish)"
+    )
+    reel.add_argument("--topic", default="", help="topic slug or title")
+    reel.add_argument(
+        "--seconds", default="45", help="20, 30, 45 or 60 (default 45)"
+    )
+    reel.add_argument(
+        "--format", default="",
+        help="list | error_solution | comparison | ranking | myth | combination",
+    )
+    reel.add_argument("--items", default="0", help="0 = as many as fit")
+    reel.add_argument("--voice", default="", help="Piper voice; blank = es_ES female")
+    reel.add_argument("--mode", default="test", choices=["test", "production"])
+    reel.add_argument("--output", default="output/reels")
+    reel.add_argument("--database", default="")
+    reel.add_argument("--state", default="data/state")
+    reel.add_argument("--github-output", action="store_true")
+    reel.set_defaults(func=command_reel)
 
     return parser
 

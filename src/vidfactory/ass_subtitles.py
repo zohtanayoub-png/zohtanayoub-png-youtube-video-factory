@@ -448,13 +448,30 @@ def render_ass(
     width: int = 1920,
     height: int = 1080,
     font: str = "",
+    extra_styles: Sequence[SubtitleStyle] = (),
+    extra_events: Sequence[tuple[float, float, str, str]] = (),
 ) -> str:
-    """The complete .ass document as text."""
+    """The complete .ass document as text.
+
+    ``extra_styles`` and ``extra_events`` exist for one thing: the fixed
+    top title a vertical reel carries for its whole duration. Putting it in
+    the same .ass file means libass draws it in the same pass as the
+    captions, so there is no second filter, no second encode and no way for
+    the two to disagree about the frame size. The captions themselves are
+    untouched, and a caller that passes neither gets byte-identical output to
+    before.
+    """
 
     font = font or available_font()
-    lines = [
-        ASS_HEADER.format(width=width, height=height, styles=style.to_ass(font))
-    ]
+    styles = "\n".join(
+        [style.to_ass(font), *(s.to_ass(font) for s in extra_styles)]
+    )
+    lines = [ASS_HEADER.format(width=width, height=height, styles=styles)]
+    for start, end, style_name, text in extra_events:
+        lines.append(
+            f"Dialogue: 0,{format_ass_time(start)},{format_ass_time(end)},"
+            f"{style_name},,0,0,0,,{text}"
+        )
     fade = ""
     if style.fade_in_ms or style.fade_out_ms:
         fade = f"{{\\fad({int(style.fade_in_ms)},{int(style.fade_out_ms)})}}"
@@ -475,16 +492,22 @@ def write_ass(
     width: int = 1920,
     height: int = 1080,
     font: str = "",
+    extra_styles: Sequence[SubtitleStyle] = (),
+    extra_events: Sequence[tuple[float, float, str, str]] = (),
+    max_line_chars: int = 42,
 ) -> tuple[Path, list[AssEvent], str]:
     """Write ``subtitles.ass`` and report what went into it."""
 
     resolved = style_for(style) if isinstance(style, str) else style
     chosen_font = font or available_font()
-    events = events_from_chunks(chunks, resolved, language)
+    events = events_from_chunks(chunks, resolved, language, max_line_chars)
     target = Path(destination)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(
-        render_ass(events, resolved, language, width, height, chosen_font),
+        render_ass(
+            events, resolved, language, width, height, chosen_font,
+            extra_styles=extra_styles, extra_events=extra_events,
+        ),
         encoding="utf-8",
     )
     log.info(

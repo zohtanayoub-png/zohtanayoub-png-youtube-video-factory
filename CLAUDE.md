@@ -4,9 +4,23 @@ Context for anyone (human or model) modifying this repository.
 
 ## What this project is
 
-An autonomous, cloud-based factory that produces long-form (15-30 minute)
-narrated home decor / interior design videos for a US English YouTube audience,
-running entirely on GitHub Actions CPU runners.
+An autonomous, cloud-based factory that produces **two** things on GitHub
+Actions CPU runners, from one set of shared machinery:
+
+1. **Long-form** (15-30 minute) narrated home decor / interior design videos
+   for a US English YouTube audience. This is the original product and
+   everything outside `src/vidfactory/reels/` belongs to it.
+2. **DIABETES REELS** - vertical 20-60 second Spanish reels about diabetes and
+   glucose, for Instagram / TikTok / Shorts. `src/vidfactory/reels/`,
+   `vidfactory reel`, `.github/workflows/generate-reel.yml`.
+
+They share the parts that are genuinely general - TTS, stock search, ranking,
+frame inspection, the downloader, the FFmpeg editor, the ASS caption renderer
+- and share **no editorial logic at all**, because forty vertical seconds
+about food and twenty-five horizontal minutes about living rooms disagree
+about almost everything: shot length, frame shape, what a good opening is,
+and what a false sentence costs. Nothing in `reels/` is imported by the
+long-form pipeline, and a test enforces that.
 
 ## Hard rules
 
@@ -79,7 +93,81 @@ src/vidfactory/
   pipeline.py        orchestration
   main.py            CLI
   testassets.py      synthetic FFmpeg footage for the offline integration test
+  reels/             DIABETES REELS - the second product (see below)
+    knowledge.py     Spanish diabetes/glucose topics, claims and their sources
+    sources.py       the organisations every claim rests on
+    safety.py        what a reel about diabetes may never say
+    hooks.py         5-10 candidate openings, scored, one chosen
+    script.py        hook/promise/value/retention/conclusion/CTA, fitted to length
+    captions.py      1080x1920 captions plus the fixed top title
+    qc.py            the seven metrics, and the production gate
+    metadata.py      caption, hashtags, disclaimer
+    pipeline.py      orchestration, reusing the shared machinery
 ```
+
+## DIABETES REELS
+
+A health channel, so the rule the long-form side applies to footage - a number
+in the report has to come from a measurement - applies here to the **words**.
+
+* **Every factual sentence carries a source.** `sources.py` lists the standing
+  guidance of bodies whose job this is (ADA, NIDDK, WHO, Harvard Nutrition
+  Source, Diabetes UK, Fundacion para la Diabetes, redGDPS), and
+  `unsupported_claim_count` is an error. A mistyped source key counts as
+  unsupported rather than being skipped, because that is exactly the claim
+  that would otherwise ship with nothing behind it.
+* **Claims are written at the strength the evidence supports, not softened
+  afterwards.** "10 frutas que bajan el azucar" is a false sentence; "10
+  frutas que suelen tener un impacto mas moderado en la glucosa" is a true one
+  carrying the same useful information. `safety.py` refuses the first: cure,
+  reversal, guarantees, immediate effects, universal prohibitions, anything
+  touching medication or insulin dosing, fear used to hold attention, and any
+  effect claim missing the hedge that makes it true. The hedge rule is
+  deliberately **directional** - "como influye el tamano de la racion en la
+  glucosa" names a subject and asserts nothing, and demanding a hedge from it
+  would be asking a title to apologise for existing.
+* **Three caveats recur because they are what make almost anything in this
+  niche correct**: la cantidad, la preparacion, y con que se combina - plus
+  the fact that people genuinely differ. A script that has been trimmed until
+  it lost them all gets one back rather than a warning, because the warning
+  tells an operator the reel is weaker and the viewer is the one who needed
+  the sentence.
+* **The hook is chosen, not written once.** Five to ten candidates per topic,
+  scored on curiosity, clarity, benefit, relevance and naturalness, multiplied
+  by how well the opening matches what the reel actually delivers - because
+  "pick the strongest candidate" makes hook/content drift *more* likely, not
+  less. Banned openers ("Hoy vamos a hablar de...", "En este video...",
+  "Hola amigos...", a generic "?Sabias que...?") are refused outright rather
+  than scored low: they are not weak openings, they are a wasted second, and
+  it is the only second guaranteed to be watched. `HOOK_PASS` was read off the
+  brief's own eight example hooks, which score 0.54 to 0.80.
+* **The hook may not be the conclusion said twice.** Measured as the longest
+  shared run of words, not as vocabulary overlap: a hook is *supposed* to
+  share its subject with the conclusion, and what must not happen is the same
+  clause appearing at both ends of a forty second video.
+* **When the duration is tight, explanations go and claims stay.** The same
+  rule `_trim_to_duration` follows: optional material first, the substance
+  last. Never below two items - a twenty second reel with two items is a reel,
+  and one with none is a caption read aloud.
+* **The interior gates are off, and that is not a lowered standard.**
+  `enforce_premium`, `enforce_aspirational` and `min_interior_relevance` exist
+  to reject footage that is not a photograph of a styled room. A bowl of
+  strawberries is not a photograph of a styled room.
+* **Test and production cannot mix, structurally.** The reel pipeline never
+  calls `record_clip_use`, so it neither reads nor writes the 45-day footage
+  cooldown the long-form product depends on. What the mode changes is the
+  gate: in production one medical-claim risk or one unsupported claim fails
+  the run.
+* **A vertical frame is not a small landscape one.** Captions at 68px with
+  24-character lines, 430px clear of the bottom where Instagram, TikTok and
+  Shorts draw their own furniture; one fixed ExtraBold title across the top
+  for the whole reel, with a single accent word. Both ride in the same .ass
+  file so libass draws them in one pass. Two bugs there were invisible to
+  every check that read the file and obvious in the first rendered frame: the
+  title's alignment byte is field **18**, not 19 - writing 8 into field 19
+  sets MarginL and leaves the title at the bottom of the screen - and 42
+  character lines sized for a 1920px frame run off both edges of a 1080px
+  one.
 
 ## Editorial invariants (added after the first production video repeated footage)
 
