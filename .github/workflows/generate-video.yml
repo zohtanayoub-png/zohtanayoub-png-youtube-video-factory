@@ -99,7 +99,7 @@ on:
         required: false
         type: choice
         default: "render"
-        options: [render, calibrate-entities, premium-check]
+        options: [render, calibrate-entities, premium-check, instruction-check]
       upload_to_youtube:
         description: "Upload to YouTube when it is finished"
         required: false
@@ -185,7 +185,10 @@ concurrency:
 jobs:
   render:
     name: Render long-form video
-    if: inputs.task != 'calibrate-entities' && inputs.task != 'premium-check'
+    if: >-
+      inputs.task != 'calibrate-entities'
+      && inputs.task != 'premium-check'
+      && inputs.task != 'instruction-check'
     runs-on: ubuntu-latest
     timeout-minutes: 300
 
@@ -735,6 +738,71 @@ jobs:
         with:
           name: entity-calibration
           path: entity-calibration.json
+          retention-days: 30
+          if-no-files-found: warn
+
+  # ---------------------------------------------------------------------------
+  #  INSTRUCTION GROUNDING PROBE
+  #  Run 44 grounded 93 of 93 shots and shipped a dragonfly on a windowpane
+  #  under "do not block the window" and metallic ribbons under "paint the
+  #  trim". Entity presence cannot see either: both frames contain their
+  #  object. This scores the whole visual claim against the searches that
+  #  reproduce those exact failures, and against the claim's own valid
+  #  searches, so the layer is measured before a render is spent on it.
+  # ---------------------------------------------------------------------------
+  instruction-check:
+    name: Measure the instruction-grounding probes
+    if: inputs.task == 'instruction-check'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+          pip install onnxruntime
+
+      - name: Restore the cached model files
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: vidfactory-cache-Automatic-visual-v2
+
+      - name: Measure
+        env:
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          # Through the environment rather than interpolated into the script,
+          # so a dispatch input is data and never shell.
+          PROBE_CLAIMS: ${{ inputs.probe_entities }}
+          PROBE_QUERY: ${{ inputs.probe_query }}
+        run: |
+          python -m vidfactory instruction-check \
+            --samples 6 --json-out instruction-calibration.json \
+            --claims "$PROBE_CLAIMS" \
+            --probe-query "$PROBE_QUERY" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the raw scores
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instruction-calibration
+          path: instruction-calibration.json
           retention-days: 30
           if-no-files-found: warn
 

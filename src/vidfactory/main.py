@@ -310,6 +310,182 @@ def command_visual_check(args: argparse.Namespace) -> int:
     return 1
 
 
+def command_instruction_check(args: argparse.Namespace) -> int:
+    """Does the claim probe reject the exact footage run 44 shipped?
+
+    ``entity-check`` asked whether the object is displaced and answered
+    honestly that MobileCLIP-S0 can barely tell. This asks a different
+    question of the same backend - whether the frame looks more like the
+    stated scene than like the stated failure - and the point of this command
+    is that the answer is measured before anything is built on it.
+
+    For each claim it scores two searches through the real probe: the claim's
+    own queries, which should pass, and ``observed_failures``, which are the
+    searches that reproduce what actually shipped - a dragonfly on a window, a
+    kitchen faucet, colourful ribbons. A probe worth keeping rejects the
+    second and keeps the first. One that rejects both is a probe that rejects
+    everything, and that is the number this prints alongside, because it is
+    the one that decides whether a heavier verifier is needed.
+
+    Preview stills only, so this costs a few hundred kilobytes.
+    """
+
+    from .instructions import (
+        BY_NAME,
+        CLAIMS,
+        CLAIM_DOMINANCE_FAIL,
+        claim_prompts,
+        score_from_similarities,
+    )
+    from .stock.registry import build_providers
+    from .visual_analysis import PROMPT_TEMPLATE, VisualAnalyzer, _cosine, _ramp
+    from .visual_model import load_model
+
+    config = load_config(args.config)
+    model = load_model(dict(config.get("visual.model", {}) or {}))
+    if model is None:
+        print("[FAIL] no CLIP backend here, so the claim probes cannot be measured.")
+        print("       run this where 'vidfactory visual-check' reports ok.")
+        return 1
+
+    providers = [p for p in build_providers(dict(config.get("sources", {}) or {}))
+                 if p.name != "local"]
+    if not providers:
+        print("[FAIL] no stock provider - set PEXELS_API_KEY")
+        return 1
+    provider = providers[0]
+
+    analyzer = VisualAnalyzer(
+        model=model,
+        frames_per_clip=int(config.get("visual.frames_per_clip", 3)),
+        allow_remote_video=False,
+    )
+    wanted = [n.strip() for n in str(args.claims or "").split(",") if n.strip()]
+    claims = [BY_NAME[n] for n in wanted if n in BY_NAME] or list(CLAIMS)
+    per_query = max(2, int(args.samples))
+    cut = 1.0 - CLAIM_DOMINANCE_FAIL
+
+    def scores_for(claim, query: str) -> list[tuple[float, str]]:
+        """This claim's probe against whatever ``query`` returns.
+
+        The claim is passed in rather than re-derived from the query text, for
+        the reason the entity harness had to learn: letting the analyzer infer
+        it scores every control row as if it were the real thing.
+        """
+
+        try:
+            results = provider.search(query, per_page=per_query, page=1)
+        except Exception as exc:
+            print(f"       search failed for {query!r}: {exc}")
+            return []
+        prompts, _ = claim_prompts(claim)
+        try:
+            text_vectors = analyzer._encode_texts(
+                [PROMPT_TEMPLATE.format(p) for p in prompts]
+            )
+        except Exception as exc:
+            print(f"       prompt encoding failed: {exc}")
+            return []
+        out: list[tuple[float, str]] = []
+        for clip in results[:per_query]:
+            frames = [f for f in analyzer.sample(clip) if f and f.ok]
+            if not frames:
+                continue
+            try:
+                image_vectors = list(model.encode_images(frames))
+            except Exception:
+                continue
+            per_frame = [
+                [_cosine(image, t) for t in text_vectors] for image in image_vectors
+            ]
+            grounding = score_from_similarities(claim, per_frame, _ramp)
+            if grounding.checked:
+                out.append((grounding.score, grounding.top_forbidden))
+        return out
+
+    def summarise(rows: list[tuple[float, str]]) -> str:
+        if not rows:
+            return "no samples"
+        values = sorted(v for v, _ in rows)
+        rejected = sum(1 for v in values if v <= cut)
+        leaders: dict[str, int] = {}
+        for _, name in rows:
+            leaders[name] = leaders.get(name, 0) + 1
+        top = sorted(leaders.items(), key=lambda kv: kv[1], reverse=True)[:2]
+        return (
+            f"n={len(values)} min={values[0]:.3f} "
+            f"median={values[len(values) // 2]:.3f} "
+            f"rejected={rejected}/{len(values)} "
+            f"| closest: " + ", ".join(f"{k!r}x{v}" for k, v in top)
+        )
+
+    if args.probe_query:
+        for claim in claims:
+            rows = scores_for(claim, args.probe_query)
+            print(f"\n{claim.name} probed against {args.probe_query!r}")
+            print(f"  {summarise(rows)}")
+        return 0
+
+    report: dict[str, Any] = {}
+    kept_total = rejected_total = valid_total = failure_total = 0
+    for claim in claims:
+        print(f"\n=== {claim.name}: {claim.label} (cut {cut:.2f})")
+        valid: list[tuple[float, str]] = []
+        for query in claim.queries[:2]:
+            rows = scores_for(claim, query)
+            valid.extend(rows)
+            print(f"  valid   {query!r}: {summarise(rows)}")
+        failing: list[tuple[float, str]] = []
+        for query in claim.observed_failures:
+            rows = scores_for(claim, query)
+            failing.extend(rows)
+            print(f"  FAILURE {query!r}: {summarise(rows)}")
+        kept = sum(1 for v, _ in valid if v > cut)
+        rejected = sum(1 for v, _ in failing if v <= cut)
+        kept_total += kept
+        valid_total += len(valid)
+        rejected_total += rejected
+        failure_total += len(failing)
+        report[claim.name] = {
+            "valid": [v for v, _ in valid],
+            "observed_failures": [v for v, _ in failing],
+            "kept_of_valid": [kept, len(valid)],
+            "rejected_of_failures": [rejected, len(failing)],
+        }
+        if valid and failing:
+            print(
+                f"  -> keeps {kept}/{len(valid)} valid, "
+                f"rejects {rejected}/{len(failing)} of the observed failures"
+            )
+
+    print("\n" + "=" * 62)
+    if valid_total and failure_total:
+        print(
+            f"overall: keeps {kept_total}/{valid_total} valid "
+            f"({100.0 * kept_total / valid_total:.0f}%), rejects "
+            f"{rejected_total}/{failure_total} observed failures "
+            f"({100.0 * rejected_total / failure_total:.0f}%)"
+        )
+        print()
+        print("sweep (cut = the score at or below which a shot is rejected):")
+        print(f"{'cut':>6}  {'valid culled':>13}  {'failures culled':>16}")
+        good = sorted(v for r in report.values() for v in r["valid"])
+        bad = sorted(v for r in report.values() for v in r["observed_failures"])
+        for candidate in (0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.40, 0.50, 0.60):
+            g = sum(1 for v in good if v <= candidate)
+            b = sum(1 for v in bad if v <= candidate)
+            print(
+                f"{candidate:>6.2f}  {g:>4}/{len(good)} ({100.0 * g / len(good):>3.0f}%)"
+                f"  {b:>5}/{len(bad)} ({100.0 * b / len(bad):>3.0f}%)"
+            )
+    if args.json_out:
+        Path(args.json_out).write_text(
+            json.dumps(report, indent=2) + "\n", encoding="utf-8"
+        )
+        print(f"\nwrote {args.json_out}")
+    return 0
+
+
 def command_entity_check(args: argparse.Namespace) -> int:
     """Measure the entity probes against real footage instead of guessing.
 
@@ -688,6 +864,21 @@ def build_parser() -> argparse.ArgumentParser:
              "contribution of a newly added distractor can be isolated",
     )
     entity_check.set_defaults(func=command_entity_check)
+
+    instruction_check = subparsers.add_parser(
+        "instruction-check",
+        help="measure the instruction-grounding probes against real footage",
+    )
+    instruction_check.add_argument(
+        "--claims", default="", help="comma-separated claim names (default: all)"
+    )
+    instruction_check.add_argument("--samples", type=int, default=6)
+    instruction_check.add_argument("--json-out", default="")
+    instruction_check.add_argument(
+        "--probe-query", default="",
+        help="score footage from THIS search with every claim's probe",
+    )
+    instruction_check.set_defaults(func=command_instruction_check)
 
     return parser
 

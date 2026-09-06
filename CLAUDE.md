@@ -63,6 +63,7 @@ src/vidfactory/
   concepts.py        is the paragraph about the same thing as its heading
   principles.py      does the causal sentence explain *this* section's idea
   entities.py        the object a concrete shot has to actually contain
+  instructions.py    the whole visual claim, not the noun inside it
   title_alignment.py what a title promises, and which ideas actually deliver it
   editorial_qc.py    repetition, relevance and diversity gates (not ffprobe)
   stock/             provider adapters: base, pexels, pixabay, local, registry
@@ -242,10 +243,72 @@ src/vidfactory/
   good footage. Anything a shot of the object legitimately also contains -
   "a close-up of furniture" for a rug under a sofa - is not a distractor; it
   is a false positive waiting to happen.
+* **Presence is a property of an object; an instruction is a property of a
+  scene.** Run 44 reported `entity_grounding_failure_count = 0` and
+  `entity_grounding_pass_percentage = 100%` over 93 grounded shots, and
+  shipped a dragonfly sitting on a windowpane and a kitchen faucet under "do
+  not block the window", and metallic ribbon strips, flowers beside a wall and
+  ornate carved decoration under "paint the trim the same colour as the
+  walls". Not one of those is a scoring error: every frame contains its
+  object and nothing displaces it, which is the only question `entities.py`
+  asks. The advice is not "show me a window" - it is *keep tall furniture away
+  from the glass*, and only a room, a window and the relationship between them
+  can demonstrate that.
+
+  `instructions.py` states the whole claim in four parts - the subject
+  `entities.py` already requires, the scene context, the relationship, and the
+  scenes that satisfy the subject while failing the advice. Context and
+  relationship are scored together as one set of positive prompts, because two
+  independent CLIP margins multiply their false positive rates. The verdict is
+  the same margin, and the reason it can work where the bare-noun probe
+  measured chance is that **both sides are now equally specific**: "a dragonfly
+  resting on a windowpane" against "a sofa placed clear of a bright living room
+  window" gives the generality bias no generality gap to exploit.
+  `instruction_grounding_failure_count` is an **error**, additional to entity
+  grounding and a replacement for nothing, and it splits by mode exactly as
+  entity grounding does - one tolerated in test, none in production. A failed
+  shot is repaired by searching for the *relationship*; searching for the
+  object is what returned the dragonfly.
+
+  Whether MobileCLIP-S0 can see this is a measurement, not an argument.
+  `vidfactory instruction-check` (the `instruction-check` task on the video
+  workflow) scores each claim's own searches against the searches that
+  reproduce the run 44 failures, and prints how much of each side it keeps. A
+  probe that rejects both is a probe that rejects everything, and that number
+  is printed next to the catch rate because it is the one that decides whether
+  a heavier verifier is needed.
 * **The subject is the object named first, not the one named most.** "A rug
   too small to reach the sofa leaves the seating floating" names seating twice
   and the rug once. It is rug advice; the sofa is the landmark the rug is
   measured against.
+* **An explanation is refused by its family, not by its wording.** Run 44's
+  script QC returned zero contamination on four paragraphs that were all
+  wrong. Removing the accidental match that caused one of them - "even" in the
+  balance vocabulary, matched by "even though its footprint never changed" -
+  fixes that sentence and not the problem: refuse it and the repair returns
+  "a sofa that is too big for the room steals the floor around it", from the
+  same mechanism family, sharing none of the first wording's words.
+  `MECHANISM_PRINCIPLES` maps each mechanism in `title_alignment` to the
+  principle it explains and `repair_text` skips the whole family when that
+  principle is not the heading's, which is a fact about the repair rather than
+  an inference from its output. Two of the four had no principle at all -
+  focal-point layout and the window - and one had the wrong subject: a bare
+  "window" was filed as window dressing, so "hanging the fabric high and wide
+  leaves the glass itself uncovered" was formally curtain advice inside a
+  curtain section. The aperture and what hangs on it are two subjects. Note
+  which check catches that last one: **none of them**. It names the glass and
+  the daylight, which are the window section's own words, so the concept check
+  reads a normal comparison and the principle check exits before it looks for
+  an intruder. Only refusing the family keeps it out.
+* **A conditional is honest only about a choice the section offered.** Run 44
+  closed "aim for at least three light sources per room" with "if you choose
+  the wall finish, light on the walls makes the boundaries of the room
+  visible", at `optional_example_leakage_count = 0` - because the leakage
+  check had written that clause itself and its own repair satisfied it. The
+  section offers a ceiling light, a lamp and a wall-mounted fitting; it never
+  offers a wall finish. `VisualEntity.excluded` stops "wall-mounted" reading as
+  the wall, and `find_false_conditioning` is the net under it, counted as
+  leakage.
 * **A principle is not an object either.** "Balance visual weight across the
   room" names nothing physical, so the cross-concept check had no subject and
   correctly returned 0 while run 25 explained that section through furniture

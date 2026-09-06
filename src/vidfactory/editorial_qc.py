@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from .entities import summarise as summarise_grounding
+from .instructions import summarise as summarise_instructions
 from .visual_analysis import premium_breakdown
 from .logging_utils import get_logger
 
@@ -210,6 +211,11 @@ def build_report(
         # tolerated failure is still reported, as a warning, by name.
         "max_entity_grounding_failures_test": 1,
         "max_entity_grounding_failures": 0,
+        # The same split, for the same reason. An instruction is a harder
+        # thing to see than an object, so tolerating one failure in test and
+        # none in production is if anything more justified here.
+        "max_instruction_grounding_failures_test": 1,
+        "max_instruction_grounding_failures": 0,
         "min_final_shot_premium_ratio": 0.60,
         **dict(thresholds or {}),
     }
@@ -358,6 +364,19 @@ def build_report(
         limits["max_entity_grounding_failures"] if is_production
         else limits["max_entity_grounding_failures_test"]
     )
+    # ---- the instruction, not only its noun ------------------------------
+    # Run 44 grounded 93 of 93 shots and showed a dragonfly on a windowpane
+    # under "do not block the window". The window was there; the advice was
+    # not. This is the second layer, additional to entity grounding and a
+    # replacement for nothing.
+    instruction_summary = summarise_instructions(final_visual)
+    instruction_failures = int(instruction_summary["failed"])
+    instruction_pass_pct = float(instruction_summary["pass_percentage"])
+    instruction_failure_limit = int(
+        limits["max_instruction_grounding_failures"] if is_production
+        else limits["max_instruction_grounding_failures_test"]
+    )
+
     visual_meta = dict(visual_stats or {})
     causal_score = float(getattr(causal, "overall", 1.0)) if causal is not None else 1.0
     contradiction_report = getattr(causal, "contradiction", None)
@@ -423,6 +442,10 @@ def build_report(
         "entity_grounding_failure_count": entity_failures,
         "entity_grounding_pass_percentage": entity_pass_pct,
         "final_shot_entity_grounding": grounding_summary,
+        # ---- the instruction the shot has to demonstrate ------------------
+        "instruction_grounding_failure_count": instruction_failures,
+        "instruction_grounding_pass_percentage": instruction_pass_pct,
+        "final_shot_instruction_grounding": instruction_summary,
         # ---- editorial logic the causal score cannot see -----------------
         "primary_concept_contamination_count": principle_contamination_count,
         "primary_concept_contamination": principle_contamination,
@@ -533,6 +556,49 @@ def build_report(
                     )
                     if entity_failures
                     else "every grounded shot shows its object"
+                ),
+                severity="warning",
+            )
+        ] if not is_production else []),
+        # ---- the instruction, not only its noun --------------------------
+        EditorialCheck(
+            "no_instruction_grounding_failures",
+            instruction_failures <= instruction_failure_limit,
+            (
+                f"{instruction_failures} of {instruction_summary['checked']} shots "
+                f"that make a visual claim do not demonstrate it: "
+                + "; ".join(
+                    f"{f['claim']} ({f['score']}, looks like {f['top_forbidden']!r})"
+                    for f in instruction_summary["failures"][:3]
+                )
+                + (
+                    f" (limit {instruction_failure_limit})"
+                    if instruction_failure_limit else ""
+                )
+                if instruction_failures
+                else (
+                    f"all {instruction_summary['checked']} shots making a visual "
+                    f"claim demonstrate it"
+                    if instruction_summary["checked"]
+                    else "no frames were inspected, so instructions are unmeasured"
+                )
+            ),
+            severity="error",
+        ),
+        *([
+            EditorialCheck(
+                "instruction_grounding_clean",
+                instruction_failures == 0,
+                (
+                    f"{instruction_failures} shot(s) contain their object and do "
+                    "not show the advice - tolerated in test mode, and a "
+                    "production render would be refused for it: "
+                    + "; ".join(
+                        f"{f['claim']} ({f['score']})"
+                        for f in instruction_summary["failures"][:3]
+                    )
+                    if instruction_failures
+                    else "every shot making a visual claim demonstrates it"
                 ),
                 severity="warning",
             )

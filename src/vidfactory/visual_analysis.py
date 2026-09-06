@@ -43,6 +43,12 @@ from .entities import (
     required_entity,
     score_from_similarities,
 )
+from .instructions import (
+    InstructionGrounding,
+    claim_prompts,
+    required_claim,
+)
+from .instructions import score_from_similarities as score_claim
 from .logging_utils import get_logger
 
 log = get_logger("VISUAL")
@@ -923,6 +929,11 @@ class VisualAnalysis:
     #: A high ``semantic_match`` cannot stand in for it: run 25 averaged 0.569
     #: while showing ribbons for painted trim and plants for an undersized rug.
     grounding: EntityGrounding = field(default_factory=EntityGrounding)
+    #: Whether the frames *demonstrate* the advice rather than containing its
+    #: noun. Run 44 grounded 93 of 93 shots and still showed a dragonfly on a
+    #: windowpane under "do not block the window": the window was there and
+    #: the instruction was not.
+    instruction: InstructionGrounding = field(default_factory=InstructionGrounding)
 
     @property
     def penalised_flags(self) -> dict[str, float]:
@@ -945,6 +956,7 @@ class VisualAnalysis:
             "flags": {k: round(v, 3) for k, v in sorted(self.flags.items()) if v > 0},
             "evidence": {k: v[:3] for k, v in self.evidence.items() if v},
             **self.grounding.to_dict(),
+            **self.instruction.to_dict(),
         }
 
 
@@ -1074,6 +1086,11 @@ class VisualAnalyzer:
                 analysis.grounding = EntityGrounding(
                     entity=entity.name, labels=entity.labels
                 )
+            claim = required_claim(f"{query} {narration}")
+            if claim is not None:
+                analysis.instruction = InstructionGrounding(
+                    claim=claim.name, label=claim.label
+                )
             return analysis
 
         stat_frames = [downsample(f, STAT_SIZE) for f in usable]
@@ -1122,6 +1139,7 @@ class VisualAnalyzer:
         likeness = round(_mean([interior_likeness(s) for s in stats]), 3)
         expectations = match_expectations(f"{query} {narration}")
         grounding = self._entity_grounding(image_vectors, query, narration)
+        instruction = self._instruction_grounding(image_vectors, query, narration)
         if semantic_source == "pixel-expectations":
             semantic = self._expectation_semantic(stats, expectations, likeness)
 
@@ -1137,6 +1155,7 @@ class VisualAnalyzer:
             brightness=round(_mean([s.mean_luma for s in stats]), 1),
             expectations=[e.name for e in expectations],
             grounding=grounding,
+            instruction=instruction,
             frames=[
                 {
                     "source": f.source[-72:],
@@ -1311,6 +1330,46 @@ class VisualAnalyzer:
             [_cosine(image, t) for t in text_vectors] for image in image_vectors
         ]
         return score_from_similarities(entity, per_frame, _ramp)
+
+    def _instruction_grounding(
+        self,
+        image_vectors: Sequence[Sequence[float]],
+        query: str,
+        narration: str,
+    ) -> InstructionGrounding:
+        """Does the frame demonstrate the advice, or merely contain its noun?
+
+        The second layer, and the one run 44 needed. ``_entity_grounding``
+        asked "is there a window" and answered yes about a dragonfly sitting
+        on one. This asks whether the frame looks more like "a sofa placed
+        clear of a bright living room window" than like the best of "a
+        close-up of an insect resting on a windowpane" and "a kitchen sink and
+        tap in front of a window" - the scenes that actually arrived.
+
+        Both sides are full scene descriptions of the same specificity, which
+        is the one thing the bare-noun probe could not arrange and the reason
+        this has a chance of separating where that one measured chance.
+        """
+
+        claim = required_claim(f"{query} {narration}")
+        if claim is None:
+            return InstructionGrounding()      # the sentence claims nothing
+        if not image_vectors:
+            return InstructionGrounding(claim=claim.name, label=claim.label)
+
+        prompts, _ = claim_prompts(claim)
+        try:
+            text_vectors = self._encode_texts(
+                [PROMPT_TEMPLATE.format(p) for p in prompts]
+            )
+        except Exception as exc:                          # pragma: no cover
+            log.warning("visual model failed on claim prompts: %s", exc)
+            return InstructionGrounding(claim=claim.name, label=claim.label)
+
+        per_frame = [
+            [_cosine(image, t) for t in text_vectors] for image in image_vectors
+        ]
+        return score_claim(claim, per_frame, _ramp)
 
     # ------------------------------------------------------------------
     def _clip_semantic(

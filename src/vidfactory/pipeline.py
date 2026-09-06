@@ -27,6 +27,7 @@ from .database import Database
 from .downloader import ClipDownloader
 from .editor import ShotPlan, VideoEditor, estimate_shot_count, plan_shots
 from .entities import repair_queries
+from .instructions import repair_queries as claim_repair_queries
 from .editorial_qc import EditorialReport, build_report
 from .ffmpeg_utils import ffmpeg_available, probe_media
 from .languages import language_from_config
@@ -806,6 +807,8 @@ class VideoPipeline:
             "average_relevance_after_repair": 0.0,
             "entity_grounding_failures_before_repair": 0,
             "entity_grounding_failures_after_repair": 0,
+            "instruction_grounding_failures_before_repair": 0,
+            "instruction_grounding_failures_after_repair": 0,
         }
         rounds = int(self.config.get("visual.max_repair_rounds", 3))
         analyzer = self._visual_analyzer()
@@ -840,6 +843,21 @@ class VideoPipeline:
                 and not visual.get("entity_grounding_passed")
             )
 
+        def undemonstrated(key: str) -> bool:
+            """The frames contain the object and do not show the advice.
+
+            The failure run 44 shipped at a hundred percent entity grounding:
+            a dragonfly on a windowpane under "do not block the window". Same
+            shape as ``ungrounded`` - only a measured failure counts.
+            """
+
+            visual = visual_of(key)
+            return bool(
+                visual.get("required_visual_claim")
+                and visual.get("instruction_grounding_checked")
+                and not visual.get("instruction_grounding_passed")
+            )
+
         def measured() -> list[float]:
             return [
                 relevance(s.clip_key)
@@ -856,14 +874,20 @@ class VideoPipeline:
         )
         weak = [
             s for s in shots
-            if relevance(s.clip_key) < LOW_RELEVANCE_MATCH or ungrounded(s.clip_key)
+            if relevance(s.clip_key) < LOW_RELEVANCE_MATCH
+            or ungrounded(s.clip_key)
+            or undemonstrated(s.clip_key)
         ]
         stats["weak_shots_before_repair"] = len(weak)
         stats["entity_grounding_failures_before_repair"] = sum(
             1 for s in shots if ungrounded(s.clip_key)
         )
+        stats["instruction_grounding_failures_before_repair"] = sum(
+            1 for s in shots if undemonstrated(s.clip_key)
+        )
         if not weak:
             stats["entity_grounding_failures_after_repair"] = 0
+            stats["instruction_grounding_failures_after_repair"] = 0
             stats["weak_shots_after_repair"] = 0
             stats["average_relevance_after_repair"] = stats[
                 "average_relevance_before_repair"
@@ -872,10 +896,11 @@ class VideoPipeline:
 
         log.info(
             "[REPAIR] %d weak final shots detected (%d low relevance, "
-            "%d missing their required object)",
+            "%d missing their required object, %d not showing the advice)",
             len(weak),
             sum(1 for s in weak if relevance(s.clip_key) < LOW_RELEVANCE_MATCH),
             stats["entity_grounding_failures_before_repair"],
+            stats["instruction_grounding_failures_before_repair"],
         )
 
         sources = dict(self.config.get("sources", {}) or {})
@@ -993,6 +1018,23 @@ class VideoPipeline:
                 # answers it happily with a beautifully proportioned room -
                 # which is how the rug section filled up with plants and doors.
                 needs_entity = ungrounded(shot.clip_key)
+                # A shot that contains its object and does not demonstrate the
+                # advice is searched for the *relationship*. Searching for the
+                # object is what the line above does, and it is exactly what
+                # returned a dragonfly for "window".
+                needs_claim = undemonstrated(shot.clip_key)
+                claim_first: list[str] = []
+                if needs_claim:
+                    claim_first = claim_repair_queries(
+                        f"{base_query} {description}", ""
+                    )
+                    if claim_first:
+                        log.info(
+                            "[REPAIR] Shot %s does not show %r: searching %r",
+                            shot.scene_id,
+                            visual_of(shot.clip_key).get("instruction_label", "?"),
+                            claim_first[0],
+                        )
                 searches = list(prefixes)
                 if needs_entity:
                     entity_first = repair_queries(
@@ -1018,6 +1060,11 @@ class VideoPipeline:
                                 continue        # zero source reuse, still
                             found.setdefault(candidate.key, candidate)
 
+                if needs_claim:
+                    # The relationship first: it is the narrower requirement,
+                    # and footage that shows it contains the object anyway.
+                    for text in claim_first[:2]:
+                        collect(text)
                 if needs_entity:
                     # The object's own searches come first and, when they
                     # answer, the advice's phrasings are not needed at all.
@@ -1048,15 +1095,17 @@ class VideoPipeline:
                     candidate.visual = analysis.to_dict()
                     candidate.visual_semantic_match = analysis.semantic_match
 
-                # Two conditions, not one. A replacement has to be a better
-                # match for the sentence *and* has to contain the object the
-                # sentence is about; either alone is what let run 25 through.
-                # Neither threshold moves to make this easier.
+                # Three conditions, not one. A replacement has to be a better
+                # match for the sentence, has to contain the object the
+                # sentence is about, and has to show what the sentence says
+                # about it. The first two alone are what let run 44 through.
+                # No threshold moves to make this easier.
                 better = [
                     c for c in ranked
                     if dict(c.visual or {}).get("analyzed")
                     and float(dict(c.visual).get("semantic_match", 0.0)) > current
                     and bool(dict(c.visual).get("entity_grounding_passed", True))
+                    and bool(dict(c.visual).get("instruction_grounding_passed", True))
                 ]
                 better.sort(
                     key=lambda c: float(dict(c.visual).get("semantic_match", 0.0)),
@@ -1093,7 +1142,11 @@ class VideoPipeline:
                     max(0.0, float(replacement.duration) - float(shot.duration) - 0.1),
                 )
                 stats["repaired_shot_count"] += 1
-                if score < LOW_RELEVANCE_MATCH or ungrounded(shot.clip_key):
+                if (
+                    score < LOW_RELEVANCE_MATCH
+                    or ungrounded(shot.clip_key)
+                    or undemonstrated(shot.clip_key)
+                ):
                     still_weak.append(shot)
 
             log.info(
@@ -1106,6 +1159,9 @@ class VideoPipeline:
         stats["weak_shots_after_repair"] = len(weak)
         stats["entity_grounding_failures_after_repair"] = sum(
             1 for s in shots if ungrounded(s.clip_key)
+        )
+        stats["instruction_grounding_failures_after_repair"] = sum(
+            1 for s in shots if undemonstrated(s.clip_key)
         )
         stats["average_relevance_after_repair"] = (
             round(sum(after) / len(after), 3) if after else 0.0
