@@ -342,7 +342,25 @@ def command_instruction_check(args: argparse.Namespace) -> int:
     from .visual_model import load_model
 
     config = load_config(args.config)
-    model = load_model(dict(config.get("visual.model", {}) or {}))
+    settings = dict(config.get("visual.model", {}) or {})
+    if args.model_repo:
+        # A heavier model on the same probe, so "is the backend too small" is
+        # a measured question rather than an assumption. The loader is repo
+        # agnostic as long as the export is a CLIP dual encoder with the CLIP
+        # BPE tokenizer, which is what every Xenova/clip-* export is.
+        settings = dict(settings)
+        settings.update({
+            "repo": args.model_repo,
+            "vision_file": args.model_vision or "onnx/vision_model_quantized.onnx",
+            "text_file": args.model_text or "onnx/text_model_quantized.onnx",
+        })
+        if args.model_image_size:
+            settings["image_size"] = int(args.model_image_size)
+        # No silent fallback: a run that quietly reverts to MobileCLIP would
+        # answer a different question than the one being asked and look like
+        # an answer to this one.
+        settings["fallback"] = False
+    model = load_model(settings)
     if model is None:
         print("[FAIL] no CLIP backend here, so the claim probes cannot be measured.")
         print("       run this where 'vidfactory visual-check' reports ok.")
@@ -360,6 +378,7 @@ def command_instruction_check(args: argparse.Namespace) -> int:
         frames_per_clip=int(config.get("visual.frames_per_clip", 3)),
         allow_remote_video=False,
     )
+    print(f"backend: {getattr(model, 'name', '?')}")
     wanted = [n.strip() for n in str(args.claims or "").split(",") if n.strip()]
     claims = [BY_NAME[n] for n in wanted if n in BY_NAME] or list(CLAIMS)
     per_query = max(2, int(args.samples))
@@ -387,6 +406,7 @@ def command_instruction_check(args: argparse.Namespace) -> int:
             print(f"       prompt encoding failed: {exc}")
             return []
         out: list[tuple[float, str]] = []
+        offset = len(claim.positives)
         for clip in results[:per_query]:
             frames = [f for f in analyzer.sample(clip) if f and f.ok]
             if not frames:
@@ -399,8 +419,30 @@ def command_instruction_check(args: argparse.Namespace) -> int:
                 [_cosine(image, t) for t in text_vectors] for image in image_vectors
             ]
             grounding = score_from_similarities(claim, per_frame, _ramp)
-            if grounding.checked:
-                out.append((grounding.score, grounding.top_forbidden))
+            if not grounding.checked:
+                continue
+            out.append((grounding.score, grounding.top_forbidden))
+            if args.raw:
+                # The margin is a difference of two maxima over prompt sets of
+                # different sizes and different phrasings, so a score of 1.000
+                # is ambiguous: it can mean the model saw the scene correctly,
+                # or that the comparison never gave the forbidden prompt a
+                # chance. This prints what was actually compared - and where
+                # the forbidden prompt ranked among all of them - so the
+                # difference is visible instead of guessed at.
+                middle = per_frame[len(per_frame) // 2]
+                best_pos = max(middle[:offset])
+                best_bad = max(middle[offset:])
+                order = sorted(range(len(middle)), key=lambda i: middle[i], reverse=True)
+                rank = next(
+                    (place for place, i in enumerate(order, 1) if i >= offset), 0
+                )
+                top = prompts[order[0]]
+                print(
+                    f"      raw pos={best_pos:.4f} bad={best_bad:.4f} "
+                    f"margin={best_bad - best_pos:+.4f} "
+                    f"best-forbidden-rank={rank}/{len(middle)} top={top!r}"
+                )
         return out
 
     def summarise(rows: list[tuple[float, str]]) -> str:
@@ -878,6 +920,20 @@ def build_parser() -> argparse.ArgumentParser:
         "--probe-query", default="",
         help="score footage from THIS search with every claim's probe",
     )
+    instruction_check.add_argument(
+        "--raw", action="store_true",
+        help="print the two similarities the margin is made of, and where the "
+             "best forbidden prompt ranked, so a score of 1.000 can be told "
+             "apart from a comparison that never gave it a chance",
+    )
+    instruction_check.add_argument(
+        "--model-repo", default="",
+        help="score with a different CLIP export (e.g. Xenova/clip-vit-large-"
+             "patch14) to measure whether the backend is the limit",
+    )
+    instruction_check.add_argument("--model-vision", default="")
+    instruction_check.add_argument("--model-text", default="")
+    instruction_check.add_argument("--model-image-size", default="")
     instruction_check.set_defaults(func=command_instruction_check)
 
     return parser

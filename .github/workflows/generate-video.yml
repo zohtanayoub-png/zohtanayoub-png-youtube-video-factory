@@ -90,6 +90,19 @@ on:
         required: false
         type: string
         default: ""
+      probe_model:
+        description: >-
+          instruction-check only: score with a different CLIP export (for
+          example Xenova/clip-vit-large-patch14) to measure whether the
+          backend is the limit. Blank uses the configured model.
+        required: false
+        type: string
+        default: ""
+      probe_raw:
+        description: "instruction-check only: print the raw similarities"
+        required: false
+        type: boolean
+        default: false
       task:
         description: >-
           render, or calibrate the required-entity probes against real footage.
@@ -790,11 +803,16 @@ jobs:
           # so a dispatch input is data and never shell.
           PROBE_CLAIMS: ${{ inputs.probe_entities }}
           PROBE_QUERY: ${{ inputs.probe_query }}
+          PROBE_MODEL: ${{ inputs.probe_model }}
+          PROBE_RAW: ${{ inputs.probe_raw }}
         run: |
+          [ "$PROBE_RAW" = "true" ] && RAW=--raw || RAW=""
           python -m vidfactory instruction-check \
             --samples 6 --json-out instruction-calibration.json \
             --claims "$PROBE_CLAIMS" \
             --probe-query "$PROBE_QUERY" \
+            --model-repo "$PROBE_MODEL" \
+            $RAW \
             | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Upload the raw scores
