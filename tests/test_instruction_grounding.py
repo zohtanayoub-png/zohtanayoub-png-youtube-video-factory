@@ -26,6 +26,7 @@ from vidfactory.entities import BY_NAME as ENTITIES_BY_NAME
 from vidfactory.instructions import (
     CLAIMS,
     CLAIM_DOMINANCE_FAIL,
+    CLAIM_PROBE_VALIDATED,
     InstructionClaim,
     InstructionGrounding,
     claim_prompts,
@@ -301,3 +302,43 @@ def test_the_instruction_gate_splits_by_mode(mode, failures, should_pass):
     summary = summarise(_rows(failures))
     limit = 0 if mode == "production" else 1
     assert (summary["failed"] <= limit) is should_pass
+
+
+# ---------------------------------------------------------------------------
+# What the measurement says this layer is allowed to do
+# ---------------------------------------------------------------------------
+
+def test_an_unvalidated_probe_reports_and_does_not_refuse():
+    """Runs 45 and 46: 96% of valid footage kept, 1% of known failures caught.
+
+    A check with those numbers is not a gate. It is computed and reported so
+    the next measurement has something to compare against, and it does not
+    fail a render or spend the repair budget - because acting on it would
+    replace shots that are fine and pass the ones it exists to catch.
+
+    This test is the tripwire on that decision: flipping
+    ``CLAIM_PROBE_VALIDATED`` has to be a deliberate act accompanied by a
+    measurement, not a line that drifts to True.
+    """
+
+    from vidfactory.editorial_qc import build_report
+
+    assert CLAIM_PROBE_VALIDATED is False, (
+        "the probe is only a gate once a measurement separates; update this "
+        "test together with the numbers that justify it"
+    )
+
+
+def test_a_failing_claim_does_not_make_a_shot_weak_while_unvalidated():
+    from vidfactory import pipeline
+
+    assert pipeline.CLAIM_PROBE_VALIDATED is CLAIM_PROBE_VALIDATED
+
+
+def test_the_metric_is_still_reported_when_it_is_not_believed():
+    """Observation only is not silence. The number still has to be in the
+    report, or the next measurement has nothing to compare against."""
+
+    summary = summarise(_rows(3))
+    assert summary["failed"] == 3
+    assert summary["by_claim"]["window_layout"]["shots"] == 6

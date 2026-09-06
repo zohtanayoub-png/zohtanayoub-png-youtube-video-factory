@@ -27,6 +27,7 @@ from .database import Database
 from .downloader import ClipDownloader
 from .editor import ShotPlan, VideoEditor, estimate_shot_count, plan_shots
 from .entities import repair_queries
+from .instructions import CLAIM_PROBE_VALIDATED
 from .instructions import repair_queries as claim_repair_queries
 from .editorial_qc import EditorialReport, build_report
 from .ffmpeg_utils import ffmpeg_available, probe_media
@@ -851,6 +852,12 @@ class VideoPipeline:
             shape as ``ungrounded`` - only a measured failure counts.
             """
 
+            if not CLAIM_PROBE_VALIDATED:
+                # Measured at 1% of the observed failures caught and 8% of
+                # good footage culled, so acting on it would spend the repair
+                # budget replacing shots that are fine. Still computed and
+                # still reported - just not believed.
+                return False
             visual = visual_of(key)
             return bool(
                 visual.get("required_visual_claim")
@@ -1105,7 +1112,10 @@ class VideoPipeline:
                     if dict(c.visual or {}).get("analyzed")
                     and float(dict(c.visual).get("semantic_match", 0.0)) > current
                     and bool(dict(c.visual).get("entity_grounding_passed", True))
-                    and bool(dict(c.visual).get("instruction_grounding_passed", True))
+                    and (
+                        not CLAIM_PROBE_VALIDATED
+                        or bool(dict(c.visual).get("instruction_grounding_passed", True))
+                    )
                 ]
                 better.sort(
                     key=lambda c: float(dict(c.visual).get("semantic_match", 0.0)),

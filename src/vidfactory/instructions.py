@@ -71,14 +71,35 @@ log = get_logger("CLAIM")
 CLAIM_MARGIN_LOW = 0.0
 CLAIM_MARGIN_HIGH = 0.05
 
-#: How much displacement is a failure. Provisional at 0.70 rather than the
-#: entity gate's 0.80, and deliberately looser than the entity threshold in
-#: the direction that matters: a claim is a harder thing to state than a noun,
-#: so a frame has to lose more clearly before this rejects it. The real value
-#: is whatever ``vidfactory instruction-check`` measures on the run 44 failure
-#: classes; until that has run on a machine with a CLIP backend and a provider
-#: key, this number is an assumption and is documented as one.
+#: How much displacement is a failure.
 CLAIM_DOMINANCE_FAIL = 0.70
+
+#: **Measured, and the answer was no.**
+#:
+#: Runs 45 and 46 scored this probe on real Pexels footage: each claim's own
+#: searches against the searches that reproduce the run 44 failures. Over 48
+#: valid clips and 72 from the failure searches, it kept 96% of the valid ones
+#: and rejected **1%** of the failures. The sweep has no crossing point - at
+#: every cut from 0.05 to 0.60 the two sides are culled at the same rate, and
+#: past 0.30 the valid side is culled *faster*.
+#:
+#: Run 46's ``--raw`` output says why, and it is not the aggregation. On
+#: ribbon and ornate-pattern footage MobileCLIP-S0 does rank a forbidden
+#: prompt first (``best-forbidden-rank=1/12`` on almost every clip), so the
+#: signal is there - but the margin is +0.001 to +0.05 and the *valid*
+#: painted-wall footage produces the same margins, ranking "a patterned tiled
+#: surface" first just as often. Median margin: valid +0.012, ribbons +0.008,
+#: ornate +0.013. Only "flowers in front of a wall" separates, at +0.028. On
+#: window footage the margins are negative on both sides.
+#:
+#: So the claim probe is **not a gate**. It is computed, reported and used to
+#: name suspect shots, and it does not fail a render or send a shot to repair,
+#: because a check that rejects 1% of the failures and 8% of good footage
+#: makes the video worse and the report dishonest. Flipping this to True
+#: requires a measurement that separates - a heavier verifier, or a different
+#: question - not a threshold that has been nudged until the numbers look
+#: better.
+CLAIM_PROBE_VALIDATED = False
 
 
 @dataclass(frozen=True)

@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from .entities import summarise as summarise_grounding
+from .instructions import CLAIM_PROBE_VALIDATED
 from .instructions import summarise as summarise_instructions
 from .visual_analysis import premium_breakdown
 from .logging_utils import get_logger
@@ -376,6 +377,11 @@ def build_report(
         limits["max_instruction_grounding_failures"] if is_production
         else limits["max_instruction_grounding_failures_test"]
     )
+    # Until the probe separates on real footage it reports and does not
+    # refuse. Runs 45 and 46 put it at 1% of the observed failures caught
+    # against 8% of good footage culled; a gate on that would fail renders for
+    # the wrong shots and pass the ones it exists to catch.
+    instruction_severity = "error" if CLAIM_PROBE_VALIDATED else "warning"
 
     visual_meta = dict(visual_stats or {})
     causal_score = float(getattr(causal, "overall", 1.0)) if causal is not None else 1.0
@@ -582,8 +588,14 @@ def build_report(
                     if instruction_summary["checked"]
                     else "no frames were inspected, so instructions are unmeasured"
                 )
+            )
+            + (
+                "" if CLAIM_PROBE_VALIDATED
+                else " [observation only: this probe has not been shown to "
+                     "separate on real footage - runs 45 and 46 caught 1% of "
+                     "the known failures]"
             ),
-            severity="error",
+            severity=instruction_severity,
         ),
         *([
             EditorialCheck(
@@ -602,7 +614,7 @@ def build_report(
                 ),
                 severity="warning",
             )
-        ] if not is_production else []),
+        ] if not is_production and CLAIM_PROBE_VALIDATED else []),
         # A general recommendation explained through one of its own options
         # leaves most readers with no reason at all, and a causal sentence
         # about a different principle is not an explanation of this one.

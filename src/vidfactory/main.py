@@ -397,6 +397,9 @@ def command_instruction_check(args: argparse.Namespace) -> int:
         except Exception as exc:
             print(f"       search failed for {query!r}: {exc}")
             return []
+        if not results:
+            print(f"       the provider returned nothing for {query!r}")
+            return []
         prompts, _ = claim_prompts(claim)
         try:
             text_vectors = analyzer._encode_texts(
@@ -407,13 +410,21 @@ def command_instruction_check(args: argparse.Namespace) -> int:
             return []
         out: list[tuple[float, str]] = []
         offset = len(claim.positives)
+        empty = 0
         for clip in results[:per_query]:
             frames = [f for f in analyzer.sample(clip) if f and f.ok]
             if not frames:
+                empty += 1
+                if empty == 1:
+                    print(f"       no frames decoded for {clip.key!r}")
                 continue
             try:
                 image_vectors = list(model.encode_images(frames))
-            except Exception:
+            except Exception as exc:
+                # Swallowed silently in the first version, which is how the
+                # ViT-L/14 comparison came back as "no samples" everywhere and
+                # said nothing about whether a bigger model helps.
+                print(f"       encode failed on {clip.key!r}: {exc}")
                 continue
             per_frame = [
                 [_cosine(image, t) for t in text_vectors] for image in image_vectors
