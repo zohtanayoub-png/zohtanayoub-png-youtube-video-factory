@@ -107,7 +107,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install -e .
-          pip install onnxruntime
+          # onnxruntime for the frame scoring, pytest for the safety check
+          # below - neither is a runtime dependency of the package, and the
+          # pre-flight check duly died on "No module named pytest".
+          pip install onnxruntime pytest
 
       - name: Restore the cached model and voice files
         uses: actions/cache@v4
