@@ -278,12 +278,24 @@ src/vidfactory/
   valid painted-wall footage produces the same margins. Median margins: valid
   +0.012, ribbons +0.008, ornate +0.013.
 
-  **CLIP ViT-L/14 can** (run 49): **keeps 24 of 24 valid clips and rejects 25
-  of 36 failures**, with zero valid footage culled at *every* cut in the
-  sweep. Per class at the 0.30 cut - the dragonfly 6/6, the kitchen faucet
-  4/6, the ribbons 5/6, flowers on a wall 6/6, ornate carving 3/6 - and in
-  every one of those the closest forbidden prompt is the one naming that exact
-  scene. The backend was the limit, not the question.
+  **CLIP ViT-L/14 can** (runs 49, 50). On the two classes run 44 actually
+  shipped, run 49 **keeps 24 of 24 valid clips and rejects 25 of 36
+  failures**: the dragonfly 6/6, the kitchen faucet 4/6, the ribbons 5/6,
+  flowers on a wall 6/6, ornate carving 3/6 - and in every one of those the
+  closest forbidden prompt is the one naming that exact scene. Run 50 across
+  all four claims: **keeps 48 of 48 valid clips and rejects 35 of 72
+  failures**, with **zero valid footage culled at every cut in the sweep**,
+  from 33% of the failures at 0.05 to 61% at 0.60. The backend was the limit,
+  not the question.
+
+  The weak claim is `layered_lighting` at 5 of 18, and it is weak for a
+  reason worth keeping in mind rather than papering over: "at least three
+  light sources" is a claim about *how many*, a lit lamp close-up genuinely
+  resembles a lit lamp in a room, and counting is not something a
+  contrastive image-text model does. What the numbers do say is that the
+  false-positive side is clean - nothing culled a valid clip at any cut in
+  either run - which is the half that matters for a check that refuses a
+  render.
 
   So this is a **two-model pipeline** and the second model is the point.
   MobileCLIP-S0 stays the broad ranker: it is what decodes hundreds of
