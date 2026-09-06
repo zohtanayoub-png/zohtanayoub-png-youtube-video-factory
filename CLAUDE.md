@@ -265,38 +265,51 @@ src/vidfactory/
   resting on a windowpane" against "a sofa placed clear of a bright living room
   window" gives the generality bias no generality gap to exploit.
   Whether MobileCLIP-S0 can see this is a measurement, not an argument, and
-  **the measurement came back no.** `vidfactory instruction-check` (the
+  it was made three times. `vidfactory instruction-check` (the
   `instruction-check` task on the video workflow) scores each claim's own
-  searches against the searches that reproduce the run 44 failures. Runs 45
-  and 46, over 48 valid clips and 72 from the failure searches: **keeps 96% of
-  the valid footage and rejects 1% of the failures**, with no crossing point
-  anywhere in the sweep from 0.05 to 0.60 - past 0.30 it culls the valid side
-  faster than the failures.
+  searches against the searches that reproduce the run 44 failures.
 
-  The raw margins say why, and it is not the aggregation. On ribbon and
-  ornate-pattern footage the model *does* rank a forbidden prompt first on
-  almost every clip, so the signal is not absent - but the margin is +0.001 to
-  +0.05 and valid painted-wall footage produces the same margins, ranking "a
-  patterned tiled surface" first just as often. Median margins: valid +0.012,
-  ribbons +0.008, ornate +0.013, and only "flowers in front of a wall"
-  separates at +0.028. Window footage is negative on both sides.
+  **MobileCLIP-S0 cannot** (runs 45, 46): over 48 valid clips and 72 from the
+  failure searches it keeps 96% of the valid ones and rejects **1%** of the
+  failures, with no crossing point anywhere in the sweep from 0.05 to 0.60 -
+  past 0.30 it culls the valid side faster. The raw margins say it is not the
+  aggregation: on ribbon and ornate-pattern footage the model *does* rank a
+  forbidden prompt first on almost every clip, but at +0.001 to +0.05, and
+  valid painted-wall footage produces the same margins. Median margins: valid
+  +0.012, ribbons +0.008, ornate +0.013.
 
-  So `CLAIM_PROBE_VALIDATED` is **False**, and this layer reports rather than
-  gates: `instruction_grounding_failure_count` and the per-claim rows are in
-  the report, and nothing fails a render, marks a shot weak or spends the
-  repair budget on them. A check that catches one percent of the failures
-  while culling eight percent of good footage makes the video worse and the
-  report dishonest, and a threshold nudged until the numbers improve only
-  hides that. A test pins the flag so it cannot drift to True without the
-  measurement that justifies it. The wiring is all there - claim-first repair
-  searches, the three-condition replacement rule, the mode split - and turns
-  on the day a verifier separates.
+  **CLIP ViT-L/14 can** (run 49): **keeps 24 of 24 valid clips and rejects 25
+  of 36 failures**, with zero valid footage culled at *every* cut in the
+  sweep. Per class at the 0.30 cut - the dragonfly 6/6, the kitchen faucet
+  4/6, the ribbons 5/6, flowers on a wall 6/6, ornate carving 3/6 - and in
+  every one of those the closest forbidden prompt is the one naming that exact
+  scene. The backend was the limit, not the question.
 
-  One lead that is not a prompt list: the run 44 trim frame measures
-  **colourfulness 104.2** against 27-36 for every other frame in that render.
-  "Paint the trim the same colour as the walls" is advice *about* colour
-  uniformity, so a physical statistic contradicts it directly, with no
-  vocabulary involved. That is where the next measurement should go.
+  So this is a **two-model pipeline** and the second model is the point.
+  MobileCLIP-S0 stays the broad ranker: it is what decodes hundreds of
+  shortlist candidates and it is never asked about claims, because its answer
+  was measured at one percent. `visual.claim_model` (ViT-L/14, 224px) runs on
+  the **final shots and on shortlisted repair candidates only** - the frames
+  that will be on screen - which is a few hundred forward passes rather than
+  tens of thousands. Validation is a property of the backend, not a flag:
+  `VALIDATED_CLAIM_BACKENDS` lists the models a verdict may come from, and any
+  other model returns an *unchecked* grounding, which the report and the
+  repair pass already read as "no verdict" rather than "passed". If the
+  verifier does not load, claims go unmeasured and the render carries on,
+  exactly like every other optional model here.
+
+  `instruction_grounding_failure_count` is an **error**, additional to entity
+  grounding and a replacement for nothing, and it splits by mode as entity
+  grounding does - one tolerated in test, none in production. A failed shot is
+  repaired by searching for the *relationship*; searching for the object is
+  what returned the dragonfly. A replacement must now improve the semantic
+  score **and** contain the object **and** demonstrate the claim.
+
+  One lead this did not need but which is worth keeping: the run 44 trim frame
+  measures **colourfulness 104.2** against 27-36 for every other frame in that
+  render, and "paint the trim the same colour as the walls" is advice *about*
+  colour uniformity. A physical statistic can contradict that claim with no
+  model involved at all.
 * **The subject is the object named first, not the one named most.** "A rug
   too small to reach the sofa leaves the seating floating" names seating twice
   and the rug once. It is rug advice; the sofa is the landmark the rug is

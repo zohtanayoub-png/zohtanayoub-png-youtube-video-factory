@@ -45,6 +45,7 @@ from .entities import (
 )
 from .instructions import (
     InstructionGrounding,
+    backend_is_validated,
     claim_prompts,
     required_claim,
 )
@@ -1010,14 +1011,22 @@ class VisualAnalyzer:
         reject_confidence: float = REJECT_CONFIDENCE,
         penalty_confidence: float = PENALTY_CONFIDENCE,
         allow_remote_video: bool = True,
+        claim_model: Any | None = None,
     ) -> None:
         self.model = model
+        # The second stage. MobileCLIP-S0 ranks the shortlist; a claim is a
+        # question it measurably cannot answer (1% of the known failures
+        # caught), so when a heavier verifier is available the claim probe
+        # uses that one and nothing else changes. None means claims are not
+        # measured at all, which is a verdict of "unchecked", not "passed".
+        self.claim_model = claim_model
         self.frames_per_clip = max(1, int(frames_per_clip))
         self.timeout = float(timeout)
         self.reject_confidence = float(reject_confidence)
         self.penalty_confidence = float(penalty_confidence)
         self.allow_remote_video = bool(allow_remote_video)
         self._text_cache: dict[str, list[float]] = {}
+        self._claim_text_cache: dict[str, list[float]] = {}
 
     # ------------------------------------------------------------------
     @property
@@ -1062,8 +1071,16 @@ class VisualAnalyzer:
         query: str = "",
         narration: str = "",
         metadata_flags: Mapping[str, float] | None = None,
+        verify_claim: bool = False,
     ) -> VisualAnalysis:
-        """Judge a clip from its frames plus whatever the caption suggested."""
+        """Judge a clip from its frames plus whatever the caption suggested.
+
+        ``verify_claim`` runs the second-stage instruction check, which is
+        deliberately not on by default: it costs a ViT-L/14 forward pass per
+        frame and the shortlist is hundreds of candidates deep. The final
+        shots and the repair pass's shortlisted replacements ask for it; the
+        broad ranking does not need it and cannot afford it.
+        """
 
         metadata_flags = dict(metadata_flags or {})
         usable = [f for f in frames if f and f.ok]
@@ -1139,7 +1156,10 @@ class VisualAnalyzer:
         likeness = round(_mean([interior_likeness(s) for s in stats]), 3)
         expectations = match_expectations(f"{query} {narration}")
         grounding = self._entity_grounding(image_vectors, query, narration)
-        instruction = self._instruction_grounding(image_vectors, query, narration)
+        instruction = (
+            self._instruction_grounding(usable, query, narration)
+            if verify_claim else InstructionGrounding()
+        )
         if semantic_source == "pixel-expectations":
             semantic = self._expectation_semantic(stats, expectations, likeness)
 
@@ -1194,10 +1214,12 @@ class VisualAnalyzer:
         narration: str = "",
         video: str | Path | None = None,
         metadata_flags: Mapping[str, float] | None = None,
+        verify_claim: bool = False,
     ) -> VisualAnalysis:
         frames = self.sample(clip, video=video)
         return self.analyze(frames, query=query, narration=narration,
-                            metadata_flags=metadata_flags)
+                            metadata_flags=metadata_flags,
+                            verify_claim=verify_claim)
 
     # ------------------------------------------------------------------
     @staticmethod
@@ -1331,9 +1353,17 @@ class VisualAnalyzer:
         ]
         return score_from_similarities(entity, per_frame, _ramp)
 
+    def _claim_texts(self, texts: Sequence[str]) -> list[list[float]]:
+        model = self.claim_model
+        missing = [t for t in texts if t not in self._claim_text_cache]
+        if missing:
+            for text, vector in zip(missing, model.encode_texts(missing)):
+                self._claim_text_cache[text] = list(vector)
+        return [self._claim_text_cache[t] for t in texts]
+
     def _instruction_grounding(
         self,
-        image_vectors: Sequence[Sequence[float]],
+        frames: Sequence[Any],
         query: str,
         narration: str,
     ) -> InstructionGrounding:
@@ -1354,17 +1384,27 @@ class VisualAnalyzer:
         claim = required_claim(f"{query} {narration}")
         if claim is None:
             return InstructionGrounding()      # the sentence claims nothing
-        if not image_vectors:
-            return InstructionGrounding(claim=claim.name, label=claim.label)
+        unchecked = InstructionGrounding(claim=claim.name, label=claim.label)
+        model = self.claim_model
+        if model is None or not frames:
+            return unchecked
+        if not backend_is_validated(getattr(model, "name", "")):
+            # Measured at 1% of the known failures on MobileCLIP-S0. A verdict
+            # from a backend that cannot answer the question is worse than no
+            # verdict, because the report would carry it as one.
+            return unchecked
 
         prompts, _ = claim_prompts(claim)
         try:
-            text_vectors = self._encode_texts(
+            text_vectors = self._claim_texts(
                 [PROMPT_TEMPLATE.format(p) for p in prompts]
             )
+            image_vectors = list(model.encode_images(frames))
         except Exception as exc:                          # pragma: no cover
-            log.warning("visual model failed on claim prompts: %s", exc)
-            return InstructionGrounding(claim=claim.name, label=claim.label)
+            log.warning("claim verifier failed: %s", exc)
+            return unchecked
+        if not image_vectors:
+            return unchecked
 
         per_frame = [
             [_cosine(image, t) for t in text_vectors] for image in image_vectors

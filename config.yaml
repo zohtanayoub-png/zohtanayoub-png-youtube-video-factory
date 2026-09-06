@@ -200,6 +200,29 @@ visual:
     image_size: 256
     fallback: true              # try Xenova/clip-vit-base-patch32 if that fails
     threads: 2
+  # The second stage, and the only place a heavy model runs on a render: the
+  # instruction check on final shots and on shortlisted repair candidates.
+  #
+  # Measured three times, and the difference is the model. MobileCLIP-S0 keeps
+  # 96% of valid footage and rejects 1% of run 44's failure classes, with no
+  # crossing point anywhere in the sweep. ViT-L/14 keeps 24 of 24 valid clips
+  # and rejects 25 of 36 failures - the dragonfly 6/6, the kitchen faucet 4/6,
+  # the ribbons 5/6, flowers on a wall 6/6 - with zero valid footage culled at
+  # every cut from 0.05 to 0.60.
+  #
+  # Optional in the same way everything else here is: if it does not load,
+  # claims go unmeasured and the render carries on. No fallback, because
+  # falling back to the small model would produce a verdict already measured
+  # at one percent.
+  claim_model:
+    enabled: true
+    repo: Xenova/clip-vit-large-patch14
+    vision_file: onnx/vision_model_quantized.onnx
+    text_file: onnx/text_model_quantized.onnx
+    tokenizer_file: tokenizer.json
+    image_size: 224             # 256/14 makes 325 patches meet 257 embeddings
+    fallback: false
+    threads: 2
 
 topics:
   similarity_threshold: 0.62    # reject a new topic that is this similar to an old one

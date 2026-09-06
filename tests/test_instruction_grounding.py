@@ -26,7 +26,8 @@ from vidfactory.entities import BY_NAME as ENTITIES_BY_NAME
 from vidfactory.instructions import (
     CLAIMS,
     CLAIM_DOMINANCE_FAIL,
-    CLAIM_PROBE_VALIDATED,
+    VALIDATED_CLAIM_BACKENDS,
+    backend_is_validated,
     InstructionClaim,
     InstructionGrounding,
     claim_prompts,
@@ -308,37 +309,60 @@ def test_the_instruction_gate_splits_by_mode(mode, failures, should_pass):
 # What the measurement says this layer is allowed to do
 # ---------------------------------------------------------------------------
 
-def test_an_unvalidated_probe_reports_and_does_not_refuse():
-    """Runs 45 and 46: 96% of valid footage kept, 1% of known failures caught.
+def test_only_a_backend_that_was_measured_may_return_a_verdict():
+    """Three measurements, two answers, and the difference is the model.
 
-    A check with those numbers is not a gate. It is computed and reported so
-    the next measurement has something to compare against, and it does not
-    fail a render or spend the repair budget - because acting on it would
-    replace shots that are fine and pass the ones it exists to catch.
+    MobileCLIP-S0 (runs 45, 46): keeps 96% of valid footage, rejects 1% of
+    the run 44 failure classes - no crossing point anywhere in the sweep.
+    CLIP ViT-L/14 (run 49): keeps 24/24 valid and rejects 25/36 failures,
+    with zero valid footage culled at every cut.
 
-    This test is the tripwire on that decision: flipping
-    ``CLAIM_PROBE_VALIDATED`` has to be a deliberate act accompanied by a
-    measurement, not a line that drifts to True.
+    So the gate is a property of the backend. An unlisted model produces an
+    *unchecked* grounding, which the report and the repair pass already read
+    as "no verdict" rather than "passed" - the cheap model can go on ranking
+    the shortlist without its opinion about claims counting either way.
     """
 
-    from vidfactory.editorial_qc import build_report
+    assert backend_is_validated("onnx-clip:Xenova/clip-vit-large-patch14")
+    assert not backend_is_validated("onnx-clip:Xenova/mobileclip_s0")
+    assert not backend_is_validated("")
+    assert VALIDATED_CLAIM_BACKENDS
 
-    assert CLAIM_PROBE_VALIDATED is False, (
-        "the probe is only a gate once a measurement separates; update this "
-        "test together with the numbers that justify it"
+
+def test_an_unmeasured_claim_is_not_a_failure():
+    """No verifier, no verdict - and no verdict is not a bad one."""
+
+    from vidfactory.visual_analysis import VisualAnalyzer
+
+    analyzer = VisualAnalyzer(model=None, claim_model=None)
+    grounding = analyzer._instruction_grounding(
+        [], "living room window", "do not block the window"
     )
+    assert grounding.required and not grounding.checked and not grounding.failed
 
 
-def test_a_failing_claim_does_not_make_a_shot_weak_while_unvalidated():
-    from vidfactory import pipeline
+def test_the_cheap_ranker_never_returns_a_claim_verdict():
+    """The measured reason this is a second stage and not the first one."""
 
-    assert pipeline.CLAIM_PROBE_VALIDATED is CLAIM_PROBE_VALIDATED
+    from vidfactory.visual_analysis import VisualAnalyzer
+
+    class _Model:
+        name = "onnx-clip:Xenova/mobileclip_s0"
+
+        def encode_images(self, frames):        # pragma: no cover - never called
+            raise AssertionError("the unvalidated backend must not be asked")
+
+        def encode_texts(self, texts):          # pragma: no cover - never called
+            raise AssertionError("the unvalidated backend must not be asked")
+
+    analyzer = VisualAnalyzer(model=None, claim_model=_Model())
+    grounding = analyzer._instruction_grounding(
+        [object()], "living room window", "do not block the window"
+    )
+    assert not grounding.checked
 
 
-def test_the_metric_is_still_reported_when_it_is_not_believed():
-    """Observation only is not silence. The number still has to be in the
-    report, or the next measurement has nothing to compare against."""
-
+def test_the_metric_is_still_reported_when_nothing_was_verified():
     summary = summarise(_rows(3))
     assert summary["failed"] == 3
     assert summary["by_claim"]["window_layout"]["shots"] == 6

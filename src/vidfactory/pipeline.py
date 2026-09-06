@@ -27,7 +27,6 @@ from .database import Database
 from .downloader import ClipDownloader
 from .editor import ShotPlan, VideoEditor, estimate_shot_count, plan_shots
 from .entities import repair_queries
-from .instructions import CLAIM_PROBE_VALIDATED
 from .instructions import repair_queries as claim_repair_queries
 from .editorial_qc import EditorialReport, build_report
 from .ffmpeg_utils import ffmpeg_available, probe_media
@@ -852,12 +851,9 @@ class VideoPipeline:
             shape as ``ungrounded`` - only a measured failure counts.
             """
 
-            if not CLAIM_PROBE_VALIDATED:
-                # Measured at 1% of the observed failures caught and 8% of
-                # good footage culled, so acting on it would spend the repair
-                # budget replacing shots that are fine. Still computed and
-                # still reported - just not believed.
-                return False
+            # ``instruction_grounding_checked`` is only ever true when a
+            # validated verifier looked, so an unmeasured claim is silently
+            # not a failure - the same rule the entity check follows.
             visual = visual_of(key)
             return bool(
                 visual.get("required_visual_claim")
@@ -1098,6 +1094,10 @@ class VideoPipeline:
                         query=candidate.query or base_query,
                         narration=description,
                         metadata_flags=metadata_visual_flags(candidate, candidate.query),
+                        # A replacement has to satisfy the claim, so the claim
+                        # has to be measured on it. This is a shortlist of
+                        # twelve, not the whole search.
+                        verify_claim=True,
                     )
                     candidate.visual = analysis.to_dict()
                     candidate.visual_semantic_match = analysis.semantic_match
@@ -1112,10 +1112,7 @@ class VideoPipeline:
                     if dict(c.visual or {}).get("analyzed")
                     and float(dict(c.visual).get("semantic_match", 0.0)) > current
                     and bool(dict(c.visual).get("entity_grounding_passed", True))
-                    and (
-                        not CLAIM_PROBE_VALIDATED
-                        or bool(dict(c.visual).get("instruction_grounding_passed", True))
-                    )
+                    and bool(dict(c.visual).get("instruction_grounding_passed", True))
                 ]
                 better.sort(
                     key=lambda c: float(dict(c.visual).get("semantic_match", 0.0)),
@@ -1207,8 +1204,20 @@ class VideoPipeline:
             from .visual_model import load_model
 
             model = load_model(model_settings)
+        # The second stage, for instruction grounding on final shots only.
+        # Heavier than the ranker by design and optional in exactly the same
+        # way: if it does not load, claims go unmeasured and nothing else
+        # changes. No fallback, because falling back to the small model here
+        # would produce a verdict measured at 1% of the known failures.
+        claim_model = None
+        claim_settings = dict(self.config.get("visual.claim_model", {}) or {})
+        if claim_settings.get("enabled", True) and model_settings.get("enabled", True):
+            from .visual_model import load_model
+
+            claim_model = load_model({**claim_settings, "fallback": False})
         return VisualAnalyzer(
             model=model,
+            claim_model=claim_model,
             frames_per_clip=int(self.config.get("visual.frames_per_clip", 3)),
             reject_confidence=float(self.config.get("visual.reject_confidence", 0.72)),
             penalty_confidence=float(self.config.get("visual.penalty_confidence", 0.42)),
@@ -1420,6 +1429,10 @@ class VideoPipeline:
                 narration=(scene.search_text if scene else ""),
                 video=clip.local_path or result.path,
                 metadata_flags=metadata_visual_flags(clip, clip.query),
+                # The final shortlist, and the only place the heavy verifier
+                # runs on a full render: these are the frames that will be on
+                # screen, so these are the ones whose claim has to hold.
+                verify_claim=True,
             )
             if analysis.analyzed:
                 clip.visual = analysis.to_dict()

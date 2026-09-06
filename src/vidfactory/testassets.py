@@ -12,6 +12,7 @@ from pathlib import Path
 from .ffmpeg_utils import run_ffmpeg
 from .logging_utils import get_logger
 from .entities import EntityGrounding, required_entity
+from .instructions import InstructionGrounding, required_claim
 from .visual_analysis import VisualAnalyzer
 
 log = get_logger("ASSETS")
@@ -256,6 +257,7 @@ class ScriptedVisualAnalyzer(VisualAnalyzer):
         high: float = 0.75,
         frames_per_clip: int = 3,
         grounding: bool | None = True,
+        instruction: bool | None = True,
         **kwargs: object,
     ) -> None:
         super().__init__(model=None, frames_per_clip=frames_per_clip, **kwargs)  # type: ignore[arg-type]
@@ -268,6 +270,11 @@ class ScriptedVisualAnalyzer(VisualAnalyzer):
         #: never looked at. A gradient contains no rug either way, so this is
         #: decided for the same reason the score is.
         self.grounding = grounding
+        #: The same decision for the instruction check. A gradient does not
+        #: demonstrate "keep the sofa clear of the window" any more than it
+        #: contains a rug, and the real verifier is a 224px ViT-L/14 that the
+        #: offline test must not require.
+        self.instruction = instruction
 
     def scripted_score(self, clip: object) -> float:
         """A stable score in ``[low, high]``, decided by the clip's identity."""
@@ -282,10 +289,13 @@ class ScriptedVisualAnalyzer(VisualAnalyzer):
         spread = hashlib.sha256(key.encode("utf-8")).digest()[0] / 255.0
         return round(self.low + spread * (self.high - self.low), 3)
 
-    def analyze_clip(self, clip, query="", narration="", video=None, metadata_flags=None):
+    def analyze_clip(
+        self, clip, query="", narration="", video=None, metadata_flags=None,
+        verify_claim=False,
+    ):
         analysis = super().analyze_clip(
             clip, query=query, narration=narration, video=video,
-            metadata_flags=metadata_flags,
+            metadata_flags=metadata_flags, verify_claim=verify_claim,
         )
         analysis.semantic_match = self.scripted_score(clip)
         analysis.semantic_source = "scripted"
@@ -305,6 +315,19 @@ class ScriptedVisualAnalyzer(VisualAnalyzer):
                 detail=(
                     f"scripted {entity.labels[0]} "
                     f"{'present' if self.grounding else 'absent'}"
+                ),
+            )
+        claim = required_claim(f"{query} {narration}")
+        if claim is not None and verify_claim and self.instruction is not None:
+            analysis.instruction = InstructionGrounding(
+                claim=claim.name,
+                label=claim.label,
+                checked=True,
+                score=0.72 if self.instruction else 0.18,
+                passed=bool(self.instruction),
+                detail=(
+                    f"scripted {claim.label} "
+                    f"{'shown' if self.instruction else 'not shown'}"
                 ),
             )
         return analysis
