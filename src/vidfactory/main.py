@@ -354,8 +354,11 @@ def command_instruction_check(args: argparse.Namespace) -> int:
             "vision_file": args.model_vision or "onnx/vision_model_quantized.onnx",
             "text_file": args.model_text or "onnx/text_model_quantized.onnx",
         })
-        if args.model_image_size:
-            settings["image_size"] = int(args.model_image_size)
+        # 224 unless told otherwise. The configured size is MobileCLIP-S0's
+        # 256, and feeding that to a 224px ViT-L/14 export makes 18x18+1=325
+        # patches meet 257 position embeddings - which is exactly the error
+        # the first comparison run died on, once per clip, silently.
+        settings["image_size"] = int(args.model_image_size or 224)
         # No silent fallback: a run that quietly reverts to MobileCLIP would
         # answer a different question than the one being asked and look like
         # an answer to this one.
