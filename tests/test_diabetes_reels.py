@@ -613,14 +613,18 @@ def test_the_long_form_pipeline_does_not_import_the_reels_package():
 
 
 def test_the_reels_package_reuses_rather_than_reimplements():
-    """It should be importing the shared machinery, not copying it."""
+    """It should be importing the shared machinery, not copying it.
+
+    Across the package rather than out of one file: the reel reaches Piper
+    through reels/voice.py now, which is still reuse - voice.py's whole job
+    is to try Kokoro and hand back what vidfactory.tts already builds when it
+    cannot. Asserting on pipeline.py alone would call that a regression.
+    """
 
     import pathlib
 
-    body = (
-        pathlib.Path(__file__).resolve().parents[1]
-        / "src" / "vidfactory" / "reels" / "pipeline.py"
-    ).read_text(encoding="utf-8")
+    package = pathlib.Path(__file__).resolve().parents[1] / "src" / "vidfactory" / "reels"
+    body = "\n".join(p.read_text(encoding="utf-8") for p in package.glob("*.py"))
     for shared in ("..downloader", "..editor", "..ranking", "..tts",
                    "..stock.registry", "..subtitles"):
         assert shared in body, shared

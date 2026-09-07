@@ -272,6 +272,13 @@ PIPER_VOICE_LICENCES: dict[str, str] = {
 }
 
 
+def _licence_name(value: str) -> str:
+    """The licence's name, not its text."""
+
+    first = next((line.strip() for line in str(value).splitlines() if line.strip()), "")
+    return first[:80]
+
+
 def licence_report() -> dict[str, Any]:
     """What the installed packages say about themselves.
 
@@ -294,7 +301,10 @@ def licence_report() -> dict[str, Any]:
             entry["installed"] = True
             entry["version"] = dist.version
             meta = dist.metadata
-            licence = meta.get("License") or ""
+            # Some projects put the *entire* licence text in this field -
+            # kokoro ships all 176 lines of Apache-2.0 - and a QC report is
+            # not the place for it. The first non-empty line is the name.
+            licence = _licence_name(meta.get("License") or "")
             classifiers = [
                 c for c in meta.get_all("Classifier") or [] if "License" in c
             ]

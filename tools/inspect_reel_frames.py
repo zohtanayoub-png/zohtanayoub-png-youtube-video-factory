@@ -32,9 +32,10 @@ from pathlib import Path
 #: the two ends pinned to real seconds instead.
 SAMPLES: tuple[tuple[str, float], ...] = (
     ("hook", 0.0),
-    ("promise", 0.16),
+    ("answer", 0.16),
     ("first-item", 0.35),
     ("mid-item", 0.60),
+    ("takeaway", 0.85),
     ("cta", 1.0),
 )
 
@@ -103,9 +104,10 @@ def main(argument: str) -> int:
 
     notes = {
         "hook": by_kind.get("hook", ""),
-        "promise": by_kind.get("promise", ""),
+        "answer": by_kind.get("answer", ""),
         "first-item": by_kind.get("item", ""),
         "mid-item": by_kind.get("item", ""),
+        "takeaway": by_kind.get("takeaway", ""),
         "cta": by_kind.get("cta", ""),
     }
 
