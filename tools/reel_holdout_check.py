@@ -40,6 +40,8 @@ Four questions, four commands, and they are deliberately separate runs:
                which names a tree, a plate, a table or a board: the state is a
                fact about the fruit and the location is not.
 ``apple-holdout`` the applied apple wording on fresh apple footage, per class.
+``apple-final`` one named negative prompt against the one that ships, on a
+               third apple set, with the accept rule written down first.
 ``holdout``    the whole gate on fresh piles: precision and recall, overall
                and per food and per state.
 
@@ -422,6 +424,67 @@ APPLE_HOLDOUT_PILES: tuple[Pile, ...] = (
 )
 
 
+#: The third apple set, and the last one. Two measurements now agree on a
+#: single prompt: the calibration pile said replacing the state negatives
+#: cuts the board losses from six in six to one and lifts recall from 0.472
+#: to 0.611, and the held-out set - which had never been seen and was not
+#: scored against any candidate - named ``pale wet apple flesh being cut``
+#: as the closest distractor on **fourteen of the twenty-one** valid clips
+#: it lost, including six of six apples on a board and four of five apple
+#: wedges with the peel still on the edge.
+#:
+#: The brief requires both of those accepted, so that negative is wrong
+#: against the specification and not merely low-scoring. What is wrong with
+#: it is legible: an apple wedge does have pale flesh, and a whole apple
+#: beside a knife looks like an apple about to be cut. What actually
+#: distinguishes a *peeled* apple is that the pale surface is the whole
+#: fruit, so that is what the replacement says - and nothing else moves.
+#: The positives stay exactly as they are, because every rewording of them
+#: measured worse.
+APPLE_FINAL_PILES: tuple[Pile, ...] = (
+    Pile("whole apple", "a bright red apple against a plain backdrop",
+         "whole", True, "manzana"),
+    Pile("apples piled", "hundreds of apples filling a harvest bin",
+         "piled", True, "manzana"),
+    Pile("apple in a hand", "a child holding an apple with both hands",
+         "held", True, "manzana"),
+    Pile("apple on a board", "a whole apple placed beside a chef's knife",
+         "board", True, "manzana"),
+    Pile("sliced, peel visible", "apple halves showing the skin and the core",
+         "sliced_with_skin", True, "manzana"),
+    Pile("peeled apple", "removing every bit of skin from an apple",
+         "peeled", False, "manzana"),
+    Pile("apple dessert", "apple crumble served warm in a bowl",
+         "dessert", False, "manzana"),
+    Pile("apple juice", "cloudy apple juice in a tall tumbler",
+         "juice", False, "manzana"),
+    Pile("oranges, not apples", "orange fruit stacked in a greengrocer window",
+         "orange", False, "manzana"),
+)
+
+#: Two wordings and no more. A third would make this a calibration, and a
+#: calibration is what the previous two runs already were: this set exists
+#: to say whether one named change survives footage it has never seen.
+APPLE_FINAL_CANDIDATES: dict[str, dict[str, tuple[str, ...]]] = {
+    "shipped": {
+        "required": ("apples with glossy red and green surfaces",
+                     "apples on a tree with their skin on"),
+        "forbidden": ("pale wet apple flesh being cut",
+                      "apple pieces in pastry and syrup",
+                      "an apple drink in a glass"),
+    },
+    # One prompt different. "Whose whole surface is" is the thing a peeled
+    # apple has and a wedge with a red edge does not.
+    "peeled names the whole surface": {
+        "required": ("apples with glossy red and green surfaces",
+                     "apples on a tree with their skin on"),
+        "forbidden": ("an apple whose whole surface is pale bare flesh",
+                      "apple pieces in pastry and syrup",
+                      "an apple drink in a glass"),
+    },
+}
+
+
 #: The held-out set. Every query here is new again: the calibration run
 #: above spent its own, and a pile that decided a rule cannot also grade it.
 HOLDOUT_PILES: tuple[Pile, ...] = (
@@ -455,6 +518,7 @@ PILES_FOR: dict[str, tuple[Pile, ...]] = {
     "apple": APPLE_PILES,
     "apple-state": APPLE_STATE_PILES,
     "apple-holdout": APPLE_HOLDOUT_PILES,
+    "apple-final": APPLE_FINAL_PILES,
     "holdout": HOLDOUT_PILES,
 }
 
@@ -1066,6 +1130,100 @@ def run_apple_state(args, analyzer, providers, downloader, excluded) -> dict[str
     return report
 
 
+def run_apple_final(args, analyzer, providers, downloader, excluded) -> dict[str, Any]:
+    """One named change, on a third apple set, and then this stops.
+
+    Not a calibration: two wordings, one of them the one that ships, and the
+    other differing from it by a single negative prompt that two independent
+    measurements have already blamed. The accept rule is the brief's own and
+    is written down before the numbers arrive - precision at or above 0.95,
+    no peeled apple accepted, no apple dessert accepted, no orange accepted,
+    and a material improvement in recall. Anything less and the wording that
+    ships keeps shipping.
+    """
+
+    entity = BY_NAME["manzana"]
+    base = requirement_for_food(entity)
+    variants = {
+        name: replace(base,
+                      required_attributes=tuple(spec["required"]),
+                      forbidden_attributes=tuple(spec["forbidden"]))
+        for name, spec in APPLE_FINAL_CANDIDATES.items()
+    }
+    edge = analyzer.decode_size[0]
+    width = len(entity.positives) + len(entity.competitors)
+
+    per_variant: dict[str, list[dict[str, Any]]] = {name: [] for name in variants}
+    entity_rows: list[dict[str, Any]] = []
+    for pile in APPLE_FINAL_PILES:
+        for clip, frames, _big in collect(providers, downloader, pile, args.clips,
+                                          excluded, edge, 3):
+            order, master = _union_probe(analyzer, frames, variants.values(),
+                                         WRONG_CONTEXT)
+            if not master:
+                continue
+            alone = identify_food(entity, [row[:width] for row in master])
+            entity_rows.append({
+                "pile": pile.name, "presentation": pile.truth,
+                "source": clip.key, "should_accept": pile.accept,
+                "entity_alone": bool(alone.passed),
+            })
+            for name, requirement in variants.items():
+                verdict = score_requirement(
+                    requirement, _as_variant(order, master, requirement, WRONG_CONTEXT),
+                    WRONG_CONTEXT,
+                )
+                per_variant[name].append({
+                    "pile": pile.name, "presentation": pile.truth,
+                    "source": clip.key, "should_accept": pile.accept,
+                    "conjunction": bool(verdict.passed),
+                    "state_score": round(verdict.state_match_score, 3),
+                    "failed_on": list(verdict.failed_on),
+                    "looked_like": verdict.top_distractor,
+                })
+
+    report: dict[str, Any] = {
+        "command": "apple-final",
+        "clips": len(entity_rows),
+        "accept_rule": (
+            "precision >= 0.95, peeled 0, dessert 0, orange 0, and recall "
+            "materially above the shipped wording - written before the run"
+        ),
+        "entity_alone": _rates(entity_rows, "entity_alone"),
+        "entity_per_class": _per_class(entity_rows, "entity_alone"),
+        "variants": {},
+    }
+    for name, rows in per_variant.items():
+        def seen(shape: str) -> int:
+            return sum(1 for r in rows
+                       if r["presentation"] == shape and r["conjunction"])
+        report["variants"][name] = {
+            "required": list(APPLE_FINAL_CANDIDATES[name]["required"]),
+            "forbidden": list(APPLE_FINAL_CANDIDATES[name]["forbidden"]),
+            "conjunction": _rates(rows, "conjunction"),
+            "per_class": _per_class(rows, "conjunction"),
+            "blamed": _blamed(rows),
+            "oranges_accepted": seen("orange"),
+            "dessert_accepted": seen("dessert"),
+            "peeled_accepted": seen("peeled"),
+            "juice_accepted": seen("juice"),
+            "false_positives": [
+                {"pile": r["pile"], "source": r["source"],
+                 "state_score": r["state_score"]}
+                for r in rows if not r["should_accept"] and r["conjunction"]
+            ],
+            "per_clip": rows,
+        }
+        log.info("%s: precision %s, recall %s, peeled %d, dessert %d, orange %d",
+                 name, report["variants"][name]["conjunction"]["precision"],
+                 report["variants"][name]["conjunction"]["recall"],
+                 report["variants"][name]["peeled_accepted"],
+                 report["variants"][name]["dessert_accepted"],
+                 report["variants"][name]["oranges_accepted"])
+    report["per_clip"] = entity_rows
+    return report
+
+
 def run_apple_holdout(args, analyzer, providers, downloader, excluded) -> dict[str, Any]:
     """The applied apple wording, on apple footage nothing has been tuned on.
 
@@ -1430,7 +1588,8 @@ def main(argv: list[str] | None = None) -> int:
                   "presentation": run_presentation,
                   "avocado": run_avocado, "holdout": run_holdout,
                   "apple-state": run_apple_state,
-                  "apple-holdout": run_apple_holdout}[args.command]
+                  "apple-holdout": run_apple_holdout,
+                  "apple-final": run_apple_final}[args.command]
         report = runner(args, analyzer, providers, downloader, excluded)
 
     report["held_out_from"] = {"clips": len(excluded), "queries": sorted(burned)}

@@ -80,16 +80,30 @@
     "avocado": "halved avocado on a wooden board"
   },
   "burned_queries": [
+    "a bare peeled apple with the skin removed",
+    "a glass of apple juice on a counter",
     "a heap of avocados in a crate",
+    "a mound of apples at an autumn fruit stand",
+    "a person picking up an apple in their hand",
+    "a pile of oranges at a fruit stall",
+    "a single glossy apple on a bare surface",
+    "a slice of apple cake on a fork",
+    "a whole apple next to a knife blade",
+    "an apple resting on a wooden chopping board",
+    "an apple stripped bare of its peel",
     "apple beside a knife on a cutting board",
+    "apple juice being poured from a bottle",
     "apple pie cooling on a rack",
     "apple pie slice dessert on a plate",
+    "apple pie with a lattice crust",
     "apple slices on a white plate",
     "apple stripped of its skin on a chopping block",
     "apple tart with cream on a plate",
+    "apple wedges with the red skin on the edge",
     "apples heaped high at a fruit stand",
     "apples on a market stall in autumn",
     "apples packed in a cardboard box",
+    "apples stacked high in a shop display",
     "avocado cut into thin green slices",
     "avocado cut open showing the pit",
     "avocado halves with lime on a board",
@@ -130,6 +144,7 @@
     "hand holding a single ripe strawberry",
     "hand holding up a red apple",
     "hand peeling apple skin into a spiral",
+    "holding a green apple up to the camera",
     "homemade apple crumble in a baking dish",
     "kiwi cut into rounds beside a knife",
     "kiwi cut into thin green wheels",
@@ -140,6 +155,8 @@
     "many avocados spread across a surface",
     "mashed guacamole being stirred in a bowl",
     "one red apple standing alone",
+    "one ripe apple photographed up close",
+    "oranges heaped in a wicker display",
     "oranges piled on a market stall",
     "pears and oranges together in a fruit bowl",
     "peeled apple pieces in a bowl of water",
@@ -147,6 +164,7 @@
     "peeling an apple with a knife",
     "pouring apple juice into a glass",
     "punnets of strawberries in a supermarket box",
+    "quartered apple showing red peel and white flesh",
     "raspberries filling a clear glass jar",
     "raspberries in a cardboard punnet",
     "raspberries in a shallow ceramic bowl",
@@ -175,8 +193,10 @@
     "toast with sliced avocado on top",
     "tropical fruit buffet with dragon fruit",
     "tropical fruit platter coconut pineapple",
+    "warm apple turnover dusted with icing sugar",
     "whole avocados in a basket",
-    "whole raw red apple with skin on a wooden table"
+    "whole raw red apple with skin on a wooden table",
+    "wooden crates full of apples for sale"
   ],
   "note": "Every query listed here has been used to decide or to grade something, so none of them can do either again. A further cycle needs its own queries; the piles in tools/reel_holdout_check.py are checked against this list at startup, for the command about to run.",
   "runs": [
@@ -211,6 +231,18 @@
     {
       "id": 34156801236,
       "what": "the same presentation piles, re-run for a readable summary"
+    },
+    {
+      "id": 34161356836,
+      "what": "the apple state: ten presentations against eight formulations"
+    },
+    {
+      "id": 34162044863,
+      "what": "the same apple-state piles, re-read for which probe did the rejecting"
+    },
+    {
+      "id": 34162048979,
+      "what": "the held-out apple set; it graded the shipped wording and is spent"
     }
   ]
 }

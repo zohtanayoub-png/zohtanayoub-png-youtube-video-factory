@@ -1621,7 +1621,7 @@ def test_every_command_the_cli_offers_has_piles_recorded():
     # Every command has a runner, and every runner has piles.
     assert set(module.PILES_FOR) == {
         "berries", "entity", "presentation", "avocado", "apple",
-        "apple-state", "apple-holdout", "holdout",
+        "apple-state", "apple-holdout", "apple-final", "holdout",
     }
     for command, piles in module.PILES_FOR.items():
         assert piles, command
