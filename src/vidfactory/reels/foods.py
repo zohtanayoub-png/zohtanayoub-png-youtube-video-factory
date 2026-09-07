@@ -126,8 +126,16 @@ FOODS: tuple[VisualEntity, ...] = (
     _food(
         "aguacate", ["an avocado"],
         ["aguacate", "aguacates"],
-        ["a halved avocado", "avocado cut in half with the stone",
-         "sliced avocado on a board"],
+        # Every positive used to describe a *cut*, which is how a whole
+        # avocado - dark bumpy skin, no green flesh anywhere - came to be
+        # rejected by the layer under the state probe. Naming the whole fruit
+        # did not by itself buy the whole-avocado clips back (run 34153962478:
+        # 4 of 6 either way), but adding the pile alongside it dominates the
+        # shipped wording outright - the same 10 of 12 valid clips kept, and
+        # false positives on pears and limes halved from 2 of 6 to 1 of 6.
+        ["a whole avocado with dark bumpy skin",
+         "a halved avocado with the stone", "sliced green avocado",
+         "a pile of avocados"],
         ["a kiwi fruit", "a lime", "a green apple", "a pear",
          "guacamole dip"],
         ["halved avocado on a wooden board", "avocado cut in half close up",

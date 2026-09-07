@@ -81,9 +81,12 @@
   },
   "burned_queries": [
     "apple pie slice dessert on a plate",
+    "apple slices on a white plate",
     "apple tart with cream on a plate",
+    "apples on a market stall in autumn",
     "avocado cut open showing the pit",
     "avocado halves with lime on a board",
+    "avocado sliced open on a chopping board",
     "avocado slices arranged on a salad",
     "avocado slices fanned on a plate",
     "avocado toast breakfast plate",
@@ -99,16 +102,19 @@
     "fruit salad bowl with pineapple and melon",
     "green avocado milkshake in a glass",
     "green avocado smoothie in a tall glass",
+    "green pears and limes on a table",
     "guacamole dip in a molcajete bowl",
     "halved avocado on a wooden board",
     "hand peeling apple skin into a spiral",
     "homemade apple crumble in a baking dish",
     "kiwi fruit sliced on a wooden chopping board",
+    "oranges piled on a market stall",
     "peeled apple without skin on a plate",
     "peeling an apple with a knife",
     "pouring apple juice into a glass",
     "raspberries on a branch in a garden",
     "red apples on a branch in an orchard",
+    "ripe avocados stacked in a bowl",
     "ripe raspberries harvest closeup macro",
     "shiny apples in a wooden crate at a market",
     "sliced kiwi fruit on a plate",
@@ -137,6 +143,10 @@
     {
       "id": 34115418980,
       "what": "the held-out benchmark of the four-probe gate; spent"
+    },
+    {
+      "id": 34153962478,
+      "what": "the entity layer: can the probe see whole fruit"
     }
   ]
 }

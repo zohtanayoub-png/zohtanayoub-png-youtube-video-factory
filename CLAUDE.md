@@ -562,6 +562,34 @@ in the report has to come from a measurement - applies here to the **words**.
   avocado smoothies, all four scoring entity 1.00 and state 1.00, which are
   frames where the glossy surface really is glossy and the fruit really is
   beside the glass.
+* **The entity layer, run 34153962478, and the change that was refused.**
+  Whole, cut and piled fruit on fresh piles, against what the search returns
+  instead - pears and limes for the avocado, oranges for the apple:
+
+      aguacate variant       valid kept   pears/limes accepted
+      shipped                  10/12            2/6
+      whole-and-cut             9/12            0/6
+      whole-cut-and-many       10/12            1/6
+
+      manzana variant        valid kept    oranges accepted
+      shipped                   6/12            1/6
+      single-and-many           8/12            3/6
+
+  **Naming the whole avocado did not buy the whole avocados back.** Four of
+  six either way, and the closest competitor is "guacamole dip" in every
+  variant - so the "whole avocado 2 of 6" from the benchmark was again partly
+  the pile. What the rewrite does buy is precision: `whole-cut-and-many`
+  keeps the same ten valid clips as the shipped wording and halves the false
+  positives, which dominates it on both axes, so that is what shipped.
+
+  **The apple candidate was refused, and this is the interesting one.**
+  `single-and-many` keeps two more valid clips and accepts two more
+  **oranges** - and an orange under "manzana" is the failure this entire
+  layer was built to stop. A trade that buys bulk-apple retention with orange
+  rejection is the wrong trade whatever the totals say, so the apple keeps
+  its wording and the bulk-apple weakness (2 of 6) stays recorded and
+  unfixed. It is a real cost: a market-crate shot of apples is good footage
+  the repair pass has to replace.
 * **The CTA may not play over a frozen frame, and the gap is between the
   beats rather than after them.** The editor holds the last frame when the
   picture is shorter than the narration: run 34093462658 held it for 1.7
