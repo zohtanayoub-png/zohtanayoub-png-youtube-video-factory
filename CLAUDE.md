@@ -359,12 +359,16 @@ in the report has to come from a measurement - applies here to the **words**.
   the "lower the threshold until it passes" this methodology exists to
   prevent. What it costs is that a raspberry beat gets repaired three times
   and is then reported, which is the right failure to have.
-* **The CTA may not play over a frozen frame.** The editor holds the last
-  frame when the picture is shorter than the narration, and run 34093462658
-  held it for 1.7 seconds - across the whole call to action. The shot plan now
-  covers `narration + TAIL_SECONDS` by stretching the final beat, which buys
-  real footage rather than a still, and `frozen_tail_duration` is measured and
-  gated at 0.2s.
+* **The CTA may not play over a frozen frame, and the gap is between the
+  beats rather than after them.** The editor holds the last frame when the
+  picture is shorter than the narration: run 34093462658 held it for 1.7
+  seconds, across the whole call to action. Stretching the final beat to
+  `narration + TAIL_SECONDS` fixed a third of it and run 34100918235 still
+  froze for 1.52s, because a beat's `scene_timings` span covers only its own
+  spoken chunks - the pause that follows it belongs to no beat at all, and a
+  shot plan summed from the spans is short by *every pause in the reel*. Each
+  beat's picture now runs to the **next beat's first word**, and the last one
+  to the end. `frozen_tail_duration` is measured and gated at 0.2s.
 * **The reel is spelled in correct Spanish.** ración, azúcar, síguenos,
   última: Kokoro is handed the script verbatim and a Spanish G2P front end
   does not read "racion" as "ración". `safety._flat` folds accents, because a

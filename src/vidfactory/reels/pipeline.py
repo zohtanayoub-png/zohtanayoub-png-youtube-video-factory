@@ -508,11 +508,25 @@ class ReelPipeline:
                 used_keys.append(result.clip.key)
             return kept, rejected
 
+        # The picture is continuous; the narration is not. A beat's timing
+        # spans only its own spoken chunks, and the pause that follows it
+        # belongs to no beat at all - so a shot plan built from the spans is
+        # short by every pause in the reel. That is where the 1.52s of frozen
+        # frame came from, not from the tail: each beat's picture runs to the
+        # *next* beat's first word, and the last one runs to the end.
+        spans: list[tuple[float, float]] = []
+        for index in range(len(script.beats)):
+            start, end = narration.scene_timings.get(f"beat-{index:02d}", (0.0, 0.0))
+            spans.append((start, end))
+        starts = [s for s, _e in spans]
+
         for index, beat in enumerate(script.beats):
             scene_id = f"beat-{index:02d}"
-            start, end = narration.scene_timings.get(scene_id, (0.0, 0.0))
-            if index == len(script.beats) - 1:
-                end = max(end, timeline_end)
+            start, end = spans[index]
+            end = (
+                timeline_end if index == len(script.beats) - 1
+                else max(end, starts[index + 1])
+            )
             span = max(0.6, end - start)
             wanted = max(1, int(round(span / MAX_SHOT + 0.35)))
             entity = required_food_for(beat)

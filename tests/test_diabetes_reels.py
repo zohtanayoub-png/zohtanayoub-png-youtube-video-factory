@@ -1063,3 +1063,35 @@ def test_a_mostly_right_clip_still_passes():
     verdict = identify_food(kiwi, [right, right, wrong])
     assert verdict.score == pytest.approx(2 / 3, abs=0.01)
     assert verdict.passed is (2 / 3 >= FOOD_IDENTIFY_PASS)
+
+
+def test_the_shot_plan_covers_the_pauses_between_beats():
+    """The picture is continuous; the narration is not.
+
+    A beat's timing spans only its own spoken chunks, so the pause that
+    follows it belongs to no beat and a plan built from the spans is short by
+    every pause in the reel. That is where run 34100918235's 1.52s of frozen
+    frame came from - not from the tail, which had already been extended.
+    Each beat's picture must run to the *next* beat's first word.
+    """
+
+    from vidfactory.reels.narration import BEAT_PAUSE, SENTENCE_PAUSE
+    from vidfactory.reels.pipeline import TAIL_SECONDS
+
+    script = fitted(BY_SLUG[FIRST], 45)
+    spans, clock = [], 0.0
+    for beat in script.beats:
+        span = max(0.6, beat.word_count / 2.62)
+        spans.append((clock, clock + span))
+        clock += span + SENTENCE_PAUSE + BEAT_PAUSE.get(beat.kind, 0.12)
+    timeline_end = clock + TAIL_SECONDS
+    starts = [s for s, _e in spans]
+
+    naive = sum(end - start for start, end in spans)
+    assert timeline_end - naive > 1.0, "the pauses should add up to a real gap"
+
+    covered = 0.0
+    for index, (start, end) in enumerate(spans):
+        last = index == len(spans) - 1
+        covered += (timeline_end if last else max(end, starts[index + 1])) - start
+    assert covered == pytest.approx(timeline_end, abs=0.01)
