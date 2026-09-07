@@ -176,12 +176,20 @@ in the report has to come from a measurement - applies here to the **words**.
   amigos...", a generic "?Sabias que...?") are refused outright rather than
   scored low: they are not weak openings, they are a wasted second, and it is
   the only second guaranteed to be watched.
-* **The hook has a time budget as well as a quality one.** The brief puts it
-  in the first two seconds - six words at this voice's rate - and its own
-  example hook is fifteen. Both cannot be had, so the builder takes the
-  *shortest* hook among those within 0.06 of the best, provided it still
-  clears the pass mark and is still about this reel. That is worth more than
-  it sounds: it is what pays for the fifth item.
+* **The hook has a time budget as well as a quality one, and the three gates
+  are applied together.** The brief puts the hook in the first two seconds -
+  six words at this voice's rate - and its own example hook is fifteen. Both
+  cannot be had, so the builder prefers the shortest hook among the near-best.
+  That is worth more than it sounds: it is what pays for the fifth item.
+
+  The three things the report will gate on - the hook is about this reel
+  (alignment), it is strong enough (`HOOK_PASS`), and it is short enough to
+  leave the answer at `HOOK_SECONDS` - are one predicate, not three filters in
+  a row. In a row they fight: filtering by strength first threw away the only
+  candidate that fitted the time budget, and the builder then handed out a
+  hook its own report refused. `qc` reads `HOOK_SECONDS` from `script` for the
+  same reason. Two topics had no candidate satisfying all three and were given
+  one; `ranking-frutas` now opens at 0.68 with alignment 1.00 in 17 words.
 * **The third second carries the answer, not a trailer for one.** "En este
   reel vas a ver cinco frutas" spends it describing the reel to somebody who
   is already watching it; "fresas, frambuesas, kiwi, manzana con piel y
@@ -196,12 +204,32 @@ in the report has to come from a measurement - applies here to the **words**.
   not shorter value, it is worse value, so the trim now drops items and every
   survivor keeps its reason. Making that affordable meant rewriting all 85
   items from prose to speech, 24 words each down to 17.
-* **A number in the title is a requirement here too.** "5 frutas" that ships
-  four has a false line burned into every frame of the reel. `build` raises
-  and names the duration that would fit rather than renaming the video, which
-  is the same answer the long-form side gives. All seventeen topics deliver
-  their promised count at 45s; several genuinely cannot at 30s, and saying so
-  is the correct behaviour.
+* **A number in the title is a requirement here too, and so is a number in
+  the answer.** "5 frutas" that ships four has a false line burned into every
+  frame of the reel, and "granola, barritas, salsas, zumos envasados y lacteos
+  de sabores" followed by three items is the same lie three seconds in.
+  `promises_all_items` marks the topics whose answer enumerates, and
+  `required_item_count` covers both.
+
+  `build` raises rather than renaming the video, which is the answer the
+  long-form side gives - but a strict pure function is not a reason for the
+  pipeline to produce nothing, and hard rule six says it degrades instead. So
+  `build_fitted` takes the shortest allowed duration that keeps the promise,
+  says loudly that it did, and puts `requested_seconds` and the rendered
+  duration in the report. At the measured Kokoro rate six five-item topics
+  render at 60s rather than 45s. That is the honest shape of five items that
+  each carry a reason; the lever, if 45s matters more, is fewer items.
+* **A reel is sized from the rate a *reel* is spoken at.** Not the content
+  language's declared words-per-minute: that is 142 wpm for Spanish and it
+  describes long-form narration with long-form pauses. The voice comparison
+  measured the real thing on the runner - the same 126 word script ran 48.05s
+  under Kokoro and 46.79s under Piper, so 2.62 and 2.69 words a second
+  including every pause - and `MEASURED_WORDS_PER_SECOND` carries those,
+  keyed by engine. The long-form number under-counts a reel's budget by a
+  fifth, which is two items of a five item list: the first Kokoro render was
+  refused before a word was synthesized for exactly that reason. A database
+  measurement is looked up under the engine that will actually narrate, not
+  under "piper" whatever is speaking.
 * **The hook may not be the conclusion said twice.** Measured as the longest
   shared run of words, not as vocabulary overlap: a hook is *supposed* to
   share its subject with the conclusion, and what must not happen is the same
