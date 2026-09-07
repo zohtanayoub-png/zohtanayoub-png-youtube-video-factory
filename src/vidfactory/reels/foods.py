@@ -363,11 +363,30 @@ def score_food(entity: VisualEntity, per_frame: Sequence[Sequence[float]], ramp:
 
 #: What share of frames must name the right food for the shot to be about it.
 #:
-#: Placeholder until the identification probe has been swept. The dominance
-#: probe above was measured first and came back at chance - kept% + rejected%
-#: summed to ~100 at every cut, and manzana was *inverted*, real apple footage
-#: at a median of 0.131 against orange footage at 0.508.
-FOOD_IDENTIFY_PASS = 0.60
+#: Read off the sweep, on the validated ViT-L/14, over 28 clips found by
+#: searching for the food and 28 found by searching for the food that turns
+#: up instead:
+#:
+#:     cut    kept of correct    rejected of wrong
+#:     0.20     23/28 (82.1%)      26/28 ( 92.9%)
+#:     0.40     23/28 (82.1%)      28/28 (100.0%)
+#:     0.50     23/28 (82.1%)      28/28 (100.0%)
+#:     0.60     23/28 (82.1%)      28/28 (100.0%)
+#:     0.70     20/28 (71.4%)      28/28 (100.0%)
+#:
+#: 0.5 is the middle of the plateau: everything from 0.4 to 0.6 catches every
+#: wrong-food clip at the same cost, and 0.7 starts charging for nothing.
+#: Per food, apple against orange - the failure that started this - separates
+#: perfectly, 1.0 against 0.0, as do kiwi and avocado; strawberries run
+#: 0.834 against 0.0.
+#:
+#: **Raspberries do not identify themselves at all** (0.0 against 0.0) and are
+#: the whole of the 5-in-28 loss. Recorded rather than tuned away: dropping
+#: "strawberries" from the raspberry competitors would buy the number back and
+#: would be exactly the "lower the threshold until it passes" this is meant to
+#: avoid. What it costs is that a raspberry beat is repaired three times and
+#: then reported, which is the right failure to have.
+FOOD_IDENTIFY_PASS = 0.5
 
 
 def identify_food(

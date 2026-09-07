@@ -332,10 +332,33 @@ in the report has to come from a measurement - applies here to the **words**.
   not. So `identify_food` ranks every prompt and asks which came first,
   scoring the share of frames in which the right food won. No margin band - a
   frame that looks marginally more like an orange than an apple is a frame of
-  an orange. Both probes are kept and `reel-entity-check` sweeps all four
-  combinations, both probes on MobileCLIP-S0 and on the validated ViT-L/14,
-  because "the backend was the limit" is what the instruction check found and
-  it deserves measuring rather than assuming here too.
+  an orange.
+
+  **And the backend was the limit here too.** All four combinations were
+  measured - both probes on MobileCLIP-S0 and on the validated ViT-L/14 - and
+  only one of them works:
+
+      model / probe                  kept of correct   rejected of wrong
+      MobileCLIP-S0 + dominance        43-71%            54% -> 11%  (chance)
+      ViT-L/14 + dominance             89%               86%  (at 0.20)
+      ViT-L/14 + identification        82.1%            100%  (0.40-0.60)
+
+  So the reel is a **two-model pipeline** for the same reason the long-form
+  side is: MobileCLIP-S0 stays the broad ranker and is never asked which fruit
+  this is, and `visual.claim_model` answers the food question on the handful
+  of candidates a beat actually downloads. `FOOD_IDENTIFY_PASS` is 0.5, the
+  middle of a plateau where 0.4, 0.5 and 0.6 all reject every wrong-food clip
+  at the same cost.
+
+  Per food, apple against orange - the failure that started all this -
+  separates perfectly, **1.0 against 0.0**; so do kiwi and avocado;
+  strawberries run 0.834 against 0.0. **Raspberries do not identify
+  themselves at all, 0.0 against 0.0**, and are the whole of the five-in-28
+  loss. That is recorded rather than tuned away: dropping "strawberries" from
+  the raspberry competitors would buy the number back and would be precisely
+  the "lower the threshold until it passes" this methodology exists to
+  prevent. What it costs is that a raspberry beat gets repaired three times
+  and is then reported, which is the right failure to have.
 * **The CTA may not play over a frozen frame.** The editor holds the last
   frame when the picture is shorter than the narration, and run 34093462658
   held it for 1.7 seconds - across the whole call to action. The shot plan now

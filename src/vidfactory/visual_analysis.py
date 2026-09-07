@@ -1317,6 +1317,7 @@ class VisualAnalyzer:
         frames: Sequence[Frame],
         entity: Any,
         scorer: Any = None,
+        use_claim_model: bool = False,
     ) -> EntityGrounding:
         """Does this clip show the entity the *caller* names?
 
@@ -1333,12 +1334,17 @@ class VisualAnalyzer:
             entity=getattr(entity, "name", ""),
             labels=tuple(getattr(entity, "labels", ()) or ()),
         )
-        if entity is None or not usable or self.model is None:
+        # Which backend answers is a measured decision, not a preference. On
+        # food, MobileCLIP-S0 is at chance and the validated ViT-L/14 keeps
+        # 82% of correct footage while rejecting 100% of the wrong food.
+        model = self.claim_model if use_claim_model else self.model
+        if entity is None or not usable or model is None:
             return blank
         try:
-            image_vectors = list(self.model.encode_images(usable))
+            image_vectors = list(model.encode_images(usable))
             prompts, _ = grounding_prompts(entity)
-            text_vectors = self._encode_texts(
+            encode = self._claim_texts if use_claim_model else self._encode_texts
+            text_vectors = encode(
                 [PROMPT_TEMPLATE.format(p) for p in prompts]
             )
         except Exception as exc:                          # pragma: no cover

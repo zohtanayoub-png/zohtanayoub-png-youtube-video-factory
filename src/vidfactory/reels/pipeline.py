@@ -490,7 +490,9 @@ class ReelPipeline:
                         "analyzed": analysis.analyzed,
                     })
                     if entity is not None:
-                        grounding = analyzer.ground_entity(frames, entity, identify_food)
+                        grounding = analyzer.ground_entity(
+                            frames, entity, identify_food, use_claim_model=True
+                        )
                         if grounding.failed:
                             # Not this beat's food. Put the clip back rather
                             # than shipping it: the whole point is that the
@@ -621,8 +623,26 @@ class ReelPipeline:
 
         settings = dict(self.config.get("visual.model", {}) or {})
         model = load_model(settings) if settings.get("enabled", True) else None
+
+        # Two models, for the reason the long-form side runs two: MobileCLIP-S0
+        # is the broad ranker and is measured at chance on "which fruit is
+        # this", so the food grounding asks the validated ViT-L/14 instead. It
+        # sees only the handful of candidates a beat actually downloads, not
+        # the whole shortlist. If it will not load, grounding goes unmeasured
+        # and the render carries on - like every other optional model here.
+        claim_settings = dict(self.config.get("visual.claim_model", {}) or {})
+        claim_model = (
+            load_model(claim_settings)
+            if claim_settings.get("enabled", True) else None
+        )
+        if claim_model is None:
+            log.warning(
+                "the claim model did not load; the food each beat names will "
+                "not be checked"
+            )
         return VisualAnalyzer(
             model=model,
+            claim_model=claim_model,
             frames_per_clip=int(self.config.get("visual.frames_per_clip", 3)),
             allow_remote_video=False,
         )
