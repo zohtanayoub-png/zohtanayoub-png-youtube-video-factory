@@ -15,6 +15,9 @@ seen.
 
 Four questions, four commands, and they are deliberately separate runs:
 
+``entity``     can the probe see the fruit in every shape it arrives in -
+               whole, cut and piled? The layer under all the others, and the
+               one the second held-out benchmark pointed at.
 ``berries``    does the raspberry wording+crop candidate survive fresh
                footage, against strawberry, blackberry and blueberry? A
                confusion matrix, because "kept 5 of 8" hides which berry the
@@ -40,7 +43,7 @@ import argparse
 import json
 import resource
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -145,32 +148,75 @@ APPLE_PILES: tuple[Pile, ...] = (
     Pile("apple juice", "pouring apple juice into a glass", "juice", False, "manzana"),
 )
 
+#: Entity-layer calibration. The held-out benchmark said a *whole* avocado
+#: survives twice in six and a raw apple in a market crate once - and that
+#: the probe doing the rejecting is the entity probe, not the state layer
+#: above it. So these piles are about presentation rather than about state:
+#: the same fruit, whole and cut and in bulk, against what the search returns
+#: instead of it.
+ENTITY_PILES: tuple[Pile, ...] = (
+    Pile("whole avocados", "ripe avocados stacked in a bowl", "whole", True, "aguacate"),
+    Pile("cut avocado", "avocado sliced open on a chopping board", "cut", True, "aguacate"),
+    Pile("not avocado", "green pears and limes on a table", "other", False, "aguacate"),
+    Pile("apples in bulk", "apples on a market stall in autumn", "bulk", True, "manzana"),
+    Pile("cut apple", "apple slices on a white plate", "cut", True, "manzana"),
+    Pile("not apple", "oranges piled on a market stall", "other", False, "manzana"),
+)
+
+#: Candidate positive sets. The shipped ones are first so the table reads as
+#: a before/after. Every candidate is written from the *diagnosis* - name the
+#: presentations a beat legitimately gets, whole and cut and piled - and not
+#: from the clips that exposed the gap, which are in the manifest.
+ENTITY_CANDIDATES: dict[str, dict[str, tuple[str, ...]]] = {
+    "aguacate": {
+        "shipped": ("a halved avocado", "avocado cut in half with the stone",
+                    "sliced avocado on a board"),
+        "whole-and-cut": ("a whole avocado with dark bumpy skin",
+                          "a halved avocado with the stone",
+                          "sliced green avocado"),
+        "whole-cut-and-many": ("a whole avocado with dark bumpy skin",
+                               "a halved avocado with the stone",
+                               "sliced green avocado",
+                               "a pile of avocados"),
+    },
+    "manzana": {
+        "shipped": ("a red apple", "a whole apple with skin",
+                    "sliced apple on a board", "a green apple"),
+        "single-and-many": ("a red apple", "a green apple",
+                            "sliced apple on a board",
+                            "a crate of apples at a market",
+                            "many apples piled together"),
+    },
+}
+
 #: The held-out set. Every query here is new again: the calibration run
 #: above spent its own, and a pile that decided a rule cannot also grade it.
 HOLDOUT_PILES: tuple[Pile, ...] = (
-    Pile("raw apple with skin", "shiny apples in a wooden crate at a market", "raw", True, "manzana"),
-    Pile("peeled apple", "hand peeling apple skin into a spiral", "peeled", False, "manzana"),
-    Pile("apple dessert", "apple tart with cream on a plate", "dessert", False, "manzana"),
-    Pile("strawberries", "strawberries in a punnet at a farm stall", "raw", True, "fresas"),
-    Pile("strawberry dessert", "strawberry ice cream in a cone", "processed", False, "fresas"),
-    Pile("raspberries", "raspberries on a branch in a garden", "raw", True, "frambuesas"),
-    Pile("kiwi", "kiwi fruit sliced on a wooden chopping board", "raw", True, "kiwi"),
-    Pile("kiwi in a mixed platter", "fruit salad bowl with pineapple and melon", "mixed", False, "kiwi"),
-    # The avocado states the calibration decided, on footage it never saw.
-    Pile("whole avocado", "avocados piled at a grocery market", "whole", True, "aguacate"),
-    Pile("halved avocado", "avocado halves with lime on a board", "halved", True, "aguacate"),
-    Pile("sliced avocado", "avocado slices arranged on a salad", "sliced", True, "aguacate"),
-    Pile("avocado toast", "toast with sliced avocado on top", "toast", True, "aguacate"),
-    Pile("guacamole", "guacamole dip in a molcajete bowl", "guacamole", False, "aguacate"),
-    Pile("avocado smoothie", "green avocado milkshake in a glass", "smoothie", False, "aguacate"),
-    Pile("food with an animal", "dog begging next to a plate of food", "animal", False, "fresas"),
+    Pile("raw apple with skin", "red apples resting on a windowsill", "raw", True, "manzana"),
+    Pile("apples in bulk", "boxes of apples at a farmers market", "raw", True, "manzana"),
+    Pile("peeled apple", "peeled apple pieces in a bowl of water", "peeled", False, "manzana"),
+    Pile("apple dessert", "baked apple strudel dusted with sugar", "dessert", False, "manzana"),
+    Pile("strawberries", "strawberries scattered on a linen cloth", "raw", True, "fresas"),
+    Pile("strawberry dessert", "strawberry cheesecake slice on a plate", "processed", False, "fresas"),
+    Pile("raspberries", "raspberries in a small glass jar", "raw", True, "frambuesas"),
+    Pile("kiwi", "kiwi cut into rounds beside a knife", "raw", True, "kiwi"),
+    Pile("kiwi in a mixed platter", "tropical fruit buffet with dragon fruit", "mixed", False, "kiwi"),
+    Pile("whole avocado", "a heap of avocados in a crate", "whole", True, "aguacate"),
+    Pile("halved avocado", "avocado split in two on a dark plate", "halved", True, "aguacate"),
+    Pile("sliced avocado", "fanned avocado slices beside bread", "sliced", True, "aguacate"),
+    Pile("guacamole", "mashed guacamole being stirred in a bowl", "guacamole", False, "aguacate"),
+    Pile("avocado smoothie", "blended green smoothie poured from a jug", "smoothie", False, "aguacate"),
+    Pile("food with an animal", "cat lying beside a fruit basket", "animal", False, "fresas"),
 )
 
 
-#: Which piles each command searches. Named once so the freeze check and the
-#: runner cannot disagree about what a command is about to spend.
+#: Which piles each command searches. Named once so three things cannot
+#: disagree: the freeze check, the runner, and the list of commands the CLI
+#: offers - a command the freeze check has never heard of is a command with
+#: no freeze check.
 PILES_FOR: dict[str, tuple[Pile, ...]] = {
     "berries": BERRY_PILES,
+    "entity": ENTITY_PILES,
     "avocado": AVOCADO_PILES,
     "apple": APPLE_PILES,
     "holdout": HOLDOUT_PILES,
@@ -436,6 +482,75 @@ def run_avocado(args, analyzer, providers, downloader, excluded) -> dict[str, An
 
 
 # ---------------------------------------------------------------------------
+# entity - can the probe see the fruit it is looking for at all
+# ---------------------------------------------------------------------------
+
+def run_entity(args, analyzer, providers, downloader, excluded) -> dict[str, Any]:
+    """Does the entity probe recognise the fruit in every shape it comes in?
+
+    The layer under everything else, and the one the held-out benchmark
+    pointed at: a probe whose positives all describe a cut cannot see a whole
+    avocado, and nothing built on top of it can rescue that.
+
+    Scored exactly as production scores it - the identification probe against
+    the food's own competitors - so what changes between variants is the
+    wording and nothing else.
+    """
+
+    edge = analyzer.decode_size[0]
+    piles = {p.name: collect(providers, downloader, p, args.clips, excluded, edge, 3)
+             for p in ENTITY_PILES}
+    report: dict[str, Any] = {"command": "entity", "foods": {}}
+
+    for food, variants in ENTITY_CANDIDATES.items():
+        entity = BY_NAME[food]
+        mine = [p for p in ENTITY_PILES if p.food == food]
+        rows: dict[str, Any] = {}
+        for name, positives in variants.items():
+            candidate = replace(entity, positives=tuple(positives))
+            prompts = [*candidate.positives, *candidate.competitors]
+            per_pile: dict[str, Any] = {}
+            kept = counted = leaked = wrong = 0
+            for pile in mine:
+                accepted = seen = 0
+                losers: dict[str, int] = {}
+                for _clip, frames, _big in piles[pile.name]:
+                    matrix = analyzer.probe_frames(frames, prompts,
+                                                   use_claim_model=True)
+                    if not matrix:
+                        continue
+                    seen += 1
+                    verdict = identify_food(candidate, matrix)
+                    accepted += bool(verdict.passed)
+                    if verdict.top_distractor:
+                        losers[verdict.top_distractor] = (
+                            losers.get(verdict.top_distractor, 0) + 1)
+                per_pile[pile.name] = {
+                    "should_accept": pile.accept,
+                    "accepted": f"{accepted}/{seen}",
+                    "top_competitor": (max(losers, key=lambda k: losers[k])
+                                       if losers else ""),
+                }
+                if pile.accept:
+                    kept += accepted
+                    counted += seen
+                else:
+                    leaked += accepted
+                    wrong += seen
+            rows[name] = {
+                "positives": list(positives),
+                "per_pile": per_pile,
+                "kept_of_valid": f"{kept}/{counted}",
+                "accepted_of_invalid": f"{leaked}/{wrong}",
+            }
+            log.info("%s / %s: valid %s, invalid %s", food, name,
+                     rows[name]["kept_of_valid"], rows[name]["accepted_of_invalid"])
+        report["foods"][food] = {"competitors": list(entity.competitors),
+                                 "variants": rows}
+    return report
+
+
+# ---------------------------------------------------------------------------
 # apple - backends and formulations together
 # ---------------------------------------------------------------------------
 
@@ -670,8 +785,7 @@ def run_holdout(args, analyzer, providers, downloader, excluded) -> dict[str, An
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command",
-                        choices=["berries", "avocado", "apple", "holdout"])
+    parser.add_argument("command", choices=sorted(PILES_FOR))
     parser.add_argument("--config", default="config.yaml")
     parser.add_argument("--clips", type=int, default=6)
     parser.add_argument("--out", default="")
@@ -711,8 +825,8 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         analyzer = VisualAnalyzer(model=model, claim_model=model,
                                   frames_per_clip=3, allow_remote_video=False)
-        runner = {"berries": run_berries, "avocado": run_avocado,
-                  "holdout": run_holdout}[args.command]
+        runner = {"berries": run_berries, "entity": run_entity,
+                  "avocado": run_avocado, "holdout": run_holdout}[args.command]
         report = runner(args, analyzer, providers, downloader, excluded)
 
     report["held_out_from"] = {"clips": len(excluded), "queries": sorted(burned)}

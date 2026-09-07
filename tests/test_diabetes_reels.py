@@ -1544,11 +1544,12 @@ def test_the_report_counts_the_stills_and_the_last_resort_separately():
 def test_a_pile_that_has_been_spent_cannot_be_spent_again():
     """The freeze is the whole point: a number about seen footage is not one.
 
-    Every query in the manifest has already decided a rule or graded one, so
-    none of them can do either again - including the held-out queries, which
-    were fresh exactly once. What this pins is not which set happens to be
-    fresh today but the mechanism: the tool refuses a command whose piles are
-    used up, and it says which ones.
+    What this pins is not which set happens to be fresh today - that changes
+    every cycle - but the two properties that have to hold in every cycle.
+    A command is either wholly fresh or wholly spent, because a table mixing
+    new piles with re-used ones is the exact confusion the manifest exists to
+    prevent; and the tool refuses a spent command rather than quietly
+    re-measuring it.
     """
 
     import importlib.util
@@ -1574,13 +1575,12 @@ def test_a_pile_that_has_been_spent_cannot_be_spent_again():
     clips, queries = module.frozen()
     assert len(clips) == 54 and queries == burned
 
-    # Every pile the tool can search is recorded, so nothing can be re-run by
-    # accident, and every command therefore refuses until it is rewritten.
-    assert set(module.PILES_FOR) == {"berries", "avocado", "apple", "holdout"}
-    assert module.PILES_FOR["holdout"] is module.HOLDOUT_PILES
     for command, piles in module.PILES_FOR.items():
         spent = module.spent_piles(command, burned)
-        assert len(spent) == len(piles), f"{command} has unrecorded piles"
+        assert len(spent) in (0, len(piles)), (
+            f"{command} mixes {len(spent)} spent piles with "
+            f"{len(piles) - len(spent)} fresh ones"
+        )
 
     # A query nobody has spent is not flagged, which is what makes the check
     # a gate rather than a wall.
@@ -1597,3 +1597,30 @@ def test_a_pile_that_has_been_spent_cannot_be_spent_again():
     for piles in module.PILES_FOR.values():
         for pile in piles:
             assert not pile.food or pile.food in BY_NAME, pile.name
+
+
+def test_every_command_the_cli_offers_has_piles_recorded():
+    """A command the freeze check does not know about is unprotected.
+
+    So the CLI takes its choices *from* the pile map rather than repeating
+    them, and this is the check that it still does.
+    """
+
+    import importlib.util
+    import sys
+
+    tool = Path(__file__).resolve().parents[1] / "tools" / "reel_holdout_check.py"
+    source = tool.read_text(encoding="utf-8")
+    assert 'parser.add_argument("command", choices=sorted(PILES_FOR))' in source
+
+    spec = importlib.util.spec_from_file_location("reel_holdout_check_cli", tool)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+
+    # Every command has a runner, and every runner has piles.
+    assert set(module.PILES_FOR) == {
+        "berries", "entity", "avocado", "apple", "holdout"
+    }
+    for command, piles in module.PILES_FOR.items():
+        assert piles, command
