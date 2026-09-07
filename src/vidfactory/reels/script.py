@@ -77,10 +77,25 @@ FORMAT_LEADS: dict[str, str] = {
 #: the duration request loses to the content.
 MIN_ITEMS = 2
 
-#: Words per second, at the rate the Spanish voice actually speaks. Overridden
-#: by the measured rate when the database has one, exactly as the long-form
-#: script generator does.
-DEFAULT_WORDS_PER_SECOND = 2.9
+#: Words per second, at the rate a reel narrator actually speaks.
+#:
+#: Measured, on the runner, from the voice comparison: the same 126 word
+#: script came out at 48.05s under Kokoro and 46.79s under Piper, which is
+#: 2.62 and 2.69 words a second including every pause. The slower of the two
+#: is the default because Kokoro is.
+#:
+#: This is deliberately *not* the content language's words-per-minute. That
+#: number is 142 wpm for Spanish and it describes long-form narration, with
+#: long-form pauses between scenes; applying it to a reel under-counts the
+#: budget by a fifth, which is two items of a five item list. The first
+#: Kokoro render was refused for exactly that reason.
+DEFAULT_WORDS_PER_SECOND = 2.62
+
+#: What each narrator was measured at, when it is the one speaking.
+MEASURED_WORDS_PER_SECOND: dict[str, float] = {
+    "kokoro": 2.62,
+    "piper": 2.69,
+}
 
 
 @dataclass
@@ -252,6 +267,11 @@ def _shared_run(left: str, right: str) -> int:
 #: At or above this the hook and the takeaway are the same clause twice.
 _HOOK_ECHO_WORDS = 5
 
+#: The answer has to have started by here, so this is the hook's time budget.
+#: The gate in :mod:`.qc` reads the same number from here: a builder that can
+#: hand out a hook the report then refuses is two rules, not one.
+HOOK_SECONDS = 6.5
+
 #: A hook scoring within this of the best is treated as its equal, and the
 #: shortest of them wins.
 #:
@@ -274,7 +294,11 @@ def _hook_pass() -> float:
     return HOOK_PASS
 
 
-def _distinct_hook(topic: Topic, extra: Sequence[str] = ()) -> HookChoice:
+def _distinct_hook(
+    topic: Topic,
+    extra: Sequence[str] = (),
+    words_per_second: float = DEFAULT_WORDS_PER_SECOND,
+) -> HookChoice:
     """The best hook that is not already the conclusion.
 
     The fruit topic's strongest candidate was "la fruta no tiene por que
@@ -291,15 +315,21 @@ def _distinct_hook(topic: Topic, extra: Sequence[str] = ()) -> HookChoice:
     ]
     if not usable:
         return choice
-    # A shorter hook is worth having, but not one that stops being about this
-    # reel: alignment is a gate in the report, and trading it for two seconds
-    # buys a faster opening for a different video.
-    aligned = [c for c in usable if c.scores.get("alignment", 0.0) >= _HOOK_MIN_ALIGNMENT]
-    usable = aligned or usable
-    # And not one that only just clears the bar: the margin below is there to
-    # break ties between good hooks, not to spend a good one on two seconds.
-    strong = [c for c in usable if c.total >= _hook_pass()]
-    usable = strong or usable
+    # Three things the report will gate on, applied together rather than in
+    # sequence. In sequence they fight: filtering by strength first can throw
+    # away the only candidate that fits the time budget, and then the builder
+    # hands out a hook its own report refuses. Only if nothing satisfies all
+    # three does this fall back - and then the report says which one gave.
+    budget = max(6, int(HOOK_SECONDS * max(1.0, words_per_second)))
+
+    def viable(candidate: Any) -> bool:
+        return (
+            candidate.scores.get("alignment", 0.0) >= _HOOK_MIN_ALIGNMENT
+            and candidate.total >= _hook_pass()
+            and len(candidate.text.split()) <= budget
+        )
+
+    usable = [c for c in usable if viable(c)] or usable
     best = max(c.total for c in usable)
     close = [c for c in usable if c.total >= best - _HOOK_LENGTH_MARGIN]
     winner = min(close, key=lambda c: (len(c.text.split()), -c.total))
@@ -459,7 +489,7 @@ def build(
     target_seconds = float(target_seconds or DEFAULT_SECONDS)
     budget_words = target_seconds * words_per_second
 
-    hook = _distinct_hook(topic, extra_hooks)
+    hook = _distinct_hook(topic, extra_hooks, words_per_second)
     cta = cta_for(topic)
     lead = FORMAT_LEADS.get(topic.format, "")
 
@@ -483,8 +513,9 @@ def build(
     # whole forty seconds saying so. Renaming it silently would be worse, so
     # this raises and names the duration that would fit.
     if required and len(items) < required:
+        where = "in its answer" if topic.promises_all_items else "in its title"
         raise ValueError(
-            f"{topic.slug!r} promises {required} items in its title and only "
+            f"{topic.slug!r} promises {required} items {where} and only "
             f"{len(items)} fit in {target_seconds:.0f}s at "
             f"{words_per_second:.2f} words/second. Render it longer "
             f"({_smallest_fit(topic, words, words_per_second, required)}) or "
@@ -499,6 +530,43 @@ def build(
         words_per_second=words_per_second,
         dropped_items=dropped,
     )
+
+
+def build_fitted(
+    topic: Topic,
+    target_seconds: float = DEFAULT_SECONDS,
+    words_per_second: float = DEFAULT_WORDS_PER_SECOND,
+    max_items: int = 0,
+    extra_hooks: Sequence[str] = (),
+) -> tuple[ReelScript, float]:
+    """The script, at the shortest allowed duration that keeps its promise.
+
+    :func:`build` is strict on purpose - it will not quietly ship four items
+    under a title that says five - but strictness in a pure function is not a
+    reason for the pipeline to produce nothing. A number in the title is not
+    negotiable and the duration is a request from a fixed menu, so when the
+    two collide the duration moves, loudly, and both numbers reach the report.
+
+    Returns the script and the duration it was actually built for.
+    """
+
+    wanted = [s for s in ALLOWED_SECONDS if s >= target_seconds]
+    attempts = [target_seconds, *[s for s in wanted if s != target_seconds]]
+    last: ValueError | None = None
+    for candidate in attempts:
+        try:
+            script = build(
+                topic,
+                target_seconds=candidate,
+                words_per_second=words_per_second,
+                max_items=max_items,
+                extra_hooks=extra_hooks,
+            )
+        except ValueError as exc:
+            last = exc
+            continue
+        return script, float(candidate)
+    raise last if last else RuntimeError("no script could be built")
 
 
 def _smallest_fit(

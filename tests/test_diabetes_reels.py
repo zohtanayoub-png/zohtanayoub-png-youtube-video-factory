@@ -32,7 +32,25 @@ from vidfactory.reels.captions import (
 from vidfactory.reels.knowledge import BY_SLUG, FORMATS, TOPICS, claims_of, find_topic
 from vidfactory.reels.metadata import DISCLAIMER, caption, hashtags
 from vidfactory.reels.qc import build_report, explains_something, value_density
-from vidfactory.reels.script import ALLOWED_SECONDS, CTA_VARIANTS, build
+from vidfactory.reels.script import (
+    ALLOWED_SECONDS,
+    CTA_VARIANTS,
+    build,
+    build_fitted,
+)
+
+
+def fitted(topic, target_seconds=45, **kw):
+    """The script the pipeline would render, at the duration it would use.
+
+    ``build`` is strict: it refuses to ship four items under a title that
+    says five. The pipeline answers that by rendering longer, so a test
+    sweeping every topic has to do the same or it is testing a code path
+    production never takes.
+    """
+
+    return build_fitted(topic, target_seconds=target_seconds, **kw)[0]
+
 from vidfactory.reels.sources import SOURCES, bibliography
 
 FIRST = "frutas-impacto-moderado"
@@ -108,7 +126,7 @@ def test_a_mistyped_source_counts_as_unsupported():
 
 def test_no_topic_says_anything_it_should_not():
     for topic in TOPICS:
-        script = build(topic, target_seconds=45)
+        script = fitted(topic, 45)
         assert not safety.find_risks(script.narration), topic.slug
 
 
@@ -231,7 +249,7 @@ def test_the_hook_is_not_the_conclusion_said_twice():
     from vidfactory.reels.script import _shared_run
 
     for topic in TOPICS:
-        script = build(topic, target_seconds=45)
+        script = fitted(topic, 45)
         assert _shared_run(script.hook.hook, topic.takeaway_line) < 5, topic.slug
 
 
@@ -253,7 +271,7 @@ def test_the_answer_is_an_answer_and_not_a_trailer_for_one():
     """The third second carries the reel's point, not a description of it."""
 
     for topic in TOPICS:
-        answer = build(topic, target_seconds=45).beats[1]
+        answer = fitted(topic, 45).beats[1]
         assert answer.kind == "answer"
         flat = answer.text.lower()
         for trailer in ("en este video", "en este reel", "te voy a contar",
@@ -265,7 +283,7 @@ def test_every_item_says_why_it_is_true():
     """The reason is no longer the first thing the duration trim throws away."""
 
     for topic in TOPICS:
-        script = build(topic, target_seconds=45)
+        script = fitted(topic, 45)
         assert script.items_without_a_reason == [], topic.slug
 
 
@@ -276,15 +294,37 @@ def test_a_number_in_the_title_is_delivered():
         promised = topic.required_item_count
         if not promised:
             continue
-        script = build(topic, target_seconds=45)
+        script = fitted(topic, 45)
         assert len(script.item_beats) == promised, topic.slug
 
 
 def test_an_impossible_count_raises_rather_than_shipping_a_short_list():
     topic = BY_SLUG["frutas-impacto-moderado"]
     assert topic.required_item_count == 5
+    # The strict builder, not the fitting one: build_fitted answers this by
+    # rendering longer, which is the pipeline's job and is tested below.
     with pytest.raises(ValueError, match="promises 5 items"):
         build(topic, target_seconds=20)
+
+
+def test_the_duration_grows_rather_than_the_promise_shrinking():
+    """A five item title at a slow rate is a longer reel, not a shorter list."""
+
+    topic = BY_SLUG["errores-comer-fruta"]
+    script, seconds = build_fitted(topic, target_seconds=45)
+    assert len(script.item_beats) == topic.required_item_count
+    assert seconds in ALLOWED_SECONDS and seconds > 45
+
+
+def test_an_answer_that_names_every_item_is_a_promise_too():
+    """"Granola, barritas, salsas, zumos envasados y lacteos de sabores"
+    commits the reel to five things as surely as a title that says five."""
+
+    topic = BY_SLUG["azucar-oculto"]
+    assert topic.promises_all_items
+    assert topic.required_item_count == len(topic.items)
+    script, _seconds = build_fitted(topic, target_seconds=45)
+    assert len(script.item_beats) == len(topic.items)
 
 
 def test_dos_personas_in_a_title_is_not_an_item_count():
@@ -295,7 +335,7 @@ def test_dos_personas_in_a_title_is_not_an_item_count():
 
 def test_the_cta_is_one_of_the_allowed_variations():
     for topic in TOPICS:
-        assert build(topic, target_seconds=45).cta in CTA_VARIANTS
+        assert fitted(topic, 45).cta in CTA_VARIANTS
 
 
 def test_the_cta_never_asks_for_a_purchase():
@@ -316,7 +356,7 @@ def test_the_duration_request_is_honoured_or_the_content_wins(seconds):
     """
 
     topic = next(t for t in TOPICS if not t.required_item_count)
-    script = build(topic, target_seconds=seconds)
+    script = fitted(topic, seconds)
     assert script.item_beats, seconds
     assert script.cta
     assert script.items_without_a_reason == []
@@ -334,8 +374,8 @@ def test_items_are_dropped_before_their_reasons_are():
     """
 
     topic = next(t for t in TOPICS if not t.required_item_count and len(t.items) >= 4)
-    long_reel = build(topic, target_seconds=60)
-    short_reel = build(topic, target_seconds=30)
+    long_reel = fitted(topic, 60)
+    short_reel = fitted(topic, 30)
     assert len(long_reel.item_beats) > len(short_reel.item_beats)
     assert long_reel.word_count > short_reel.word_count
     assert long_reel.items_without_a_reason == []
@@ -344,7 +384,7 @@ def test_items_are_dropped_before_their_reasons_are():
 
 def test_retention_lines_are_used_sparingly_and_never_twice():
     for topic in TOPICS:
-        script = build(topic, target_seconds=60)
+        script = fitted(topic, 60)
         lines = [b.text for b in script.beats if b.kind == "retention"]
         assert len(lines) <= 2, topic.slug
         assert len(set(lines)) == len(lines), topic.slug
@@ -366,7 +406,7 @@ def test_the_reel_always_carries_a_caveat():
     every statement in this niche is only correct with one attached."""
 
     for topic in TOPICS:
-        script = build(topic, target_seconds=45)
+        script = fitted(topic, 45)
         assert safety.mentions_caveat(script.narration), topic.slug
 
 
@@ -525,7 +565,7 @@ def test_the_seven_metrics_the_brief_names_are_all_reported():
 
 def test_production_requires_zero_risk_and_zero_unsupported():
     for topic in TOPICS:
-        script = build(topic, target_seconds=45)
+        script = fitted(topic, 45)
         report = build_report(
             script,
             production=True,
@@ -586,7 +626,7 @@ def test_the_caption_carries_the_sources_and_the_disclaimer():
 
 def test_hashtags_are_deduplicated_and_bounded():
     for topic in TOPICS:
-        script = build(topic, target_seconds=45)
+        script = fitted(topic, 45)
         tags = hashtags(script)
         assert len(tags) == len(set(t.lower() for t in tags))
         assert 1 <= len(tags) <= 12
@@ -675,7 +715,7 @@ def test_every_beat_kind_the_builder_emits_has_a_delivery(tmp_path):
 
     from vidfactory.reels import narration as narration_module
 
-    kinds = {b.kind for topic in TOPICS for b in build(topic, 45).beats}
+    kinds = {b.kind for topic in TOPICS for b in fitted(topic, 45).beats}
     assert kinds <= set(narration_module.BEAT_SPEED), kinds
     assert kinds <= set(narration_module.BEAT_PAUSE), kinds
 

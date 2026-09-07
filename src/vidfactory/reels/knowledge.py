@@ -92,6 +92,11 @@ class Topic:
     #: The one practical thing to do, said just before the CTA. Falls back to
     #: ``conclusion``.
     takeaway: str = ""
+    #: Set when the answer names every item, so trimming one makes the third
+    #: second a lie. "Granola, barritas, salsas, zumos envasados y lacteos de
+    #: sabores" promises five things as surely as a title that says five, and
+    #: the reel has to deliver them or run longer.
+    promises_all_items: bool = False
     #: Candidate openings, written for this topic rather than generated from
     #: a template. Five to eight each: :mod:`vidfactory.reels.hooks` scores
     #: them and picks one, and a real choice needs real alternatives. Generic
@@ -121,6 +126,8 @@ class Topic:
         # "Por que dos personas pueden responder distinto" as a promise of two
         # items, and that title promises no list at all.
         head = self.title.lower().split()
+        if self.promises_all_items:
+            return len(self.items)
         first = head[0] if head else ""
         if first.isdigit():
             return int(first)
@@ -336,8 +343,7 @@ TOPICS: tuple[Topic, ...] = (
                    "raciones normales"
                ),
         takeaway=(
-                     "Si te llevas una sola cosa: mide la racion y acompana la "
-                     "fruta con algo de proteina"
+                     "Mide la racion y acompana la fruta con algo de proteina"
                  ),
         items=_fruit_list_items(),
         hashtags=("#diabetes", "#glucosa", "#alimentacionsaludable", "#fruta",
@@ -789,6 +795,7 @@ TOPICS: tuple[Topic, ...] = (
                      "La proxima vez que tomes fruta, anade un yogur natural o un "
                      "punado de nueces"
                  ),
+        promises_all_items=True,
         items=(
             Item(
                 key="fruta_proteina",
@@ -952,6 +959,7 @@ TOPICS: tuple[Topic, ...] = (
                      "Antes de comprar, mira dos numeros: azucares y fibra por "
                      "cien gramos"
                  ),
+        promises_all_items=True,
         items=(
             Item(
                 key="etiqueta_azucares",
@@ -1089,6 +1097,7 @@ TOPICS: tuple[Topic, ...] = (
                      "Dale la vuelta al envase y lee la linea de azucares antes de "
                      "echarlo al carro"
                  ),
+        promises_all_items=True,
         items=(
             Item(
                 key="granola",
@@ -1186,6 +1195,7 @@ TOPICS: tuple[Topic, ...] = (
                      "Pesa una vez tu racion habitual y tendras la referencia para "
                      "siempre"
                  ),
+        promises_all_items=True,
         items=(
             Item(
                 key="mismo_alimento",
@@ -1457,7 +1467,7 @@ TOPICS: tuple[Topic, ...] = (
             "Si te han dicho que con diabetes hay que renunciar a la fruta, esto te interesa.",
             "Te preocupa tener que dejar la fruta por miedo al azucar? Mira lo que dicen las guias.",
             "Antes de dejar la fruta por miedo al azucar, mira lo que dicen las guias.",
-            "Si has quitado la fruta por si acaso, esto te va a interesar.",
+            "Si tienes diabetes, dejar toda la fruta por miedo al azucar puede no ser necesario.",
             "Si crees que la fruta esta descartada con diabetes, esto te va a sorprender.",
         ),
     ),
@@ -1489,10 +1499,10 @@ TOPICS: tuple[Topic, ...] = (
         items=(AGUACATE, FRESAS, FRAMBUESAS, MANZANA, PLATANO_MADURO),
         hashtags=("#diabetes", "#fruta", "#glucosa", "#nutricion"),
         hooks=(
-            "Si te preocupa no saber que fruta elegir, este orden te da una referencia rapida.",
+            "Si te preocupa que la fruta te suba la glucosa, guarda este orden de menor a mayor.",
             "Te preocupa elegir mal la fruta? Esta es la lista de menor a mayor impacto aproximado.",
             "Si te preocupa elegir mal la fruta, este orden te da una referencia rapida.",
-            "Si dudas delante de la fruteria y no sabes cual coger, empieza por este orden.",
+            "Si nunca sabes que fruta elegir para no disparar tu glucosa, guarda estas cinco opciones.",
             "Si comparas frutas y no tienes claro cual pesa mas en tu glucosa, mira este orden.",
         ),
     ),

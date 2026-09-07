@@ -49,7 +49,14 @@ from .knowledge import BY_SLUG, Topic, find_topic
 from .metadata import caption as build_caption
 from .metadata import publish_metadata
 from .qc import ReelReport, build_report
-from .script import ALLOWED_SECONDS, DEFAULT_SECONDS, ReelScript, build as build_script
+from .script import (
+    ALLOWED_SECONDS,
+    DEFAULT_SECONDS,
+    DEFAULT_WORDS_PER_SECOND,
+    MEASURED_WORDS_PER_SECOND,
+    ReelScript,
+    build_fitted,
+)
 from .sources import bibliography
 
 log = get_logger("REEL")
@@ -113,27 +120,60 @@ class ReelPipeline:
         self.language = resolve_language("es")
 
     # ------------------------------------------------------------------
-    def _speech_rate(self, voice: str) -> float:
-        """Words per second, measured if this voice has ever spoken here.
+    def _speech_rate(self, engine: str, voice: str) -> float:
+        """Words per second, measured if this engine and voice have spoken here.
 
         Same rule the long-form generator follows: the engine's declared rate
-        is a constant, and the rate this voice actually speaks at is a
-        measurement. A reel is short enough that a ten percent error is three
-        or four seconds, which is the difference between fitting a format and
-        not.
+        is a constant, and the rate it actually speaks at is a measurement. A
+        reel is short enough that a ten percent error is three or four
+        seconds, which is the difference between fitting a format and not.
+
+        Keyed on the engine as well as the voice, and that is not pedantry:
+        the first Kokoro render was refused because the rate on file was a
+        Piper measurement of 2.37 words a second, taken with the long-form
+        pauses, and applying it to a different narrator with different pauses
+        cost the reel two of its five items before a word was spoken.
         """
 
-        declared = float(self.language.words_per_minute or 170.0) / 60.0
+        # The reel's own rate, not the content language's. See
+        # DEFAULT_WORDS_PER_SECOND: 142 wpm describes long-form narration and
+        # under-counts a reel's budget by a fifth.
+        declared = MEASURED_WORDS_PER_SECOND.get(
+            str(engine or "").strip().lower(), DEFAULT_WORDS_PER_SECOND
+        )
         if self.database is None:
             return declared
         try:
-            measured = self.database.measured_speech_rate("piper", voice)
+            measured = self.database.measured_speech_rate(engine, voice)
         except Exception:                                  # pragma: no cover
             return declared
         if measured and measured > 0:
-            log.info("Sizing the reel for the measured rate: %.0f wpm", measured)
+            log.info(
+                "Sizing the reel for %s's measured rate: %.0f wpm", engine, measured
+            )
             return float(measured) / 60.0
         return declared
+
+    def _fit(
+        self, topic: Any, seconds: float, rate: float, items: int
+    ) -> tuple[ReelScript, float]:
+        """The script, at a duration that keeps the topic's promise."""
+
+        script, actual = build_fitted(
+            topic, target_seconds=seconds, words_per_second=rate,
+            max_items=int(items or 0),
+        )
+        if actual != seconds:
+            promised = (
+                "the answer names" if topic.promises_all_items
+                else "the title promises"
+            )
+            log.warning(
+                "%.0fs cannot hold the %d items %s at %.2f words/second; "
+                "rendering %.0fs instead",
+                seconds, topic.required_item_count, promised, rate, actual,
+            )
+        return script, actual
 
     # ------------------------------------------------------------------
     def run(
@@ -157,11 +197,12 @@ class ReelPipeline:
         work = run_dir / "work"
         work.mkdir(exist_ok=True)
 
-        script = build_script(
-            chosen,
-            target_seconds=seconds,
-            words_per_second=self._speech_rate(voice),
-            max_items=int(items or 0),
+        # The narrator is chosen before the script, because how fast it
+        # speaks decides how much script there is room for.
+        engine = self._engine(voice, tts)
+        requested_seconds = seconds
+        script, seconds = self._fit(
+            chosen, seconds, self._speech_rate(getattr(engine, "name", ""), voice), items
         )
         log.info(
             "%s | %s | %d beats, %d items, ~%.1fs (%s)",
@@ -171,7 +212,7 @@ class ReelPipeline:
         )
         log.info("Hook: %s", script.hook.hook)
 
-        narration = self._narrate(script, work, voice, tts)
+        narration = self._narrate(script, work, engine)
         shots, clips = self._plan_visuals(script, narration, work)
 
         # Captions and the fixed title are written *before* the render,
@@ -214,6 +255,10 @@ class ReelPipeline:
         report.metrics["tts_engine"] = narration.engine
         report.metrics["tts_voice"] = narration.voice
         report.metrics["tts_licence"] = licence_report().get(narration.engine, {})
+        report.metrics["requested_seconds"] = float(requested_seconds)
+        report.metrics["duration_grew_for_the_item_count"] = (
+            float(requested_seconds) != float(seconds)
+        )
         # What "sounds robotic" actually is, as numbers: how much the loudness
         # moves, how much of the track is pause, and whether the pauses are all
         # the same length. Recorded rather than gated - this is a description
@@ -261,9 +306,18 @@ class ReelPipeline:
         return float(nearest)
 
     # ------------------------------------------------------------------
-    def _narrate(
-        self, script: ReelScript, work: Path, voice: str, tts: str = ""
-    ) -> Any:
+    def _engine(self, voice: str, tts: str = "") -> Any:
+        """The narrator this reel will use."""
+
+        return build_reel_engine(
+            engine=str(tts or self.config.get("reels.tts.engine", "auto")),
+            voice=voice,
+            speed=float(self.config.get("tts.speed", 1.0)),
+            sample_rate=int(self.config.get("audio.sample_rate", 48000)),
+            language=self.language,
+        )
+
+    def _narrate(self, script: ReelScript, work: Path, engine: Any) -> Any:
         """The reel's own narrator: same words, delivery that varies by beat.
 
         :class:`NarrationBuilder` reads a script at one pace with one pause
@@ -273,13 +327,6 @@ class ReelPipeline:
         instead.
         """
 
-        engine = build_reel_engine(
-            engine=str(tts or self.config.get("reels.tts.engine", "auto")),
-            voice=voice,
-            speed=float(self.config.get("tts.speed", 1.0)),
-            sample_rate=int(self.config.get("audio.sample_rate", 48000)),
-            language=self.language,
-        )
         narration = narrate(
             script.beats,
             engine,

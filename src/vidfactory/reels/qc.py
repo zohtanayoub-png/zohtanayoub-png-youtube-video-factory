@@ -38,7 +38,7 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from .safety import find_risks, find_unsupported, mentions_caveat, summarise
-from .script import ReelScript
+from .script import HOOK_SECONDS, ReelScript
 
 #: A reel is mostly value or it is filler. Measured as the share of spoken
 #: words that carry the content, where the hook, the promise and the
