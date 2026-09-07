@@ -630,6 +630,57 @@ in the report has to come from a measurement - applies here to the **words**.
   That is the next cycle's calibration - context prompts that describe the
   food rather than the crockery - and it needs its own piles again. Sixty
   queries are now spent across six runs.
+* **Presentation, run 34156801236: the crockery was not the problem, and
+  the measurement says where the problem is.** Ninety-eight clips over
+  thirty-three piles that hold the food constant and vary how it is
+  presented - bowl, plate, linen, board, supermarket box, a hand, a jar, a
+  punnet, loose, single, piled, whole, halved, sliced:
+
+      context wording          probe          precision   recall
+      container-named          entity alone     0.789      0.662
+      container-named          conjunction      0.971      0.485
+      food-centred             entity alone     0.789      0.662
+      food-centred             conjunction      0.971      0.500
+
+  Rewriting the context to describe the food bought **one clip in
+  ninety-eight**, at no cost to precision. It is the right wording and it
+  was not the cause. Dropping the supermarket-shelf negative changed
+  **nothing at all** - the two variants are identical to the digit - so that
+  prompt stays.
+
+  Per presentation, the pattern is not about containers either. Halved,
+  sliced, piled and "many" are kept 6/6, 6/6, 3/3, 3/3; **jar, linen and
+  plate are 0 of 3 before the conjunction ever runs**, and loose and punnet
+  are 1 of 3. Per food:
+
+      food         entity recall   conjunction recall   precision
+      kiwi             1.000             0.889            1.000
+      aguacate         0.833             0.833            0.909
+      manzana          0.800             0.400            1.000
+      fresas           0.529             0.471            1.000
+      frambuesas       0.333             0.133            1.000
+
+  Two separate faults, and neither is the one that was being looked for.
+  **The berries are invisible to the entity probe** outside a heap - which
+  is what the arrangement wording is for, and it is now shipped. **The apple
+  loses half its valid clips between the entity probe and the conjunction**,
+  which is the state wording adopted last cycle: "apples on a tree with
+  their skin on" scored 0.958 on the pile that chose it and a single apple
+  on a cutting board is not on a tree. That is the next calibration, on its
+  own piles.
+* **The raspberry candidate, decided at last** (runs 34113587132 and
+  34155581648, two independent fresh four-berry sets). Adopt the
+  arrangement wording, refuse the centre crop:
+
+      set          shipped   +crop   arrangement   arrangement+crop
+      third        0.750     0.750     0.792           0.792
+      fourth       0.583     0.500     0.667           0.542
+
+  On the fourth set raspberry recall goes 0.500 -> 0.667 and strawberry
+  precision 0.8 -> 1.000, so it improves the raspberry without creating
+  berry confusion, which was the condition. The crop won on the development
+  pile and lost on both fresh ones; that is what a development pile is for
+  and why it does not get to decide.
 * **The CTA may not play over a frozen frame, and the gap is between the
   beats rather than after them.** The editor holds the last frame when the
   picture is shorter than the narration: run 34093462658 held it for 1.7

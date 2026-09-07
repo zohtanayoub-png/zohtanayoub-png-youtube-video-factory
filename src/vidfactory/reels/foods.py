@@ -85,8 +85,22 @@ FOODS: tuple[VisualEntity, ...] = (
     _food(
         "fresas", ["strawberries"],
         ["fresa", "fresas"],
-        ["fresh strawberries", "a bowl of red strawberries",
-         "whole strawberries close up"],
+        # Arrangement rather than a close-up of one berry. Measured twice on
+        # two independent fresh four-berry sets: the four-way confusion
+        # accuracy goes 0.583 -> 0.667 and 0.750 -> 0.792, strawberry
+        # precision reaches 1.000, and raspberry recall 0.500 -> 0.667. The
+        # centre crop that looked promising on the development pile is *not*
+        # here: it lost on both fresh sets (0.667 -> 0.542, 0.750 -> 0.542).
+        #
+        # These name punnets and bowls where the context prompts may not,
+        # and the difference is what each probe is for: an entity positive
+        # describes what the food looks like in quantity, which is most of
+        # what tells a raspberry pile from a strawberry pile. Context asks
+        # whether the food is the subject, and there the crockery is
+        # furniture.
+        ["a punnet of strawberries stacked in rows",
+         "many red strawberries filling a bowl",
+         "strawberries piled on a wooden table"],
         ["raspberries", "cherries", "blueberries", "a tomato",
          "mixed berries with no strawberries"],
         ["fresh strawberries in a white bowl", "whole strawberries close up",
@@ -95,8 +109,9 @@ FOODS: tuple[VisualEntity, ...] = (
     _food(
         "frambuesas", ["raspberries"],
         ["frambuesa", "frambuesas"],
-        ["fresh raspberries", "a bowl of raspberries",
-         "raspberries close up"],
+        ["a punnet of raspberries stacked in rows",
+         "many small raspberries filling a bowl",
+         "raspberries piled on a wooden table"],
         ["strawberries", "blackberries", "cherries", "redcurrants",
          "mixed berries with no raspberries"],
         ["fresh raspberries close up bowl", "a bowl of ripe raspberries",
