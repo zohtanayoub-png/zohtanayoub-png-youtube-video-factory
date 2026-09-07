@@ -1387,7 +1387,7 @@ TOPICS: tuple[Topic, ...] = (
         ),
         hashtags=("#diabetes", "#glucosa", "#educaciondiabetologica"),
         hooks=(
-            "Te preocupa que el mismo alimento te suba la glucosa mas que a otra persona? Esto lo explica.",
+            "Te preocupa que un mismo alimento suba la glucosa distinto en cada persona? Esto te interesa.",
             "Si a otra persona le sienta bien el mismo desayuno y a ti te sube la glucosa mas de lo que esperas, esto lo explica.",
             "Si sigues una lista de alimentos y tu glucosa sube mas de lo que esperas, hay una explicacion.",
             "Si tienes diabetes y el mismo alimento te sube la glucosa mas que a otra persona, esto lo explica.",

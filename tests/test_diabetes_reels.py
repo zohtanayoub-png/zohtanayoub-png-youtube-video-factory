@@ -140,30 +140,74 @@ def test_a_dishonest_hook_cannot_win_on_being_punchy(opener):
     assert hooks.score_hook(opener, BY_SLUG[FIRST]).rejected
 
 
-def test_the_briefs_own_examples_all_clear_the_bar():
-    """The bar was read off these eight, not chosen."""
+#: The hooks the brief lists under "Prefer hooks like", each with the topic
+#: it belongs to. The bar was read off these: scored against their own topics
+#: they land between 0.491 and 0.692, and a generic opening scores 0.376.
+PROBLEM_FIRST = [
+    ("frutas-impacto-moderado",
+     "Si tienes diabetes y te preocupa que la fruta te dispare la glucosa, escucha esto."),
+    ("desayunos-picos",
+     "Tu glucosa sube mucho despues del desayuno? Puede que el problema este aqui."),
+    ("mito-dejar-fruta",
+     "Si tienes diabetes, dejar toda la fruta por miedo al azucar puede no ser necesario."),
+    ("ranking-frutas",
+     "Si nunca sabes que fruta elegir para no disparar tu glucosa, guarda estas cinco opciones."),
+    ("desayunos-picos",
+     "Este desayuno parece saludable, pero puede hacer que tu glucosa suba mucho mas rapido de lo que esperas."),
+    ("combinar-fruta",
+     "Si comes fruta sola y despues ves un pico grande, hay algo importante que debes saber."),
+    # The one the brief writes out in its timeline example.
+    ("frutas-impacto-moderado",
+     "Si tienes diabetes y te preocupa que la fruta te dispare la glucosa, apunta estas cinco opciones."),
+]
+
+
+@pytest.mark.parametrize("slug,example", PROBLEM_FIRST)
+def test_the_briefs_problem_first_examples_clear_the_bar(slug, example):
+    """The bar was read off these, not chosen."""
+
+    candidate = hooks.score_hook(example, BY_SLUG[slug])
+    assert not candidate.rejected, example
+    assert candidate.total >= hooks.HOOK_PASS, (example, candidate.total)
+
+
+def test_a_hook_that_names_a_subject_no_longer_clears_a_problem_first_bar():
+    """The first brief's openings are still legal, and no longer enough.
+
+    "Si tienes diabetes, no todas las frutas afectan igual a tu glucosa" is a
+    true, on-topic, perfectly grammatical sentence, and it is about fruit
+    rather than about the viewer's problem with fruit. It used to pass at
+    0.54; under a scoring that leads with problem recognition it scores 0.32,
+    which is the same as a deliberately generic opening. That is the change
+    the second brief asked for, so it is asserted rather than tolerated -
+    but it is scored low, not refused, because refusing it would be a claim
+    that it is dishonest, and it is not.
+    """
 
     topic = BY_SLUG[FIRST]
-    examples = [
-        "Si tienes diabetes, no todas las frutas afectan igual a tu glucosa.",
-        "Estas frutas parecen saludables, pero algunas pueden subir tu glucosa mucho mas rapido.",
-        "Si tu glucosa se dispara despues del desayuno, puede que estes cometiendo uno de estos errores.",
-        "Antes de dejar de comer fruta por miedo al azucar, mira esto.",
-        "El problema no siempre es la fruta. Muchas veces es como te la comes.",
-        "Tres cambios muy simples pueden ayudarte a evitar picos innecesarios despues de comer.",
-        "Si comes fruta sola cuando tienes hambre, presta atencion a esto.",
-        "Este desayuno parece saludable, pero puede no ser la mejor opcion para tu glucosa.",
-    ]
-    for example in examples:
-        candidate = hooks.score_hook(example, topic)
-        assert not candidate.rejected, example
-        assert candidate.total >= hooks.HOOK_PASS, (example, candidate.total)
+    subject_first = hooks.score_hook(
+        "Si tienes diabetes, no todas las frutas afectan igual a tu glucosa.", topic
+    )
+    generic = hooks.score_hook(
+        "Estas son cinco ideas sencillas para el dia a dia.", topic
+    )
+    problem_first = hooks.score_hook(
+        "Si tienes diabetes y te preocupa que la fruta te dispare la glucosa, "
+        "escucha esto.", topic
+    )
+    assert not subject_first.rejected
+    assert subject_first.total < hooks.HOOK_PASS
+    assert generic.total < hooks.HOOK_PASS
+    assert problem_first.total > generic.total
+    assert problem_first.total > subject_first.total
 
 
-def test_between_five_and_ten_candidates_are_generated_and_one_is_chosen():
+def test_between_eight_and_twelve_candidates_are_generated_and_one_is_chosen():
     for topic in TOPICS:
         candidates = hooks.generate(topic)
-        assert 5 <= len(candidates) <= 10, (topic.slug, len(candidates))
+        assert hooks.MIN_CANDIDATES <= len(candidates) <= hooks.MAX_CANDIDATES, (
+            topic.slug, len(candidates)
+        )
         choice = hooks.choose(topic)
         assert choice.hook in candidates
         assert choice.strength >= hooks.HOOK_PASS, topic.slug
@@ -188,7 +232,7 @@ def test_the_hook_is_not_the_conclusion_said_twice():
 
     for topic in TOPICS:
         script = build(topic, target_seconds=45)
-        assert _shared_run(script.hook.hook, topic.conclusion) < 5, topic.slug
+        assert _shared_run(script.hook.hook, topic.takeaway_line) < 5, topic.slug
 
 
 # ---------------------------------------------------------------------------
@@ -199,10 +243,54 @@ def test_the_six_beats_arrive_in_order():
     script = build(BY_SLUG[FIRST], target_seconds=45)
     kinds = [b.kind for b in script.beats]
     assert kinds[0] == "hook"
-    assert kinds[1] == "promise"
+    assert kinds[1] == "answer"
     assert kinds[-1] == "cta"
-    assert kinds[-2] == "conclusion"
+    assert kinds[-2] == "takeaway"
     assert "item" in kinds
+
+
+def test_the_answer_is_an_answer_and_not_a_trailer_for_one():
+    """The third second carries the reel's point, not a description of it."""
+
+    for topic in TOPICS:
+        answer = build(topic, target_seconds=45).beats[1]
+        assert answer.kind == "answer"
+        flat = answer.text.lower()
+        for trailer in ("en este video", "en este reel", "te voy a contar",
+                        "vamos a ver", "hoy hablamos"):
+            assert trailer not in flat, (topic.slug, answer.text)
+
+
+def test_every_item_says_why_it_is_true():
+    """The reason is no longer the first thing the duration trim throws away."""
+
+    for topic in TOPICS:
+        script = build(topic, target_seconds=45)
+        assert script.items_without_a_reason == [], topic.slug
+
+
+def test_a_number_in_the_title_is_delivered():
+    """"5 frutas" that ships four has a false line burned into every frame."""
+
+    for topic in TOPICS:
+        promised = topic.required_item_count
+        if not promised:
+            continue
+        script = build(topic, target_seconds=45)
+        assert len(script.item_beats) == promised, topic.slug
+
+
+def test_an_impossible_count_raises_rather_than_shipping_a_short_list():
+    topic = BY_SLUG["frutas-impacto-moderado"]
+    assert topic.required_item_count == 5
+    with pytest.raises(ValueError, match="promises 5 items"):
+        build(topic, target_seconds=20)
+
+
+def test_dos_personas_in_a_title_is_not_an_item_count():
+    """The count is a promise of a list, not any number in the sentence."""
+
+    assert BY_SLUG["respuesta-individual"].required_item_count == 0
 
 
 def test_the_cta_is_one_of_the_allowed_variations():
@@ -219,24 +307,39 @@ def test_the_cta_never_asks_for_a_purchase():
 
 @pytest.mark.parametrize("seconds", ALLOWED_SECONDS)
 def test_the_duration_request_is_honoured_or_the_content_wins(seconds):
-    """A shorter reel drops items; it never drops the claim inside one, and
-    it never ends up empty."""
+    """A shorter reel drops whole items; it never drops the reason inside one,
+    and it never ends up empty.
 
-    script = build(BY_SLUG[FIRST], target_seconds=seconds)
+    A topic whose title promises a count is the exception and raises instead,
+    because there is no honest short version of "5 frutas" - see
+    :func:`test_an_impossible_count_raises_rather_than_shipping_a_short_list`.
+    """
+
+    topic = next(t for t in TOPICS if not t.required_item_count)
+    script = build(topic, target_seconds=seconds)
     assert script.item_beats, seconds
     assert script.cta
+    assert script.items_without_a_reason == []
     for beat in script.item_beats:
         assert len(beat.text.split()) >= 8
 
 
-def test_explanations_are_dropped_before_items_are():
-    """The long-form trim rule, applied here: optional material first, the
-    substance last."""
+def test_items_are_dropped_before_their_reasons_are():
+    """The reverse of the rule this started with, and deliberately.
 
-    long_reel = build(BY_SLUG[FIRST], target_seconds=60)
-    short_reel = build(BY_SLUG[FIRST], target_seconds=30)
-    assert len(long_reel.item_beats) >= len(short_reel.item_beats)
+    The first version paid for the duration by stripping the "why" off the
+    items, which is how five assertions with nothing behind them came to be a
+    reel. An item the viewer cannot act on is not shorter value, so the
+    budget now buys fewer items and every survivor keeps its reason.
+    """
+
+    topic = next(t for t in TOPICS if not t.required_item_count and len(t.items) >= 4)
+    long_reel = build(topic, target_seconds=60)
+    short_reel = build(topic, target_seconds=30)
+    assert len(long_reel.item_beats) > len(short_reel.item_beats)
     assert long_reel.word_count > short_reel.word_count
+    assert long_reel.items_without_a_reason == []
+    assert short_reel.items_without_a_reason == []
 
 
 def test_retention_lines_are_used_sparingly_and_never_twice():
@@ -521,3 +624,122 @@ def test_the_reels_package_reuses_rather_than_reimplements():
     for shared in ("..downloader", "..editor", "..ranking", "..tts",
                    "..stock.registry", "..subtitles"):
         assert shared in body, shared
+
+
+# ---------------------------------------------------------------------------
+# The voice: delivery, and what it ships under
+# ---------------------------------------------------------------------------
+
+class _RecordingEngine:
+    """A TTS engine that writes silence and remembers how it was asked to."""
+
+    name = "recording"
+    voice = "test"
+    speech_rate_wpm = 170.0
+
+    def __init__(self):
+        self.calls = []
+
+    def synthesize(self, text, destination, speed: float = 1.0):
+        from vidfactory.ffmpeg_utils import make_silence
+
+        self.calls.append((text, speed))
+        make_silence(destination, max(0.2, len(text.split()) / 3.0), 48000)
+        return destination
+
+
+class _OnePaceEngine:
+    """The other kind: no speed argument at all."""
+
+    name = "onepace"
+    voice = "test"
+
+    def __init__(self):
+        self.calls = []
+
+    def synthesize(self, text, destination):
+        from vidfactory.ffmpeg_utils import make_silence
+
+        self.calls.append(text)
+        make_silence(destination, max(0.2, len(text.split()) / 3.0), 48000)
+        return destination
+
+
+def test_every_beat_kind_the_builder_emits_has_a_delivery(tmp_path):
+    """A beat with no entry in the tables is read at the default pace, which
+    is the bug that would make a new beat kind silently sound wrong."""
+
+    from vidfactory.reels import narration as narration_module
+
+    kinds = {b.kind for topic in TOPICS for b in build(topic, 45).beats}
+    assert kinds <= set(narration_module.BEAT_SPEED), kinds
+    assert kinds <= set(narration_module.BEAT_PAUSE), kinds
+
+
+@pytest.mark.integration
+def test_the_reel_is_not_read_at_one_pace(tmp_path):
+    from vidfactory.reels.narration import BEAT_SPEED, narrate
+
+    script = build(BY_SLUG[FIRST], target_seconds=45)
+    engine = _RecordingEngine()
+    result = narrate(
+        script.beats, engine, workdir=tmp_path / "w", destination=tmp_path / "n.wav"
+    )
+    speeds = {speed for _text, speed in engine.calls}
+    assert len(speeds) > 1, speeds
+    # The takeaway is the line to remember, so it is the slowest thing said.
+    assert BEAT_SPEED["takeaway"] == min(BEAT_SPEED.values())
+    assert result.duration > 0
+    assert len(result.scene_timings) == len(script.beats)
+
+
+@pytest.mark.integration
+def test_an_engine_without_a_speed_argument_still_works(tmp_path):
+    """Piper takes one; eSpeak does not. Neither may break the reel."""
+
+    from vidfactory.reels.narration import narrate
+
+    script = build(BY_SLUG[FIRST], target_seconds=45)
+    engine = _OnePaceEngine()
+    result = narrate(
+        script.beats, engine, workdir=tmp_path / "w", destination=tmp_path / "n.wav"
+    )
+    assert len(engine.calls) >= len(script.beats)
+    assert result.duration > 0
+
+
+def test_an_explicit_engine_request_is_not_silently_downgraded(monkeypatch):
+    """The A/B comparison is worthless if "piper" can quietly mean Kokoro."""
+
+    from vidfactory.reels import voice as voice_module
+
+    seen = {}
+
+    def fake_build_engine(engine, voice, speed, sample_rate, language, **kw):
+        seen["engine"] = engine
+        return _RecordingEngine()
+
+    monkeypatch.setattr(voice_module, "build_engine", fake_build_engine)
+    voice_module.build_reel_engine(engine="piper", language="es")
+    assert seen["engine"] == "piper"
+
+
+def test_the_licence_of_the_voice_that_spoke_is_reachable_from_its_name():
+    from vidfactory.reels.voice import licence_report
+
+    report = licence_report()
+    assert report["kokoro"]["model"] == "hexgrad/Kokoro-82M"
+    assert report["kokoro"]["model_licence"] == "Apache-2.0"
+    # The Piper runtime and the Piper voices are separate artefacts with
+    # separate terms, and the voice is the one that ends up in the video.
+    assert report["piper"]["voice_licences"]["es_ES-sharvard-medium"] == "MIT"
+
+
+def test_piper_is_still_here():
+    """Kokoro is the default; Piper is the fallback and stays in the project."""
+
+    from vidfactory import tts
+    from vidfactory.reels.voice import build_reel_engine
+
+    assert hasattr(tts, "PiperEngine")
+    assert "piper" in build_reel_engine.__doc__.lower()

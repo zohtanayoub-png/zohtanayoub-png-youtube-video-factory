@@ -46,10 +46,21 @@ on:
         default: "0"
         options: ["0", "3", "4", "5", "6", "7", "10"]
       voice:
-        description: "Piper voice. Blank = es_ES-sharvard-medium (female, Castilian)"
+        description: "Voice name. Blank = ef_dora (Kokoro) or es_ES-sharvard-medium (Piper)"
         required: false
         type: string
         default: ""
+      tts:
+        description: "Narrator. auto = Kokoro if it loads, Piper otherwise"
+        required: false
+        type: choice
+        default: "auto"
+        options: [auto, kokoro, piper, espeak]
+      compare_voices:
+        description: "Also synthesize the same script with both engines and report"
+        required: false
+        type: boolean
+        default: false
       generation_mode:
         description: "test reports the gates; production enforces them"
         required: false
@@ -114,6 +125,22 @@ jobs:
           pip install onnxruntime
           pip install -e ".[dev]"
 
+      - name: Install Kokoro (the natural Spanish voice)
+        # Apache-2.0, model and code, so it is usable commercially - which is
+        # the reason it is the default rather than merely the nicest sounding.
+        # CPU torch on purpose: the runner has no GPU and the full wheel is
+        # about 2.5 GB of download for nothing.
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          # Kokoro reaches espeak-ng through misaki for Spanish G2P; the
+          # library is already installed above for the fallback narrator, but
+          # the *shared object* is what phonemizer loads.
+          sudo apt-get install -y --no-install-recommends libespeak-ng1 || true
+          pip install --index-url https://download.pytorch.org/whl/cpu torch
+          pip install "kokoro>=0.9" "misaki[es]"
+          python -c "import json; from vidfactory.reels.voice import licence_report; print(json.dumps(licence_report()['kokoro'], indent=2))"
+
       - name: Restore the cached model and voice files
         uses: actions/cache@v4
         with:
@@ -124,6 +151,28 @@ jobs:
         # The safety layer runs offline and in a second. A reel that would
         # fail its medical gate should never reach the TTS stage.
         run: python -m pytest -q tests/test_diabetes_reels.py
+
+      - name: Compare the two voices on one script
+        # Same words, both engines, so the difference measured is the voice
+        # and nothing else. Audio only - no video is rendered here.
+        if: ${{ inputs.compare_voices }}
+        continue-on-error: true
+        env:
+          REEL_TOPIC: ${{ inputs.topic }}
+          REEL_SECONDS: ${{ inputs.duration_seconds }}
+        run: |
+          set -euo pipefail
+          python -m vidfactory reel-voice-check \
+            --topic "$REEL_TOPIC" \
+            --seconds "$REEL_SECONDS" \
+            --engines kokoro,piper \
+            --output output/voice-check
+          {
+            echo "## Voice comparison"
+            echo '```json'
+            cat output/voice-check/voice_check.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Generate the reel
         id: reel
@@ -136,6 +185,7 @@ jobs:
           REEL_FORMAT: ${{ inputs.content_format }}
           REEL_ITEMS: ${{ inputs.number_of_items }}
           REEL_VOICE: ${{ inputs.voice }}
+          REEL_TTS: ${{ inputs.tts }}
           REEL_MODE: ${{ inputs.generation_mode }}
         run: |
           set -euo pipefail
@@ -147,6 +197,7 @@ jobs:
             --format "$FORMAT" \
             --items "$REEL_ITEMS" \
             --voice "$REEL_VOICE" \
+            --tts "$REEL_TTS" \
             --mode "$REEL_MODE" \
             --output output/reels \
             --github-output
@@ -200,5 +251,7 @@ jobs:
             output/reels/*/fuentes.json
             output/reels/*/reel_quality_report.json
             output/reels/*/script.json
+            output/voice-check/voice_check.json
+            output/voice-check/*.wav
           retention-days: 30
           if-no-files-found: warn

@@ -42,7 +42,9 @@ from ..logging_utils import get_logger
 from ..ranking import ClipRanker, RankingContext
 from ..stock.registry import build_providers
 from ..subtitles import generate_subtitles
-from ..tts import NarrationBuilder, build_engine
+from ..tts import NarrationBuilder, build_engine  # noqa: F401  (Piper fallback)
+from .narration import narrate
+from .voice import build_reel_engine, licence_report, prosody
 from .captions import REEL_HEIGHT, REEL_WIDTH, safe_area_report, write_reel_ass
 from .knowledge import BY_SLUG, Topic, find_topic
 from .metadata import caption as build_caption
@@ -156,6 +158,7 @@ class ReelPipeline:
         items: int = 0,
         voice: str = "",
         mode: str = "test",
+        tts: str = "",
     ) -> ReelResult:
         started = time.time()
         chosen = self._resolve_topic(topic, content_format)
@@ -182,7 +185,7 @@ class ReelPipeline:
         )
         log.info("Hook: %s", script.hook.hook)
 
-        narration = self._narrate(script, work, voice)
+        narration = self._narrate(script, work, voice, tts)
         shots, clips = self._plan_visuals(script, narration, work)
 
         # Captions and the fixed title are written *before* the render,
@@ -212,6 +215,7 @@ class ReelPipeline:
             production=production,
             actual_seconds=duration,
             cta_start=self._cta_start(narration),
+            value_start=self._beat_start(narration, script, "answer"),
             audio_seconds=narration.duration,
             visual=self._visual_summary(shots, clips),
             captions=safe_area_report(events),
@@ -223,6 +227,12 @@ class ReelPipeline:
         )
         report.metrics["tts_engine"] = narration.engine
         report.metrics["tts_voice"] = narration.voice
+        report.metrics["tts_licence"] = licence_report().get(narration.engine, {})
+        # What "sounds robotic" actually is, as numbers: how much the loudness
+        # moves, how much of the track is pause, and whether the pauses are all
+        # the same length. Recorded rather than gated - this is a description
+        # of a voice, not a threshold anybody has calibrated.
+        report.metrics["voice_prosody"] = prosody(narration.audio_path)
         report.metrics["caption_font"] = font
         report.save(run_dir / "reel_quality_report.json")
 
@@ -265,30 +275,35 @@ class ReelPipeline:
         return float(nearest)
 
     # ------------------------------------------------------------------
-    def _narrate(self, script: ReelScript, work: Path, voice: str) -> Any:
-        engine = build_engine(
-            engine=str(self.config.get("tts.engine", "auto")),
+    def _narrate(
+        self, script: ReelScript, work: Path, voice: str, tts: str = ""
+    ) -> Any:
+        """The reel's own narrator: same words, delivery that varies by beat.
+
+        :class:`NarrationBuilder` reads a script at one pace with one pause
+        between scenes, which is right for twenty-five minutes and is most of
+        why forty seconds sounded like an audiobook. It stays exactly where it
+        is - the long-form side still uses it - and the reel walks its beats
+        instead.
+        """
+
+        engine = build_reel_engine(
+            engine=str(tts or self.config.get("reels.tts.engine", "auto")),
             voice=voice,
             speed=float(self.config.get("tts.speed", 1.0)),
             sample_rate=int(self.config.get("audio.sample_rate", 48000)),
-            fallback_voices=list(self.language.voices[1:]),
             language=self.language,
         )
-        builder = NarrationBuilder(
-            engine=engine,
+        narration = narrate(
+            script.beats,
+            engine,
             workdir=work / "tts",
-            sentence_pause=SENTENCE_PAUSE,
-            scene_pause=BEAT_PAUSE,
-            max_chunk_chars=int(self.config.get("tts.max_chunk_chars", 320)),
+            destination=work / "narration.wav",
+            language=self.language,
             loudness_lufs=float(self.config.get("audio.loudness_lufs", -16.0)),
             sample_rate=int(self.config.get("audio.sample_rate", 48000)),
-            language=self.language,
+            max_chunk_chars=int(self.config.get("tts.max_chunk_chars", 320)),
         )
-        scenes = [
-            _BeatScene(scene_id=f"beat-{i:02d}", narration=beat.text)
-            for i, beat in enumerate(script.beats)
-        ]
-        narration = builder.build(scenes, work / "narration.wav")
         log.info(
             "Narration: %.1fs, %s / %s", narration.duration,
             narration.engine, narration.voice,
@@ -302,6 +317,22 @@ class ReelPipeline:
             return 0.0
         last = sorted(timings)[-1]
         return float(timings[last][0])
+
+    @staticmethod
+    def _beat_start(narration: Any, script: ReelScript, kind: str) -> float:
+        """When a beat actually begins, measured from the synthesized track.
+
+        The word estimate is what the report falls back to; this is the real
+        number, and for "does the value start immediately" the real number is
+        the only one worth reporting.
+        """
+
+        timings = getattr(narration, "scene_timings", {}) or {}
+        for index, beat in enumerate(script.beats):
+            if beat.kind == kind:
+                span = timings.get(f"beat-{index:02d}")
+                return float(span[0]) if span else 0.0
+        return 0.0
 
     # ------------------------------------------------------------------
     def _ranking_context(self, query: str, used: Sequence[str]) -> RankingContext:

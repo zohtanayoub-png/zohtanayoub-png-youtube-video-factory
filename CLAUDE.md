@@ -97,8 +97,10 @@ src/vidfactory/
     knowledge.py     Spanish diabetes/glucose topics, claims and their sources
     sources.py       the organisations every claim rests on
     safety.py        what a reel about diabetes may never say
-    hooks.py         5-10 candidate openings, scored, one chosen
-    script.py        hook/promise/value/retention/conclusion/CTA, fitted to length
+    hooks.py         8-12 candidate openings, scored, one chosen
+    script.py        hook/answer/value/retention/takeaway/CTA, fitted to length
+    voice.py         Kokoro first, Piper as the fallback; licence + prosody
+    narration.py     the reel's own narrator: pace and pause vary by beat
     captions.py      1080x1920 captions plus the fixed top title
     qc.py            the seven metrics, and the production gate
     metadata.py      caption, hashtags, disclaimer
@@ -126,29 +128,91 @@ in the report has to come from a measurement - applies here to the **words**.
   deliberately **directional** - "como influye el tamano de la racion en la
   glucosa" names a subject and asserts nothing, and demanding a hedge from it
   would be asking a title to apologise for existing.
+
+  The exemption for viewer-conditional sentences reads the sentence rather
+  than matching a list. "Si comes fruta sola y despues ves un pico grande"
+  reports what the viewer has seen and asserts nothing, and the first version
+  encoded that as a list of *situations* - "si tienes", "si comes", "si a
+  media" - so every new opening had to be added to the list before it could
+  be written. It now asks three things: does the sentence open with si or
+  cuando, does that clause address the viewer, and is the effect word inside
+  it. "Si comes fruta, tu glucosa sube" is still caught, in the main clause.
+
+  Two rewrites were caught by this layer while shortening the items, which is
+  the check earning its place: "dispara la racion" read as a glucose claim,
+  and "influyen tu tratamiento" as individual medical instruction.
 * **Three caveats recur because they are what make almost anything in this
   niche correct**: la cantidad, la preparacion, y con que se combina - plus
   the fact that people genuinely differ. A script that has been trimmed until
   it lost them all gets one back rather than a warning, because the warning
   tells an operator the reel is weaker and the viewer is the one who needed
   the sentence.
-* **The hook is chosen, not written once.** Five to ten candidates per topic,
-  scored on curiosity, clarity, benefit, relevance and naturalness, multiplied
-  by how well the opening matches what the reel actually delivers - because
-  "pick the strongest candidate" makes hook/content drift *more* likely, not
-  less. Banned openers ("Hoy vamos a hablar de...", "En este video...",
-  "Hola amigos...", a generic "?Sabias que...?") are refused outright rather
-  than scored low: they are not weak openings, they are a wasted second, and
-  it is the only second guaranteed to be watched. `HOOK_PASS` was read off the
-  brief's own eight example hooks, which score 0.54 to 0.80.
+* **The hook is chosen, not written once, and what it is scored on is
+  whether it names the viewer's problem.** Eight to twelve candidates per
+  topic; the weights lead with problem recognition (0.26) and immediate
+  usefulness (0.18) ahead of curiosity, specificity, emotion and relevance,
+  and the whole thing is multiplied by how well the opening matches what the
+  reel actually delivers - because "pick the strongest candidate" makes
+  hook/content drift *more* likely, not less. A candidate that names no
+  problem and carries no emotion has its curiosity discounted, because that
+  combination is what a generic opening looks like from inside the scorer.
+
+  `HOOK_PASS` was read off the brief's own preferred hooks rather than
+  chosen: scored against the topics they belong to they land between
+  **0.491 and 0.692**, a deliberately generic opening scores **0.376**, and
+  "Si tienes diabetes, no todas las frutas afectan igual a tu glucosa" -
+  true, on-topic and about fruit rather than about the viewer's problem with
+  fruit - scores **0.320**. That last one used to pass at 0.54. It is scored
+  low rather than refused, because refusing it would be a claim that it is
+  dishonest and it is not.
+
+  Every topic carries the viewer's actual `worry` as a clause ("que la fruta
+  te dispare la glucosa", never "la glucosa"), the generic templates are
+  filled from it, and the per-topic hooks are written problem-first: as
+  subject-first openings they scored 0.12 to 0.36, and rewritten they choose
+  between eight and twelve candidates at 0.48 to 0.78.
+
+  Banned openers ("Hoy vamos a hablar de...", "En este video...", "Hola
+  amigos...", a generic "?Sabias que...?") are refused outright rather than
+  scored low: they are not weak openings, they are a wasted second, and it is
+  the only second guaranteed to be watched.
+* **The hook has a time budget as well as a quality one.** The brief puts it
+  in the first two seconds - six words at this voice's rate - and its own
+  example hook is fifteen. Both cannot be had, so the builder takes the
+  *shortest* hook among those within 0.06 of the best, provided it still
+  clears the pass mark and is still about this reel. That is worth more than
+  it sounds: it is what pays for the fifth item.
+* **The third second carries the answer, not a trailer for one.** "En este
+  reel vas a ver cinco frutas" spends it describing the reel to somebody who
+  is already watching it; "fresas, frambuesas, kiwi, manzana con piel y
+  aguacate" is the same length and is already the value. A viewer who leaves
+  after that sentence has still been told the thing they came for.
+  `value_starts_at` measures it from the synthesized track, and the reel ends
+  on a practical takeaway before the CTA.
+* **Every item says why, and the duration is paid for in whole items.** The
+  first version made the reason optional - the first thing dropped when the
+  budget got tight - which is how a list of five assertions with nothing
+  behind any of them came to be a reel. An item the viewer cannot act on is
+  not shorter value, it is worse value, so the trim now drops items and every
+  survivor keeps its reason. Making that affordable meant rewriting all 85
+  items from prose to speech, 24 words each down to 17.
+* **A number in the title is a requirement here too.** "5 frutas" that ships
+  four has a false line burned into every frame of the reel. `build` raises
+  and names the duration that would fit rather than renaming the video, which
+  is the same answer the long-form side gives. All seventeen topics deliver
+  their promised count at 45s; several genuinely cannot at 30s, and saying so
+  is the correct behaviour.
 * **The hook may not be the conclusion said twice.** Measured as the longest
   shared run of words, not as vocabulary overlap: a hook is *supposed* to
   share its subject with the conclusion, and what must not happen is the same
   clause appearing at both ends of a forty second video.
-* **When the duration is tight, explanations go and claims stay.** The same
-  rule `_trim_to_duration` follows: optional material first, the substance
-  last. Never below two items - a twenty second reel with two items is a reel,
+* **Never below two items** - a twenty second reel with two items is a reel,
   and one with none is a caption read aloud.
+* **The trim counts the script it is actually going to ship.** It used to
+  estimate the fixed beats and subtract, and the caveat line is appended
+  *after* the script is written - so a 45 second request came out at 50.0.
+  `_assemble` builds the real beat list for a candidate set of items and the
+  trim counts that.
 * **The interior gates are off, and that is not a lowered standard.**
   `enforce_premium`, `enforce_aspirational` and `min_interior_relevance` exist
   to reject footage that is not a photograph of a styled room. A bowl of
@@ -158,6 +222,35 @@ in the report has to come from a measurement - applies here to the **words**.
   cooldown the long-form product depends on. What the mode changes is the
   gate: in production one medical-claim risk or one unsupported claim fails
   the run.
+* **The voice is Kokoro, and the licence is why.** `hexgrad/Kokoro-82M` is
+  Apache-2.0 for both the weights and the code, which is what makes it usable
+  for a commercial channel; it runs on CPU in Actions and reaches espeak-ng
+  through misaki for Spanish G2P. **Piper stays** as the fallback and is not
+  removed from the project - the long-form side still uses it, and a reel
+  whose Kokoro import fails is narrated rather than failed. `licence_report`
+  reads the installed distributions rather than repeating a claim from a
+  comment, and it records the Piper *voice* licences separately from the
+  Piper runtime's, because the two are separate artefacts and it is the voice
+  that ends up in the video.
+* **Delivery is half of "sounds robotic", and no amount of rewriting fixes
+  it.** `NarrationBuilder` reads a script at one pace with one pause between
+  scenes, which is right for twenty-five minutes and is exactly what makes
+  forty seconds sound like an audiobook. The reel walks its own beats
+  instead: the hook lands at normal pace and gets a real breath, the answer
+  follows with no pause worth the name, items run slightly quick the way
+  anyone reads a list, the takeaway is the slowest thing said. Nothing about
+  the words changes. An engine that takes no speed argument (eSpeak) still
+  works - it is read at one pace and the log says so.
+* **A voice comparison has to be the same script.** `vidfactory
+  reel-voice-check` builds one script and synthesizes it with each engine
+  named, reporting licence, render time, audio duration and prosody -
+  loudness variation, silence ratio, pause count, mean and spread of pause
+  length, and speech-rate variation. None of those is naturalness; what they
+  are is the difference between a delivery that varies and one that does not,
+  which is the specific complaint, and unlike an opinion about a waveform
+  they can be compared between two files. An engine asked for by name that
+  quietly falls back is flagged `substituted`, because a comparison that
+  compares Piper with Piper is worse than no comparison at all.
 * **A vertical frame is not a small landscape one.** Captions at 68px with
   24-character lines, 430px clear of the bottom where Instagram, TikTok and
   Shorts draw their own furniture; one fixed ExtraBold title across the top

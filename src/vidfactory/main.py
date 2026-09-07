@@ -310,6 +310,91 @@ def command_visual_check(args: argparse.Namespace) -> int:
     return 1
 
 
+def command_reel_voice_check(args: argparse.Namespace) -> int:
+    """The same reel script, spoken by each engine, measured.
+
+    The comparison the brief asks for, and it has to be the *same script* or
+    it is not a comparison of voices. What comes back for each engine: the
+    licence it ships under, how long it took to synthesize, how long the
+    result runs, and the prosody numbers that stand in for "does this sound
+    like a person" - loudness variation, how much of the track is pause, and
+    whether the pauses are all the same length.
+
+    No video is rendered. This is about the audio.
+    """
+
+    import time
+
+    from .languages import resolve_language
+    from .reels.knowledge import find_topic
+    from .reels.narration import narrate
+    from .reels.script import build as build_script
+    from .reels.voice import build_reel_engine, compare, licence_report
+
+    config = load_config(args.config)
+    language = resolve_language(config.get("content.language", "es"))
+    topic = find_topic(args.topic or "")
+    if topic is None:
+        print(json.dumps({"error": f"unknown topic {args.topic!r}"}, indent=2))
+        return 2
+
+    script = build_script(topic, target_seconds=float(args.seconds or 45))
+    out = Path(args.output)
+    out.mkdir(parents=True, exist_ok=True)
+
+    licences = licence_report()
+    rendered: list[dict[str, Any]] = []
+    for name in [e.strip() for e in str(args.engines).split(",") if e.strip()]:
+        record: dict[str, Any] = {"requested": name}
+        started = time.time()
+        try:
+            engine = build_reel_engine(
+                engine=name, voice=args.voice or "", language=language,
+                sample_rate=int(config.get("audio.sample_rate", 48000)),
+            )
+            narration = narrate(
+                script.beats, engine,
+                workdir=out / f"{name}-work",
+                destination=out / f"{name}.wav",
+                language=language,
+                sample_rate=int(config.get("audio.sample_rate", 48000)),
+            )
+        except Exception as exc:                          # pragma: no cover
+            record.update(ok=False, error=f"{type(exc).__name__}: {exc}")
+            rendered.append(record)
+            continue
+        record.update(
+            ok=True,
+            engine=narration.engine,
+            voice=narration.voice,
+            # An engine asked for by name can still fall back, and a
+            # comparison that quietly compares Piper with Piper is worse than
+            # no comparison at all.
+            substituted=narration.engine != name and name not in ("auto",),
+            licence=licences.get(narration.engine, {}),
+            render_seconds=round(time.time() - started, 2),
+            audio_seconds=round(narration.duration, 2),
+            path=str(out / f"{name}.wav"),
+        )
+        rendered.append(record)
+
+    ok = [r for r in rendered if r.get("ok")]
+    summary = {
+        "topic": topic.slug,
+        "title": topic.title,
+        "hook": script.hook.hook,
+        "word_count": script.word_count,
+        "script": [b.text for b in script.beats],
+        "engines": rendered,
+        "prosody": compare([(r["engine"], Path(r["path"])) for r in ok]),
+    }
+    print(json.dumps(summary, indent=2, ensure_ascii=False))
+    (out / "voice_check.json").write_text(
+        json.dumps(summary, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    return 0 if ok else 3
+
+
 def command_reel(args: argparse.Namespace) -> int:
     """DIABETES REELS: one vertical Spanish reel, start to finish.
 
@@ -340,6 +425,7 @@ def command_reel(args: argparse.Namespace) -> int:
         items=int(args.items or 0),
         voice=args.voice or "",
         mode=args.mode,
+        tts=getattr(args, "tts", "") or "",
     )
 
     report = result.report.to_dict() if result.report else {}
@@ -349,6 +435,10 @@ def command_reel(args: argparse.Namespace) -> int:
         "hook_strength_score": report.get("hook_strength_score"),
         "medical_claim_risk_count": report.get("medical_claim_risk_count"),
         "unsupported_claim_count": report.get("unsupported_claim_count"),
+        "tts_engine": report.get("tts_engine"),
+        "tts_voice": report.get("tts_voice"),
+        "value_starts_at": report.get("value_starts_at"),
+        "second_person_ratio": report.get("second_person_ratio"),
     }
     print(json.dumps(summary, indent=2, ensure_ascii=False))
 
@@ -1013,13 +1103,34 @@ def build_parser() -> argparse.ArgumentParser:
         help="list | error_solution | comparison | ranking | myth | combination",
     )
     reel.add_argument("--items", default="0", help="0 = as many as fit")
-    reel.add_argument("--voice", default="", help="Piper voice; blank = es_ES female")
+    reel.add_argument(
+        "--voice", default="",
+        help="voice name; blank = ef_dora for Kokoro, es_ES female for Piper",
+    )
+    reel.add_argument(
+        "--tts", default="", choices=["", "auto", "kokoro", "piper", "espeak", "silent"],
+        help="narrator; blank/auto = Kokoro if it loads, Piper otherwise",
+    )
     reel.add_argument("--mode", default="test", choices=["test", "production"])
     reel.add_argument("--output", default="output/reels")
     reel.add_argument("--database", default="")
     reel.add_argument("--state", default="data/state")
     reel.add_argument("--github-output", action="store_true")
     reel.set_defaults(func=command_reel)
+
+    voice_check = subparsers.add_parser(
+        "reel-voice-check",
+        help="synthesize one reel script with two engines and compare them",
+    )
+    voice_check.add_argument("--topic", default="", help="topic slug or title")
+    voice_check.add_argument("--seconds", default="45")
+    voice_check.add_argument(
+        "--engines", default="kokoro,piper",
+        help="comma separated; each is synthesized from the same script",
+    )
+    voice_check.add_argument("--voice", default="")
+    voice_check.add_argument("--output", default="output/voice-check")
+    voice_check.set_defaults(func=command_reel_voice_check)
 
     return parser
 

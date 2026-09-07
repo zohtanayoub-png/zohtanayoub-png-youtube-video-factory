@@ -439,7 +439,7 @@ class PiperEngine(TTSEngine):
         """``speed`` overrides the engine's own for this chunk only.
 
         Additive and optional: every existing caller passes two arguments and
-        gets exactly the behaviour it had. The reels use it to read a list a
+        gets exactly the behaviour it had. The vertical product uses it to read a list a
         little faster than the line the viewer is meant to remember, which is
         most of the difference between a person talking and a newsreader.
         """

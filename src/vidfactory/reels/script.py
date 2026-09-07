@@ -94,6 +94,10 @@ class Beat:
     index: int = 0
     sources: tuple[str, ...] = ()
     item_key: str = ""
+    #: Whether this beat states why it is true. Recorded rather than inferred,
+    #: because "does this sentence contain a reason" is not a question a
+    #: keyword search answers, and the builder already knows.
+    has_reason: bool = False
 
     @property
     def word_count(self) -> int:
@@ -107,6 +111,7 @@ class Beat:
             "search_text": self.search_text,
             "index": self.index,
             "item_key": self.item_key,
+            "has_reason": self.has_reason,
             "sources": list(self.sources),
         }
 
@@ -157,6 +162,14 @@ class ReelScript:
     @property
     def item_beats(self) -> list[Beat]:
         return [b for b in self.beats if b.kind == "item"]
+
+    @property
+    def takeaway(self) -> str:
+        return next((b.text for b in self.beats if b.kind == "takeaway"), "")
+
+    @property
+    def items_without_a_reason(self) -> list[str]:
+        return [b.text for b in self.item_beats if not b.has_reason]
 
     @property
     def source_keys(self) -> list[str]:
@@ -250,6 +263,16 @@ _HOOK_ECHO_WORDS = 5
 #: shorter one is better for a reason the score does not measure.
 _HOOK_LENGTH_MARGIN = 0.06
 
+#: The report fails a reel whose hook is not about its content; the builder
+#: should not hand it one. Kept equal to the gate in :mod:`.qc` on purpose.
+_HOOK_MIN_ALIGNMENT = 0.5
+
+
+def _hook_pass() -> float:
+    from .hooks import HOOK_PASS
+
+    return HOOK_PASS
+
 
 def _distinct_hook(topic: Topic, extra: Sequence[str] = ()) -> HookChoice:
     """The best hook that is not already the conclusion.
@@ -268,6 +291,15 @@ def _distinct_hook(topic: Topic, extra: Sequence[str] = ()) -> HookChoice:
     ]
     if not usable:
         return choice
+    # A shorter hook is worth having, but not one that stops being about this
+    # reel: alignment is a gate in the report, and trading it for two seconds
+    # buys a faster opening for a different video.
+    aligned = [c for c in usable if c.scores.get("alignment", 0.0) >= _HOOK_MIN_ALIGNMENT]
+    usable = aligned or usable
+    # And not one that only just clears the bar: the margin below is there to
+    # break ties between good hooks, not to spend a good one on two seconds.
+    strong = [c for c in usable if c.total >= _hook_pass()]
+    usable = strong or usable
     best = max(c.total for c in usable)
     close = [c for c in usable if c.total >= best - _HOOK_LENGTH_MARGIN]
     winner = min(close, key=lambda c: (len(c.text.split()), -c.total))
@@ -398,6 +430,7 @@ def _assemble(
                 index=index,
                 sources=item.sources,
                 item_key=item.key,
+                has_reason=bool(str(item.why or "").strip()),
             )
         )
 

@@ -16,6 +16,15 @@ Seven metrics, all of them named in the brief:
 ``cta_present``              the reel ends by asking for the follow
 ``cta_position_ok``          it does so in the last few seconds, not the middle
 
+Three more came with the brief's second revision, and they measure the same
+complaint from three sides: value that starts too late, items that assert
+without explaining, and a reel written about a subject rather than to a
+person.
+
+``value_starts_at``          the second the first item begins
+``items_with_a_reason``      every item says why, not just what
+``second_person_ratio``      how much of the reel speaks to the viewer
+
 In production the two safety counts must be zero. That is not a threshold to
 be tuned later; it is the reason the safety module exists.
 """
@@ -39,6 +48,32 @@ VALUE_DENSITY_FLOOR = 0.78
 
 #: How long before the end the CTA may start.
 CTA_TAIL_SECONDS = 8.0
+
+#: The answer has to have started by here.
+#:
+#: Value starts at the *answer*, not at the first item: "fresas, frambuesas,
+#: kiwi, manzana con piel y aguacate" is the reel's point, said in the third
+#: second, and a viewer who leaves after it has still been told the thing
+#: they came for. So what this gate measures is the one thing that can delay
+#: it - the length of the hook.
+#:
+#: The brief's timeline is hook 0-2s, answer 2-5s. Two seconds is six words
+#: at this voice's rate, and the brief's own example hook - "Si tienes
+#: diabetes y te preocupa que la fruta te dispare la glucosa, escucha esto" -
+#: is fifteen. Both cannot be had, and of the two the hook is the one the
+#: brief wrote out in full, so the gate is set at the length that still
+#: leaves the shape intact rather than at the number. The builder already
+#: prefers the shortest hook among the near-best for this reason.
+VALUE_START_SECONDS = 6.5
+
+#: The first item, after the hook and the answer. Not a gate - the answer is
+#: already value - but past this the reel is slow and someone should know.
+FIRST_ITEM_WARN_SECONDS = 11.0
+
+#: Below this the reel is written about a subject rather than to a person.
+#: Measured over the beats that are prose - the answer that lists five fruits
+#: by name is not impersonal writing, it is a list.
+SECOND_PERSON_FLOOR = 0.45
 
 #: The duration bands the brief allows, as a tolerance around the request.
 DURATION_TOLERANCE = 0.18
@@ -120,6 +155,37 @@ def value_density(script: ReelScript) -> float:
     return round((total - overhead) / total, 3)
 
 
+#: Second person, as Spanish actually marks it: the pronouns, the clitics and
+#: the verb endings that only appear when someone is being addressed.
+_SECOND_PERSON = re.compile(
+    r"\b(tu|tus|ti|te|contigo|tuyo|tuya)\b|"
+    r"\b\w+(?:as|es)\b(?=\s|$)|"
+    r"\b(tienes|puedes|quieres|sabes|notas|comes|tomas|ves|eliges|mira|"
+    r"apunta|prueba|revisa|anade|sirvete|pesa|compra|usa|empieza|cambia|"
+    r"elige|ten|deja|guarda|lee|comprueba|consultalo|comentalo)\b"
+)
+
+
+def second_person_ratio(script: ReelScript) -> float:
+    """The share of spoken lines that address the viewer.
+
+    A sentence at a time rather than a word at a time, because one "te" does
+    not make a paragraph second person and the question here is whether the
+    reel is talking to somebody.
+    """
+
+    lines = [
+        sentence
+        for beat in script.beats
+        for sentence in re.split(r"(?<=[.?!])\s+", beat.text)
+        if len(sentence.split()) >= 4
+    ]
+    if not lines:
+        return 0.0
+    hits = sum(1 for line in lines if _SECOND_PERSON.search(_fold(line)))
+    return round(hits / len(lines), 3)
+
+
 def repeated_lines(script: ReelScript) -> list[str]:
     """Sentences the reel says twice.
 
@@ -165,6 +231,7 @@ def build_report(
     production: bool = False,
     actual_seconds: float = 0.0,
     cta_start: float = 0.0,
+    value_start: float = 0.0,
     audio_seconds: float = 0.0,
     visual: Mapping[str, Any] | None = None,
     captions: Mapping[str, Any] | None = None,
@@ -194,6 +261,23 @@ def build_report(
         target <= 0 or abs(measured - target) <= target * DURATION_TOLERANCE
     )
 
+    no_reason = script.items_without_a_reason
+    person = second_person_ratio(script)
+
+    # Only measurable once the narration has been synthesized; before that the
+    # word budget is the best estimate there is.
+    def _spoken_before(kind: str) -> float:
+        spoken = 0
+        for beat in script.beats:
+            if beat.kind == kind:
+                break
+            spoken += beat.word_count
+        return spoken / max(0.5, script.words_per_second)
+
+    value_start = float(value_start or 0.0) or _spoken_before("answer")
+    first_item_start = _spoken_before("item")
+    value_starts_immediately = value_start <= VALUE_START_SECONDS
+
     visual = dict(visual or {})
     captions = dict(captions or {})
 
@@ -208,6 +292,12 @@ def build_report(
         "hook_strength_score": round(script.hook.strength, 3),
         "hook_content_alignment": round(script.hook.alignment, 3),
         "value_density_score": density,
+        "value_starts_at": round(value_start, 2),
+        "value_starts_immediately": value_starts_immediately,
+        "first_item_starts_at": round(first_item_start, 2),
+        "items_with_a_reason": len(script.item_beats) - len(no_reason),
+        "items_without_a_reason": len(no_reason),
+        "second_person_ratio": person,
         "cta_present": cta_present,
         "cta_position_ok": cta_position_ok,
         **summarise(risks, unsupported),
@@ -216,6 +306,7 @@ def build_report(
         "hook_candidate_count": len(script.hook.candidates),
         "hook_rejected_count": len(script.hook.rejected),
         "cta": cta,
+        "takeaway": script.takeaway,
         "cta_start_seconds": round(cta_start, 2),
         "target_seconds": target,
         "estimated_seconds": script.estimated_seconds,
@@ -291,6 +382,51 @@ def build_report(
                 f"the CTA starts at {cta_start:.1f}s of {reference:.1f}s"
                 if cta_present else "no CTA to place"
             ),
+            severity="error",
+        ),
+        ReelCheck(
+            "value_starts_immediately",
+            value_starts_immediately,
+            (
+                f"the answer starts at {value_start:.1f}s "
+                f"(limit {VALUE_START_SECONDS:.1f}s), the first item at "
+                f"{first_item_start:.1f}s"
+            ),
+            severity="error",
+        ),
+        ReelCheck(
+            "the_list_is_not_slow",
+            first_item_start <= FIRST_ITEM_WARN_SECONDS,
+            (
+                f"the first item starts at {first_item_start:.1f}s "
+                f"(soft limit {FIRST_ITEM_WARN_SECONDS:.0f}s)"
+            ),
+            severity="warning",
+        ),
+        ReelCheck(
+            "every_item_gives_a_reason",
+            not no_reason,
+            (
+                f"{len(no_reason)} item(s) assert without explaining: "
+                f"{no_reason[0][:70]!r}" if no_reason
+                else f"all {len(script.item_beats)} items say why"
+            ),
+            severity="error",
+        ),
+        ReelCheck(
+            "speaks_to_the_viewer",
+            person >= SECOND_PERSON_FLOOR,
+            (
+                f"{person:.0%} of the lines address the viewer "
+                f"(floor {SECOND_PERSON_FLOOR:.0%})"
+            ),
+            severity="warning",
+        ),
+        ReelCheck(
+            "ends_on_a_practical_takeaway",
+            bool(script.takeaway),
+            f"closes on {script.takeaway[:60]!r}" if script.takeaway
+            else "no takeaway before the CTA",
             severity="error",
         ),
         ReelCheck(

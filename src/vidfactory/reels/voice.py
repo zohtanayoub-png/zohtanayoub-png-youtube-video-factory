@@ -261,6 +261,17 @@ def _piper_voice(requested: str, language: Any) -> str:
 # What the check command reports
 # ---------------------------------------------------------------------------
 
+#: What each Piper voice this project may reach for ships under. The runtime
+#: and the voices are separate artefacts with separate terms, so recording
+#: only the package licence would be recording the wrong one.
+PIPER_VOICE_LICENCES: dict[str, str] = {
+    "es_ES-sharvard-medium": "MIT",
+    "es_MX-claude-high": "CC-BY-4.0",
+    "es_ES-davefx-medium": "CC-BY-4.0",
+    "es_ES-mls_9972-low": "CC0-1.0",
+}
+
+
 def licence_report() -> dict[str, Any]:
     """What the installed packages say about themselves.
 
@@ -295,6 +306,31 @@ def licence_report() -> dict[str, Any]:
         except Exception as exc:
             entry["error"] = str(exc)
         out["packages"][name] = entry
+
+    # Keyed by engine name as well, because that is what a narration knows
+    # about itself: the report asks "what licence did the voice that spoke
+    # this reel ship under", and the answer has to be reachable from
+    # ``narration.engine``.
+    out["kokoro"] = {
+        "engine": "kokoro",
+        "model": KOKORO_REPO,
+        "model_licence": KOKORO_EXPECTED_LICENCE,
+        "code_licence": out["packages"]["kokoro"].get("license"),
+        "commercial_use": "yes - Apache-2.0 covers the weights and the code",
+        "packages": {
+            k: out["packages"][k].get("version")
+            for k in ("kokoro", "misaki", "torch")
+        },
+    }
+    out["piper"] = {
+        "engine": "piper",
+        "code_licence": out["packages"]["piper-tts"].get("license"),
+        # The voices are distributed separately from the runtime and each
+        # carries its own terms; es_ES-sharvard-medium is MIT. Named rather
+        # than assumed, because "Piper is MIT" is a statement about the wrong
+        # artefact.
+        "voice_licences": dict(PIPER_VOICE_LICENCES),
+    }
     return out
 
 
