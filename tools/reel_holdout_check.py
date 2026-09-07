@@ -35,6 +35,11 @@ Four questions, four commands, and they are deliberately separate runs:
                with load time, per-frame runtime and peak memory beside the
                accuracy, because a verifier that cannot run on a free runner
                is not a candidate.
+``apple-state`` which wording of "manzana con piel" keeps an apple that is
+               an apple. Ten presentations against eight formulations, none of
+               which names a tree, a plate, a table or a board: the state is a
+               fact about the fruit and the location is not.
+``apple-holdout`` the applied apple wording on fresh apple footage, per class.
 ``holdout``    the whole gate on fresh piles: precision and recall, overall
                and per food and per state.
 
@@ -279,6 +284,144 @@ CONTEXT_CANDIDATES: dict[str, dict[str, Any]] = {
     },
 }
 
+#: Apple state. The presentation run put ``manzana`` at entity recall 0.800
+#: and conjunction recall 0.400 at precision 1.000 - so half the valid apple
+#: footage is lost *between* the two, which is the state probe, and the state
+#: probe says "apples on a tree with their skin on". A single apple on a
+#: board is not on a tree. The requirement is ``manzana con piel``: the state
+#: has to describe the apple, not where the apple is standing.
+#:
+#: Ten presentations, every one of them new footage - every apple query the
+#: previous eight runs used is in the manifest, so none of them can appear
+#: here. The oranges are not a presentation; they are the failure this whole
+#: layer was built to stop, and the success condition names them.
+APPLE_STATE_PILES: tuple[Pile, ...] = (
+    Pile("a single whole apple", "a single glossy apple on a bare surface",
+         "whole", True, "manzana"),
+    Pile("apples in a pile", "a mound of apples at an autumn fruit stand",
+         "piled", True, "manzana"),
+    Pile("apples in a market box", "wooden crates full of apples for sale",
+         "piled", True, "manzana"),
+    Pile("an apple in a hand", "a person picking up an apple in their hand",
+         "held", True, "manzana"),
+    Pile("an apple on a board", "an apple resting on a wooden chopping board",
+         "board", True, "manzana"),
+    Pile("sliced, peel visible", "apple wedges with the red skin on the edge",
+         "sliced_with_skin", True, "manzana"),
+    Pile("peeled apple", "a bare peeled apple with the skin removed",
+         "peeled", False, "manzana"),
+    Pile("apple cake", "a slice of apple cake on a fork",
+         "dessert", False, "manzana"),
+    Pile("apple pie", "apple pie with a lattice crust",
+         "dessert", False, "manzana"),
+    Pile("apple juice", "a glass of apple juice on a counter",
+         "juice", False, "manzana"),
+    Pile("oranges, not apples", "a pile of oranges at a fruit stall",
+         "orange", False, "manzana"),
+)
+
+#: The formulations, and what each one is asking.
+#:
+#: The brief's rule is the whole design: **the positive describes the apple's
+#: state and never its location**, so no candidate here contains tree, plate,
+#: table, basket, kitchen or cutting board. What is deliberately varied
+#: beside the positives is the *negative* set, because "pale wet apple flesh
+#: being cut" is a negative that a legitimately sliced apple with its peel
+#: still on matches, and that is one of the presentations the brief requires
+#: accepted.
+APPLE_STATE_CANDIDATES: dict[str, dict[str, tuple[str, ...]]] = {
+    # What ships today, written out here rather than read from the module,
+    # so "before" keeps meaning what it meant when the number was taken.
+    "shipped (before)": {
+        "required": ("apples with glossy red and green surfaces",
+                     "apples on a tree with their skin on"),
+        "forbidden": ("pale wet apple flesh being cut",
+                      "apple pieces in pastry and syrup",
+                      "an apple drink in a glass"),
+    },
+    # The shipped wording with the orchard clause deleted and nothing else
+    # changed. If the location is the whole fault, this is where it shows.
+    "no orchard": {
+        "required": ("apples with glossy red and green surfaces",),
+        "forbidden": ("pale wet apple flesh being cut",
+                      "apple pieces in pastry and syrup",
+                      "an apple drink in a glass"),
+    },
+    "visible skin": {
+        "required": ("a fresh apple with visible skin",),
+        "forbidden": ("pale wet apple flesh being cut",
+                      "apple pieces in pastry and syrup",
+                      "an apple drink in a glass"),
+    },
+    "unpeeled": {
+        "required": ("a fresh unpeeled apple",),
+        "forbidden": ("pale wet apple flesh being cut",
+                      "apple pieces in pastry and syrup",
+                      "an apple drink in a glass"),
+    },
+    "natural peel": {
+        "required": ("a raw apple with its natural peel visible",),
+        "forbidden": ("pale wet apple flesh being cut",
+                      "apple pieces in pastry and syrup",
+                      "an apple drink in a glass"),
+    },
+    # All three of the brief's wordings together, still against the shipped
+    # negatives: does saying it three ways beat saying it once?
+    "all three skin wordings": {
+        "required": ("a fresh apple with visible skin",
+                     "a fresh unpeeled apple",
+                     "a raw apple with its natural peel visible"),
+        "forbidden": ("pale wet apple flesh being cut",
+                      "apple pieces in pastry and syrup",
+                      "an apple drink in a glass"),
+    },
+    # The same positives against negatives that name the states the brief
+    # rejects - peeled, baked, juiced - instead of naming a cut. A wedge of
+    # apple with its peel on the edge is a cut, and it is one of the shapes
+    # that has to pass.
+    "skin wordings, state negatives": {
+        "required": ("a fresh apple with visible skin",
+                     "a fresh unpeeled apple",
+                     "a raw apple with its natural peel visible"),
+        "forbidden": ("an apple peeled bare with its skin removed",
+                      "cooked apple baked into a cake or a pie",
+                      "apple juice in a glass"),
+    },
+    # One positive, the state negatives. The cheapest rule that could work.
+    "visible skin, state negatives": {
+        "required": ("a fresh apple with visible skin",),
+        "forbidden": ("an apple peeled bare with its skin removed",
+                      "cooked apple baked into a cake or a pie",
+                      "apple juice in a glass"),
+    },
+}
+
+#: The held-out apple set: the classes the brief asks to be reported, on
+#: footage the calibration above never touched. Written at the same time as
+#: the calibration piles and never re-written after seeing a number, which is
+#: the only thing that makes it held out.
+APPLE_HOLDOUT_PILES: tuple[Pile, ...] = (
+    Pile("whole apple", "one ripe apple photographed up close",
+         "whole", True, "manzana"),
+    Pile("apples piled", "apples stacked high in a shop display",
+         "piled", True, "manzana"),
+    Pile("apple in a hand", "holding a green apple up to the camera",
+         "held", True, "manzana"),
+    Pile("apple on a board", "a whole apple next to a knife blade",
+         "board", True, "manzana"),
+    Pile("sliced, peel visible", "quartered apple showing red peel and white flesh",
+         "sliced_with_skin", True, "manzana"),
+    Pile("peeled apple", "an apple stripped bare of its peel",
+         "peeled", False, "manzana"),
+    Pile("apple dessert", "warm apple turnover dusted with icing sugar",
+         "dessert", False, "manzana"),
+    Pile("apple juice", "apple juice being poured from a bottle",
+         "juice", False, "manzana"),
+    Pile("oranges, not apples", "oranges heaped in a wicker display",
+         "orange", False, "manzana"),
+)
+
+
 #: The held-out set. Every query here is new again: the calibration run
 #: above spent its own, and a pile that decided a rule cannot also grade it.
 HOLDOUT_PILES: tuple[Pile, ...] = (
@@ -310,6 +453,8 @@ PILES_FOR: dict[str, tuple[Pile, ...]] = {
     "presentation": PRESENTATION_PILES,
     "avocado": AVOCADO_PILES,
     "apple": APPLE_PILES,
+    "apple-state": APPLE_STATE_PILES,
+    "apple-holdout": APPLE_HOLDOUT_PILES,
     "holdout": HOLDOUT_PILES,
 }
 
@@ -750,6 +895,214 @@ def run_entity(args, analyzer, providers, downloader, excluded) -> dict[str, Any
 
 
 # ---------------------------------------------------------------------------
+# apple-state - which wording of "con piel" keeps a real apple
+# ---------------------------------------------------------------------------
+
+def _union_probe(analyzer, frames, requirements: Sequence[Any],
+                 wrong: Sequence[str]) -> tuple[dict[str, int], list[list[float]]]:
+    """One encode of the frames against every prompt any variant needs.
+
+    Seven state wordings share their entity, context and dominance prompts and
+    differ in a handful of columns, so encoding the images seven times would
+    pay 0.55 s a frame to compute the same numbers again. The frames are
+    encoded once against the union, and each variant reads its own columns
+    back out - identical arithmetic, a seventh of the runtime.
+    """
+
+    order: dict[str, int] = {}
+    for requirement in requirements:
+        for prompt in requirement_prompts(requirement, wrong)[0]:
+            order.setdefault(prompt, len(order))
+    return order, analyzer.probe_frames(frames, list(order), use_claim_model=True)
+
+
+def _as_variant(order: dict[str, int], master: Sequence[Sequence[float]],
+                requirement: Any, wrong: Sequence[str]) -> list[list[float]]:
+    """The union matrix cut down to the columns one variant asks for."""
+
+    prompts, _ = requirement_prompts(requirement, wrong)
+    columns = [order[p] for p in prompts]
+    return [[row[i] for i in columns] for row in master]
+
+
+def _per_class(rows: Sequence[dict[str, Any]], key: str) -> dict[str, Any]:
+    """Accepted of seen, per presentation class, which is what the brief asks."""
+
+    out: dict[str, Any] = {}
+    for shape in sorted({r["presentation"] for r in rows}):
+        subset = [r for r in rows if r["presentation"] == shape]
+        out[shape] = {
+            "should_accept": subset[0]["should_accept"],
+            "accepted": f"{sum(1 for r in subset if r[key])}/{len(subset)}",
+        }
+    return out
+
+
+def run_apple_state(args, analyzer, providers, downloader, excluded) -> dict[str, Any]:
+    """Which wording of "manzana con piel" keeps the apples that are apples?
+
+    The presentation run measured ``manzana`` at entity recall 0.800 and
+    conjunction recall 0.400 at precision 1.000, so half the valid apple
+    footage dies between the entity probe and the state probe - and the state
+    probe asks for apples *on a tree*. That is a fact about the scene and the
+    requirement is a fact about the fruit.
+
+    Every variant is scored on the same frames, and the entity probe's own
+    verdict is reported beside them, because a clip the entity probe already
+    rejected is not evidence about any state wording.
+    """
+
+    entity = BY_NAME["manzana"]
+    shipped = requirement_for_food(entity)
+    variants = {
+        name: replace(shipped,
+                      required_attributes=tuple(spec["required"]),
+                      forbidden_attributes=tuple(spec["forbidden"]))
+        for name, spec in APPLE_STATE_CANDIDATES.items()
+    }
+    edge = analyzer.decode_size[0]
+    piles = {p.name: collect(providers, downloader, p, args.clips, excluded, edge, 3)
+             for p in APPLE_STATE_PILES}
+
+    per_variant: dict[str, list[dict[str, Any]]] = {name: [] for name in variants}
+    entity_rows: list[dict[str, Any]] = []
+    for pile in APPLE_STATE_PILES:
+        for clip, frames, _big in piles[pile.name]:
+            order, master = _union_probe(analyzer, frames, variants.values(),
+                                         WRONG_CONTEXT)
+            if not master:
+                continue
+            width = len(entity.positives) + len(entity.competitors)
+            alone = identify_food(entity, [row[:width] for row in master])
+            entity_rows.append({
+                "pile": pile.name, "presentation": pile.truth,
+                "source": clip.key, "should_accept": pile.accept,
+                "entity_alone": bool(alone.passed),
+                "looked_like": alone.top_distractor,
+            })
+            for name, requirement in variants.items():
+                verdict = score_requirement(
+                    requirement, _as_variant(order, master, requirement, WRONG_CONTEXT),
+                    WRONG_CONTEXT,
+                )
+                per_variant[name].append({
+                    "pile": pile.name, "presentation": pile.truth,
+                    "source": clip.key, "should_accept": pile.accept,
+                    "entity_alone": bool(alone.passed),
+                    "conjunction": bool(verdict.passed),
+                    "state_score": round(verdict.state_match_score, 3),
+                    "failed_on": list(verdict.failed_on),
+                })
+
+    def accepted(rows: Sequence[dict[str, Any]], shape: str) -> int:
+        return sum(1 for r in rows if r["presentation"] == shape and r["conjunction"])
+
+    report: dict[str, Any] = {
+        "command": "apple-state",
+        "clips": len(entity_rows),
+        # The floor under every variant. A wording cannot rescue a clip the
+        # entity probe threw away, so this is the ceiling on all of them.
+        "entity_alone": _rates(entity_rows, "entity_alone"),
+        "entity_per_class": _per_class(entity_rows, "entity_alone"),
+        "variants": {},
+    }
+    for name, rows in per_variant.items():
+        spec = APPLE_STATE_CANDIDATES[name]
+        lost = [r for r in rows
+                if r["should_accept"] and r["entity_alone"] and not r["conjunction"]]
+        report["variants"][name] = {
+            "required": list(spec["required"]),
+            "forbidden": list(spec["forbidden"]),
+            "conjunction": _rates(rows, "conjunction"),
+            "per_class": _per_class(rows, "conjunction"),
+            # The brief's success conditions, counted rather than described.
+            "oranges_accepted": accepted(rows, "orange"),
+            "dessert_accepted": accepted(rows, "dessert"),
+            "peeled_accepted": accepted(rows, "peeled"),
+            "juice_accepted": accepted(rows, "juice"),
+            # Valid footage the entity probe kept and this wording then threw
+            # away: the cost of the state layer, isolated from everything
+            # underneath it.
+            "lost_after_entity": len(lost),
+            "lost_on": sorted({p for r in lost for p in r["failed_on"]}),
+            "per_clip": rows,
+        }
+        log.info("%s: recall %s, precision %s, oranges %d, dessert %d, peeled %d",
+                 name, report["variants"][name]["conjunction"]["recall"],
+                 report["variants"][name]["conjunction"]["precision"],
+                 report["variants"][name]["oranges_accepted"],
+                 report["variants"][name]["dessert_accepted"],
+                 report["variants"][name]["peeled_accepted"])
+    report["per_clip"] = entity_rows
+    return report
+
+
+def run_apple_holdout(args, analyzer, providers, downloader, excluded) -> dict[str, Any]:
+    """The applied apple wording, on apple footage nothing has been tuned on.
+
+    Whatever ``foods.py`` says at the moment this runs - no variants, no
+    overrides. The calibration above chose a wording and this grades it, and
+    the two cannot be the same clips or the grade means nothing.
+    """
+
+    requirement = requirement_for_food(BY_NAME["manzana"])
+    entity = requirement.entity
+    prompts, _ = requirement_prompts(requirement, WRONG_CONTEXT)
+    width = len(entity.positives) + len(entity.competitors)
+    edge = analyzer.decode_size[0]
+
+    rows: list[dict[str, Any]] = []
+    for pile in APPLE_HOLDOUT_PILES:
+        for clip, frames, _big in collect(providers, downloader, pile, args.clips,
+                                          excluded, edge, 3):
+            matrix = analyzer.probe_frames(frames, prompts, use_claim_model=True)
+            if not matrix:
+                continue
+            verdict = score_requirement(requirement, matrix, WRONG_CONTEXT)
+            alone = identify_food(entity, [row[:width] for row in matrix])
+            rows.append({
+                "pile": pile.name, "presentation": pile.truth,
+                "source": clip.key, "should_accept": pile.accept,
+                "entity_alone": bool(alone.passed),
+                "conjunction": bool(verdict.passed),
+                "state_score": round(verdict.state_match_score, 3),
+                "failed_on": list(verdict.failed_on),
+                "looked_like": verdict.top_distractor,
+            })
+
+    report = {
+        "command": "apple-holdout",
+        "clips": len(rows),
+        "state_required": list(requirement.required_attributes),
+        "state_forbidden": list(requirement.forbidden_attributes),
+        "entity_alone": _rates(rows, "entity_alone"),
+        "conjunction": _rates(rows, "conjunction"),
+        "entity_per_class": _per_class(rows, "entity_alone"),
+        "per_class": _per_class(rows, "conjunction"),
+        "oranges_accepted": sum(1 for r in rows
+                                if r["presentation"] == "orange" and r["conjunction"]),
+        "dessert_accepted": sum(1 for r in rows
+                                if r["presentation"] == "dessert" and r["conjunction"]),
+        "peeled_accepted": sum(1 for r in rows
+                               if r["presentation"] == "peeled" and r["conjunction"]),
+        "false_negatives": [
+            {"pile": r["pile"], "source": r["source"], "failed_on": r["failed_on"],
+             "looked_like": r["looked_like"]}
+            for r in rows if r["should_accept"] and not r["conjunction"]
+        ],
+        "false_positives": [
+            {"pile": r["pile"], "source": r["source"], "state_score": r["state_score"]}
+            for r in rows if not r["should_accept"] and r["conjunction"]
+        ],
+        "per_clip": rows,
+    }
+    log.info("held out: entity recall %s, conjunction recall %s, precision %s",
+             report["entity_alone"]["recall"], report["conjunction"]["recall"],
+             report["conjunction"]["precision"])
+    return report
+
+
+# ---------------------------------------------------------------------------
 # apple - backends and formulations together
 # ---------------------------------------------------------------------------
 
@@ -1045,7 +1398,9 @@ def main(argv: list[str] | None = None) -> int:
                                   frames_per_clip=3, allow_remote_video=False)
         runner = {"berries": run_berries, "entity": run_entity,
                   "presentation": run_presentation,
-                  "avocado": run_avocado, "holdout": run_holdout}[args.command]
+                  "avocado": run_avocado, "holdout": run_holdout,
+                  "apple-state": run_apple_state,
+                  "apple-holdout": run_apple_holdout}[args.command]
         report = runner(args, analyzer, providers, downloader, excluded)
 
     report["held_out_from"] = {"clips": len(excluded), "queries": sorted(burned)}

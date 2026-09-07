@@ -134,7 +134,8 @@ on:
         options: [render, calibrate-entities, premium-check, instruction-check, reel,
                   reel-entity-check, reel-grounding-check, reel-raspberry-check,
                   reel-holdout-calibration, reel-holdout-entity,
-                  reel-holdout-presentation, reel-holdout-final]
+                  reel-holdout-presentation, reel-holdout-final,
+                  reel-apple-state, reel-apple-holdout]
       upload_to_youtube:
         description: "Upload to YouTube when it is finished"
         required: false
@@ -1168,6 +1169,136 @@ jobs:
         with:
           name: reel-holdout-presentation
           path: output/holdout/*.json
+          retention-days: 14
+          if-no-files-found: warn
+
+  # -------------------------------------------------------------------
+  #  The apple state, on its own piles. Entity recall 0.800 against
+  #  conjunction recall 0.400 says half the valid apple footage dies in the
+  #  state probe, and the state probe asks for apples on a tree. Ten
+  #  presentations against eight formulations, none naming a location.
+  # -------------------------------------------------------------------
+  reel-apple-state:
+    name: Which wording of con piel keeps an apple
+    if: inputs.task == 'reel-apple-state'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    # Least privilege: a probe reads the code and writes nothing back.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ffmpeg
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+          pip install onnxruntime
+      - name: Restore the cached model files
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: vidfactory-reel-cache-v1
+      - name: Measure
+        env:
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p output/holdout
+          # The tool prints the summary without its per-clip arrays, which is
+          # what fits in a job log and in a step summary; the full rows go to
+          # the artifact.
+          python tools/reel_holdout_check.py apple-state --clips 6 \
+            --out output/holdout/apple-state.json | tee output/holdout/apple-state-summary.txt
+      - name: Report
+        if: always()
+        run: |
+          {
+            echo "## Apple-state calibration"
+            echo '```json'
+            cat output/holdout/apple-state-summary.txt || echo "no summary"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload the scores
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reel-apple-state
+          path: output/holdout/*
+          retention-days: 14
+          if-no-files-found: warn
+
+  # -------------------------------------------------------------------
+  #  And the grade for it: the wording the calibration chose, on apple
+  #  footage that had no part in choosing it.
+  # -------------------------------------------------------------------
+  reel-apple-holdout:
+    name: The applied apple wording on unseen apples
+    if: inputs.task == 'reel-apple-holdout'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    # Least privilege: a probe reads the code and writes nothing back.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ffmpeg
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+          pip install onnxruntime
+      - name: Restore the cached model files
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: vidfactory-reel-cache-v1
+      - name: Measure
+        env:
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p output/holdout
+          # The tool prints the summary without its per-clip arrays, which is
+          # what fits in a job log and in a step summary; the full rows go to
+          # the artifact.
+          python tools/reel_holdout_check.py apple-holdout --clips 6 \
+            --out output/holdout/apple-holdout.json | tee output/holdout/apple-holdout-summary.txt
+      - name: Report
+        if: always()
+        run: |
+          {
+            echo "## Apple state, held out"
+            echo '```json'
+            cat output/holdout/apple-holdout-summary.txt || echo "no summary"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload the scores
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reel-apple-holdout
+          path: output/holdout/*
           retention-days: 14
           if-no-files-found: warn
 
