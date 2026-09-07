@@ -528,6 +528,40 @@ in the report has to come from a measurement - applies here to the **words**.
   thing left for the state to exclude is the form where the food stops being
   visible, a drink or a puree. Rewritten that way and validated on a fresh
   avocado set rather than on the piles that exposed it.
+* **The held-out benchmark, run 34115418980: the gate is precise and it is
+  not yet ready.** Ninety clips over fifteen piles whose queries had never
+  been used to decide anything, 48 valid against 42 invalid:
+
+      probe set                precision   recall   false pos   false neg
+      entity only (shipped)      0.723      0.708     31.0%       29.2%
+      the four-probe and         0.875      0.583      9.5%       41.7%
+
+  So the conjunction is worth having and it costs what it looked like it
+  cost: **false positives fall to under a third of the entity probe's**, and
+  one valid clip in six that used to survive no longer does. Per state, on
+  fresh footage: peeled apple 2 accepted -> **0**, kiwi in a mixed platter
+  4 -> **0**, guacamole 0, an animal owning the frame 0, a strawberry
+  milkshake 0; sliced avocado **6 of 6 kept**, halved 5 of 6.
+
+  **Two targets are missed and the reason is the same one both times.** A
+  *whole* avocado is kept 2 times in 6 and a raw apple in a market crate 1
+  in 6 - and the probe doing most of that rejecting is not the new state
+  layer, it is the **entity probe underneath it**: on its own it keeps only
+  2 of 6 whole avocados and 2 of 6 of those apples. Look at what
+  ``aguacate`` says it is looking for - "a halved avocado", "avocado cut in
+  half with the stone", "sliced avocado on a board" - and every positive
+  describes a *cut*. A whole avocado is dark bumpy skin and no green flesh
+  anywhere, and nothing in the registry describes it. That is the identical
+  mistake the state prompts made, one layer down, and fixing the state layer
+  could never have reached it.
+
+  It is written down rather than fixed here, because this set has now graded
+  a gate and cannot also design the repair: the next cycle needs its own
+  calibration piles for the whole-fruit positives and then a third held-out
+  set. The two remaining leaks are narrower - two apple tarts and two
+  avocado smoothies, all four scoring entity 1.00 and state 1.00, which are
+  frames where the glossy surface really is glossy and the fruit really is
+  beside the glass.
 * **The CTA may not play over a frozen frame, and the gap is between the
   beats rather than after them.** The editor holds the last frame when the
   picture is shorter than the narration: run 34093462658 held it for 1.7

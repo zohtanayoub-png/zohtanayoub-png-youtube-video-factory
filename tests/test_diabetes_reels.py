@@ -1541,8 +1541,15 @@ def test_the_report_counts_the_stills_and_the_last_resort_separately():
     assert "every_item_shows_its_food" in [c.name for c in report.failures]
 
 
-def test_the_held_out_piles_never_reuse_a_development_query_or_clip():
-    """The freeze is the whole point: a number about seen footage is not one."""
+def test_a_pile_that_has_been_spent_cannot_be_spent_again():
+    """The freeze is the whole point: a number about seen footage is not one.
+
+    Every query in the manifest has already decided a rule or graded one, so
+    none of them can do either again - including the held-out queries, which
+    were fresh exactly once. What this pins is not which set happens to be
+    fresh today but the mechanism: the tool refuses a command whose piles are
+    used up, and it says which ones.
+    """
 
     import importlib.util
     import sys
@@ -1562,34 +1569,31 @@ def test_the_held_out_piles_never_reuse_a_development_query_or_clip():
     )
     burned = {q.strip().lower() for q in manifest["burned_queries"]}
     assert len(manifest["clips"]) == 54
-    assert burned
+    assert len(manifest["runs"]) >= 4
 
-    # The calibration piles are *in* the burned list - they were spent
-    # deciding the rules - and the held-out piles must avoid all of it.
-    spent = {p.query.strip().lower()
-             for p in (*module.BERRY_PILES, *module.AVOCADO_PILES,
-                       *module.APPLE_PILES)}
-    assert spent <= burned, sorted(spent - burned)
-    assert module.HOLDOUT_PILES
-    for pile in module.HOLDOUT_PILES:
-        assert pile.query.strip().lower() not in burned, pile.name
-    # Every food a held-out pile names has to be one the registry knows.
-    from vidfactory.reels.foods import BY_NAME
-    for pile in module.HOLDOUT_PILES:
-        assert pile.food in BY_NAME, pile.name
+    clips, queries = module.frozen()
+    assert len(clips) == 54 and queries == burned
 
-    # The guard checks the piles the command is about to search, and only
-    # those: a calibration pile belongs in the burned list once it has been
-    # spent, and checking all of them refused the held-out run for the
-    # calibration's own history.
+    # Every pile the tool can search is recorded, so nothing can be re-run by
+    # accident, and every command therefore refuses until it is rewritten.
     assert set(module.PILES_FOR) == {"berries", "avocado", "apple", "holdout"}
     assert module.PILES_FOR["holdout"] is module.HOLDOUT_PILES
     for command, piles in module.PILES_FOR.items():
-        already = {p.query.strip().lower() for p in piles} & burned
-        if command == "holdout":
-            assert not already, sorted(already)
-        else:
-            assert already, f"{command} piles are not recorded as spent"
-    # And the loader hands the id filter to every pile builder.
-    clips, queries = module.frozen()
-    assert len(clips) == 54 and queries == burned
+        spent = module.spent_piles(command, burned)
+        assert len(spent) == len(piles), f"{command} has unrecorded piles"
+
+    # A query nobody has spent is not flagged, which is what makes the check
+    # a gate rather than a wall.
+    fresh = module.Pile("invented", "a query no run has ever issued", "raw",
+                        True, "manzana")
+    module.PILES_FOR["invented"] = (fresh,)
+    try:
+        assert module.spent_piles("invented", burned) == []
+    finally:
+        del module.PILES_FOR["invented"]
+
+    # Every food a pile names has to be one the registry knows.
+    from vidfactory.reels.foods import BY_NAME
+    for piles in module.PILES_FOR.values():
+        for pile in piles:
+            assert not pile.food or pile.food in BY_NAME, pile.name

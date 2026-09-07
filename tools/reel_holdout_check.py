@@ -177,6 +177,21 @@ PILES_FOR: dict[str, tuple[Pile, ...]] = {
 }
 
 
+def spent_piles(command: str, burned: set[str]) -> list[Pile]:
+    """The piles this command would search that are already used up.
+
+    A pile is spent the moment its numbers decide something or grade
+    something: re-running it measures the pile rather than the probe, which
+    is the whole failure this file exists to prevent. Checked for the command
+    about to run and not for every command there is, because a calibration
+    pile is *supposed* to be in the burned list once it has been spent.
+    """
+
+    return [p for p in PILES_FOR.get(command, ())
+            if p.query.strip().lower() in burned]
+
+
+
 # ---------------------------------------------------------------------------
 # Fetching
 # ---------------------------------------------------------------------------
@@ -671,14 +686,14 @@ def main(argv: list[str] | None = None) -> int:
     excluded, burned = frozen()
     log.info("excluding %d development clips and %d spent queries",
              len(excluded), len(burned))
-    # Only the piles this command will actually search. A calibration pile
-    # is *supposed* to appear in the burned list once it has been spent -
-    # that is what spending it means - and checking every pile on every run
-    # refuses the held-out run for the calibration's own history.
-    for pile in PILES_FOR[args.command]:
-        if pile.query.strip().lower() in burned:
-            print(f"pile {pile.name!r} reuses a query the calibration spent")
-            return 2
+    already = spent_piles(args.command, burned)
+    if already:
+        print("these piles have already been spent, on deciding a rule or on "
+              "grading one, and cannot do either again:")
+        for pile in already:
+            print(f"  {pile.name}: {pile.query!r}")
+        print("write new queries for this command before running it.")
+        return 2
 
     downloader = ClipDownloader(
         workdir=Path("work/holdout"), min_width=1280, min_height=720,
