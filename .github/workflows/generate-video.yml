@@ -1561,6 +1561,13 @@ jobs:
             cat "$DIR/guion.txt"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          # And to stdout, because a step summary cannot be read back through
+          # the API: the report existed and could not be looked at, which is
+          # the same way the presentation aggregates were lost.
+          echo "=== reel_quality_report.json ==="
+          cat "$DIR/reel_quality_report.json"
+          echo "=== guion.txt ==="
+          cat "$DIR/guion.txt"
 
       - name: Inspect real frames from the finished reel
         if: always()
