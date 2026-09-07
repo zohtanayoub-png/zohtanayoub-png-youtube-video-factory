@@ -44,6 +44,13 @@ and the question being too small.
 ``wrong_context_failure_count``       right food, but it is a packaged product
 ``distractor_dominance_failure_count`` right food, and a dog owns the frame
 
+And two for the picture a beat ended up with when no video demonstrated its
+claim: a still photograph that does is a better answer than a video that
+does not, and the last resort below that is never silent.
+
+``image_fallback_shot_count``         beats carried by an animated still
+``ungrounded_fallback_count``         beats that shipped an unverified clip
+
 In production the two safety counts must be zero. That is not a threshold to
 be tuned later; it is the reason the safety module exists.
 """
@@ -326,6 +333,8 @@ def build_report(
     )
     frozen_tail = float(visual.pop("frozen_tail_duration", 0.0) or 0.0)
     repaired_shots = int(visual.pop("repaired_item_shot_count", 0) or 0)
+    image_shots = int(visual.pop("image_fallback_shot_count", 0) or 0)
+    ungrounded = [r for r in grounding_rows if r.get("ungrounded_fallback")]
     repair_rounds = int(visual.pop("repair_rounds_used", 0) or 0)
 
     metrics: dict[str, Any] = {
@@ -354,6 +363,8 @@ def build_report(
         "distractor_dominance_failure_count": _failed_on("dominant_subject"),
         "item_grounding_results": grounding_rows,
         "repaired_item_shot_count": repaired_shots,
+        "image_fallback_shot_count": image_shots,
+        "ungrounded_fallback_count": len(ungrounded),
         "repair_rounds_used": repair_rounds,
         "frozen_tail_duration": round(frozen_tail, 3),
         "cta_present": cta_present,
@@ -447,10 +458,12 @@ def build_report(
             not failed_rows,
             (
                 "; ".join(
-                    f"{r['item'] or r['beat']} needed {r['required_entity']} and "
-                    f"failed on {', '.join(r.get('failed_on') or ['grounding'])}: "
-                    f"the footage looked like {r['looked_like'] or 'something else'} "
-                    f"({r['score']:.2f})"
+                    f"{r.get('item') or r.get('beat')} needed "
+                    f"{r.get('required_entity')} and failed on "
+                    f"{', '.join(r.get('failed_on') or ['grounding'])}: the "
+                    f"footage looked like "
+                    f"{r.get('looked_like') or 'something else'} "
+                    f"({float(r.get('score') or 0.0):.2f})"
                     for r in failed_rows[:3]
                 ) if failed_rows else
                 f"all {len(checked_rows)} item beat(s) that name a food show it"

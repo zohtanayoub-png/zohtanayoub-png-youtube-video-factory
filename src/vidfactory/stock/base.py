@@ -61,6 +61,12 @@ class StockClip:
     visual_semantic_match: float = 0.0
     local_path: str = ""
     content_hash: str = ""
+    #: ``video`` or ``image``. A still is not a lesser clip, it is a
+    #: different one: it has no duration to seek inside and it is looped
+    #: rather than played, and both the downloader and the editor need to
+    #: know which they are holding. Defaults to video so nothing that
+    #: existed before this field changes behaviour.
+    media_type: str = "video"
 
     @property
     def key(self) -> str:
@@ -155,6 +161,19 @@ class StockProvider(ABC):
         """
 
     # ------------------------------------------------------------------
+
+    def search_images(
+        self, query: str, per_page: int = 20, **filters: Any
+    ) -> list[StockClip]:
+        """Still photographs, for a claim no video in the pool demonstrates.
+
+        Optional, and empty by default: a provider that has no image API is
+        not broken, it simply has nothing to offer the fallback. Returning
+        ``[]`` rather than raising is what lets the reel pipeline ask every
+        provider and use whichever answers.
+        """
+
+        return []
     def search_many(
         self, queries: Sequence[str], per_page: int = 20, **filters: Any
     ) -> list[StockClip]:

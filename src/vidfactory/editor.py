@@ -39,10 +39,15 @@ class Shot:
     clip_key: str = ""
     motion: str = "none"  # none | zoom_in | zoom_out | pan_right | pan_left
     rendered: Path | None = None
+    #: A still photograph rather than a video. It is looped for its whole
+    #: duration instead of being seeked into, and the motion filter that
+    #: exists for Ken Burns is what stops it looking like a freeze frame.
+    still: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "source": self.source.name,
+            "media_type": "image" if self.still else "video",
             "start": round(self.start, 2),
             "duration": round(self.duration, 2),
             "scene_id": self.scene_id,
@@ -431,9 +436,18 @@ class VideoEditor:
         """Normalize one shot into an intermediate MP4 with identical params."""
 
         target = self.workdir / f"shot_{index:05d}.mp4"
+        # A still has no timeline to seek into: it is looped at the output
+        # frame rate for exactly as long as the shot lasts. Everything after
+        # the input - the motion filter, the encoder settings, the timescale
+        # - is identical, which is what lets the concat demuxer stream-copy
+        # a photograph and a video into the same track.
+        source_args = (
+            ["-loop", "1", "-framerate", str(self.fps), "-t", f"{shot.duration:.3f}"]
+            if shot.still else
+            ["-ss", f"{shot.start:.3f}", "-t", f"{shot.duration:.3f}"]
+        )
         args = [
-            "-ss", f"{shot.start:.3f}",
-            "-t", f"{shot.duration:.3f}",
+            *source_args,
             "-i", str(shot.source),
             "-an",
             "-vf", self._filter_for(shot, fade_out=fade_out),

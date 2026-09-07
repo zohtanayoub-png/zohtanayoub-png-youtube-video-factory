@@ -19,6 +19,7 @@ from .base import ProviderError, StockClip, StockProvider
 log = get_logger("PEXELS")
 
 API_URL = "https://api.pexels.com/videos/search"
+PHOTO_URL = "https://api.pexels.com/v1/search"
 
 
 class PexelsProvider(StockProvider):
@@ -48,6 +49,66 @@ class PexelsProvider(StockProvider):
             timeout=float(filters.get("timeout", 30.0)),
         )
         return self.parse(payload, query)
+
+    # ------------------------------------------------------------------
+    def search_images(self, query: str, per_page: int = 20, **filters: Any) -> list[StockClip]:
+        """Photographs, from the same key and the same licence as the videos."""
+
+        if not self.available:
+            raise ProviderError("PEXELS_API_KEY is not set")
+
+        self.throttle()
+        payload = request_json(
+            PHOTO_URL,
+            headers={"Authorization": self.api_key},
+            params={
+                "query": query,
+                "per_page": max(1, min(int(per_page), 80)),
+                "page": max(1, int(filters.get("page", 1))),
+                "orientation": filters.get("orientation", "portrait"),
+                "size": filters.get("size", "large"),
+            },
+            retries=int(filters.get("retries", 3)),
+            timeout=float(filters.get("timeout", 30.0)),
+        )
+        return self.parse_photos(payload, query)
+
+    # ------------------------------------------------------------------
+    @classmethod
+    def parse_photos(cls, payload: dict[str, Any], query: str = "") -> list[StockClip]:
+        """Convert a Pexels photo response into :class:`StockClip` records.
+
+        ``alt`` is what a photo has and a video does not: a written
+        description of the picture, which the ranker can read.
+        """
+
+        clips: list[StockClip] = []
+        for photo in (payload or {}).get("photos", []) or []:
+            sources = photo.get("src") or {}
+            link = str(sources.get("large2x") or sources.get("large") or
+                       sources.get("original") or "")
+            if not link:
+                continue
+            clips.append(
+                StockClip(
+                    provider=cls.name,
+                    provider_id=f"photo-{photo.get('id', '')}",
+                    download_url=link,
+                    width=int(photo.get("width") or 0),
+                    height=int(photo.get("height") or 0),
+                    duration=0.0,
+                    page_url=str(photo.get("url", "")),
+                    author=str(photo.get("photographer", "")),
+                    author_url=str(photo.get("photographer_url", "")),
+                    license_name=cls.license_name,
+                    preview_image=str(sources.get("large") or link),
+                    preview_images=[str(sources.get("large") or link)],
+                    query=query,
+                    description=str(photo.get("alt", "") or "").strip().lower(),
+                    media_type="image",
+                )
+            )
+        return [clip for clip in clips if clip.provider_id and clip.download_url]
 
     # ------------------------------------------------------------------
     @classmethod

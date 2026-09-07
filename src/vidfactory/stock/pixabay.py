@@ -16,6 +16,7 @@ from .base import ProviderError, StockClip, StockProvider
 log = get_logger("PIXABAY")
 
 API_URL = "https://pixabay.com/api/videos/"
+PHOTO_URL = "https://pixabay.com/api/"
 
 #: Rendition names in descending quality order.
 _RENDITIONS = ("large", "medium", "small", "tiny")
@@ -49,6 +50,58 @@ class PixabayProvider(StockProvider):
             timeout=float(filters.get("timeout", 30.0)),
         )
         return self.parse(payload, query)
+
+    # ------------------------------------------------------------------
+    def search_images(self, query: str, per_page: int = 20, **filters: Any) -> list[StockClip]:
+        """Photographs, from the same key and the same licence as the videos."""
+
+        if not self.available:
+            raise ProviderError("PIXABAY_API_KEY is not set")
+
+        self.throttle()
+        payload = request_json(
+            PHOTO_URL,
+            params={
+                "key": self.api_key,
+                "q": query,
+                "per_page": max(3, min(int(per_page), 200)),
+                "page": max(1, int(filters.get("page", 1))),
+                "image_type": "photo",
+                "safesearch": "true",
+            },
+            retries=int(filters.get("retries", 3)),
+            timeout=float(filters.get("timeout", 30.0)),
+        )
+        return self.parse_photos(payload, query)
+
+    # ------------------------------------------------------------------
+    @classmethod
+    def parse_photos(cls, payload: dict[str, Any], query: str = "") -> list[StockClip]:
+        clips: list[StockClip] = []
+        for hit in (payload or {}).get("hits", []) or []:
+            link = str(hit.get("largeImageURL") or hit.get("webformatURL") or "")
+            if not link:
+                continue
+            tags = [t.strip() for t in str(hit.get("tags", "")).split(",") if t.strip()]
+            clips.append(
+                StockClip(
+                    provider=cls.name,
+                    provider_id=f"photo-{hit.get('id', '')}",
+                    download_url=link,
+                    width=int(hit.get("imageWidth") or 0),
+                    height=int(hit.get("imageHeight") or 0),
+                    duration=0.0,
+                    page_url=str(hit.get("pageURL", "")),
+                    author=str(hit.get("user", "")),
+                    license_name=cls.license_name,
+                    preview_image=str(hit.get("webformatURL") or link),
+                    preview_images=[str(hit.get("webformatURL") or link)],
+                    query=query,
+                    tags=tags,
+                    media_type="image",
+                )
+            )
+        return [clip for clip in clips if clip.provider_id and clip.download_url]
 
     # ------------------------------------------------------------------
     @classmethod

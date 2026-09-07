@@ -14,6 +14,10 @@ from the long-form pipeline.
 
 from __future__ import annotations
 
+import json
+import tempfile
+from pathlib import Path
+
 import pytest
 
 from vidfactory.reels import hooks, safety
@@ -1420,3 +1424,146 @@ def test_the_inspector_prints_the_four_probes():
     )
     assert "entity=1.00" in line and "state=0.00" in line
     assert "FAILED ON state" in line and "apple cake" in line
+
+
+# ---------------------------------------------------------------------------
+# A still that demonstrates the claim beats a video that does not.
+# ---------------------------------------------------------------------------
+
+def test_a_photograph_renders_as_a_shot_and_not_a_freeze():
+    """A still has no timeline to seek into; it is looped and crawled across.
+
+    Everything after the input is identical to a video shot, which is what
+    lets the concat demuxer stream-copy a photograph and a clip into one
+    track. Rendered rather than asserted about, because the argument order
+    around ``-loop 1`` is exactly the kind of thing that is right in a
+    comment and wrong in the command.
+    """
+
+    import subprocess
+
+    from vidfactory.editor import Shot, VideoEditor
+    from vidfactory.ffmpeg_utils import probe_media
+
+    work = Path(tempfile.mkdtemp(prefix="reel-still-"))
+    image = work / "apple.png"
+    subprocess.run(
+        ["ffmpeg", "-v", "error", "-y", "-f", "lavfi",
+         "-i", "testsrc=size=540x960:duration=1:rate=1", "-frames:v", "1", str(image)],
+        check=True,
+    )
+    editor = VideoEditor(workdir=work, width=540, height=960, fps=24)
+    shot = Shot(source=image, start=0.0, duration=2.5, motion="zoom_in",
+                still=True, scene_id="beat-05")
+    rendered = editor.render_shot(shot, 1)
+
+    info = probe_media(rendered)
+    assert info.has_video
+    assert abs(info.duration - 2.5) < 0.15
+    assert (info.width, info.height) == (540, 960)
+    assert shot.to_dict()["media_type"] == "image"
+    # A video shot is unchanged: no -loop, and its in-point is still honoured.
+    assert Shot(source=image, start=1.0, duration=2.0).to_dict()["media_type"] == "video"
+
+
+def test_a_photo_search_is_parsed_into_a_still_clip():
+    from vidfactory.stock.pexels import PexelsProvider
+    from vidfactory.stock.pixabay import PixabayProvider
+
+    pexels = PexelsProvider.parse_photos({"photos": [{
+        "id": 7, "width": 4000, "height": 6000,
+        "url": "https://www.pexels.com/photo/red-apple-7/",
+        "photographer": "A", "photographer_url": "u",
+        "alt": "Red Apple With Skin",
+        "src": {"large": "l.jpg", "large2x": "l2.jpg"},
+    }]}, "raw apple")[0]
+    assert pexels.media_type == "image"
+    assert pexels.duration == 0.0
+    assert pexels.key == "pexels:photo-7"
+    # The alt text is the thing a photo has and a video does not.
+    assert pexels.description == "red apple with skin"
+
+    pixabay = PixabayProvider.parse_photos({"hits": [{
+        "id": 9, "imageWidth": 3000, "imageHeight": 2000,
+        "largeImageURL": "big.jpg", "webformatURL": "small.jpg",
+        "pageURL": "p", "user": "B", "tags": "apple, fruit",
+    }]}, "raw apple")[0]
+    assert pixabay.media_type == "image" and pixabay.key == "pixabay:photo-9"
+    assert pixabay.tags == ["apple", "fruit"]
+
+
+def test_a_provider_with_no_image_api_offers_nothing_rather_than_failing():
+    """The fallback asks every provider; one that cannot answer says so."""
+
+    from vidfactory.stock.base import StockClip, StockProvider
+
+    class Bare(StockProvider):
+        name = "bare"
+
+        def search(self, query, per_page=20, **filters):
+            return [StockClip(provider="bare", provider_id="1", download_url="u",
+                              width=1920, height=1080, duration=5.0)]
+
+    assert Bare(api_key="k").search_images("apples") == []
+
+
+def test_the_report_counts_the_stills_and_the_last_resort_separately():
+    """A beat carried by a still is fine; a beat carried by nothing is not."""
+
+    from vidfactory.reels.qc import build_report
+
+    script = fitted(BY_SLUG[FIRST], 45)
+    visual = {
+        "image_fallback_shot_count": 2,
+        "item_grounding_results": [
+            {"beat": "beat-05", "item": "manzana", "required_entity": "manzana",
+             "checked": True, "passed": True, "score": 1.0, "failed_on": [],
+             "media": "image", "ungrounded_fallback": False},
+            {"beat": "beat-07", "item": "fresas", "required_entity": "fresas",
+             "checked": True, "passed": False, "score": 0.0, "failed_on": [],
+             "media": "video", "ungrounded_fallback": True},
+        ],
+    }
+    report = build_report(
+        script, production=True, visual=visual, sources=[{"key": "x"}],
+        cta_start=script.estimated_seconds - 3,
+    )
+    assert report.metrics["image_fallback_shot_count"] == 2
+    assert report.metrics["ungrounded_fallback_count"] == 1
+    # The still beat passes; the ungrounded one is a failure, so production
+    # refuses the render rather than shipping a picture nobody verified.
+    assert report.metrics["entity_grounding_failure_count"] == 1
+    assert "every_item_shows_its_food" in [c.name for c in report.failures]
+
+
+def test_the_held_out_piles_never_reuse_a_development_query_or_clip():
+    """The freeze is the whole point: a number about seen footage is not one."""
+
+    import importlib.util
+    import sys
+
+    tool = Path(__file__).resolve().parents[1] / "tools" / "reel_holdout_check.py"
+    spec = importlib.util.spec_from_file_location("reel_holdout_check", tool)
+    module = importlib.util.module_from_spec(spec)
+    # Registered before it is executed: a dataclass built under
+    # ``from __future__ import annotations`` resolves its own annotations
+    # through sys.modules, and a module that is not in there raises.
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+
+    manifest = json.loads(
+        (Path(__file__).resolve().parents[1] / "data" / "calibration"
+         / "reel_grounding_dev_clips.json").read_text(encoding="utf-8")
+    )
+    burned = {q.strip().lower() for q in manifest["burned_queries"]}
+    assert len(manifest["clips"]) == 54
+    assert burned
+
+    piles = (*module.BERRY_PILES, *module.AVOCADO_PILES,
+             *module.APPLE_PILES, *module.HOLDOUT_PILES)
+    assert piles
+    for pile in piles:
+        assert pile.query.strip().lower() not in burned, pile.name
+    # And the loader hands the id filter to every pile builder.
+    clips, queries = module.frozen()
+    assert len(clips) == 54 and queries == burned

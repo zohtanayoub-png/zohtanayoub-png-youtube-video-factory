@@ -36,12 +36,14 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from ..downloader import ClipDownloader
+from ..http import download_file
 from ..editor import Shot, VideoEditor
 from ..languages import resolve_language
 from ..logging_utils import get_logger
 from ..ranking import ClipRanker, RankingContext
 from ..stock.registry import build_providers
 from ..subtitles import generate_subtitles
+from ..visual_analysis import sample_frames
 from .narration import narrate
 from .voice import build_reel_engine, licence_report, prosody
 from .captions import REEL_HEIGHT, REEL_WIDTH, safe_area_report, write_reel_ass
@@ -482,6 +484,7 @@ class ReelPipeline:
         grounding_rows: list[dict[str, Any]] = []
         repaired_shots = 0
         rounds_used = 0
+        image_shots = 0
 
         # The picture has to cover the whole narration plus the hold at the
         # end. Falling short is what made the editor freeze the final frame
@@ -555,6 +558,62 @@ class ReelPipeline:
                 used_keys.append(result.clip.key)
             return kept, rejected
 
+        #: How long one still may hold the screen. Long enough to read, short
+        #: enough that the slow crop across it still reads as movement.
+        STILL_SECONDS = 3.0
+
+        def stills(
+            query: str, wanted: int, beat: Any, requirement: Any, scene_id: str
+        ) -> list[tuple[Any, Any, Path]]:
+            """Photographs for a beat no video in the pool could satisfy.
+
+            A high-quality still of an unmistakably unpeeled apple is a better
+            picture for "la manzana con piel" than a video of an apple whose
+            state cannot be established. It is held for three seconds and
+            crawled across rather than cut to, so it reads as a shot instead
+            of a freeze.
+
+            Judged by exactly the same four probes as a video: the point of
+            the fallback is to keep the *claim* true, so an image that fails
+            the requirement is no more usable than a clip that fails it.
+            """
+
+            if analyzer is None or requirement is None:
+                return []
+            found: list[Any] = []
+            for provider in providers:
+                try:
+                    found.extend(provider.search_images(query, per_page=20, page=1))
+                except Exception as exc:
+                    log.warning("image search failed for %r: %s", query, exc)
+            kept: list[tuple[Any, Any, Path]] = []
+            for clip in found:
+                if len(kept) >= wanted:
+                    break
+                if clip.key in used_keys:
+                    continue
+                target = work / "stills" / f"{clip.provider_id}.jpg"
+                target.parent.mkdir(parents=True, exist_ok=True)
+                try:
+                    download_file(clip.download_url, target, timeout=60.0)
+                except Exception as exc:
+                    log.warning("still download failed for %s: %s", clip.key, exc)
+                    continue
+                used_keys.append(clip.key)
+                frames = sample_frames(video=target, duration=0.0, count=1,
+                                       size=analyzer.decode_size)
+                if not frames:
+                    continue
+                grounding = ground_requirement(analyzer, frames, requirement)
+                if grounding.failed or not grounding.checked:
+                    log.info("still %s rejected (%s)", clip.key,
+                             ", ".join(grounding.failed_on) or "unchecked")
+                    continue
+                kept.append((clip, grounding, target))
+                log.info("still %s satisfies %s (%.2f)", clip.key,
+                         requirement.required_entity, grounding.score)
+            return kept
+
         # The picture is continuous; the narration is not. Built against the
         # synthesized audio - pauses, tail and all - by ``shot_spans``.
         spans = shot_spans(script.beats, narration.scene_timings, timeline_end)
@@ -594,16 +653,42 @@ class ReelPipeline:
                     chosen.extend(more)
                 rounds_used = max(rounds_used, attempts)
 
+            picture: list[tuple[Any, Any, Path]] = []
             if not chosen and requirement is not None:
-                # Nothing showed the food. Take the best available rather than
-                # leaving a hole, and let the report say so - a missing beat is
-                # a worse reel than a flagged one.
+                # No video demonstrated the claim. A still that does is a
+                # better picture than a video that does not, so the image
+                # providers are asked before anything ungrounded is
+                # considered - the state is what may never be substituted.
+                needed = max(1, int(span // STILL_SECONDS) + (1 if span % STILL_SECONDS else 0))
+                for query in [*state_repair_queries(requirement, []), beat.query]:
+                    if len(picture) >= needed:
+                        break
+                    picture.extend(
+                        stills(query, needed - len(picture), beat, requirement, scene_id)
+                    )
+                if picture:
+                    image_shots += len(picture)
+                    log.info(
+                        "%s: %d still(s) carry the beat where no video did",
+                        scene_id, len(picture),
+                    )
+
+            if not chosen and not picture and requirement is not None:
+                # Last resort, and it is never silent: the row below records
+                # the beat as ungrounded, which is a grounding failure, which
+                # in production refuses the render. Hard rule six says the
+                # pipeline degrades rather than crashing; it does not say a
+                # wrong picture may ship quietly.
                 log.warning(
-                    "no footage showing %s for %s; falling back", entity.name, scene_id
+                    "no footage and no still showing %s for %s; falling back "
+                    "to ungrounded video", entity.name, scene_id,
                 )
                 chosen, _ = take(beat.query, wanted, beat, None, scene_id)
+                ungrounded = True
+            else:
+                ungrounded = False
 
-            if not chosen:
+            if not chosen and not picture:
                 log.warning("no footage for beat %s (%r)", scene_id, beat.query)
                 continue
 
@@ -612,7 +697,10 @@ class ReelPipeline:
                 # shot in a beat is on screen while the line is spoken, so a
                 # good first clip cannot excuse a bad second one - the same
                 # reason the reel is graded per beat rather than per reel.
-                judged = [g for _clip, g in chosen if g is not None and g.checked]
+                judged = [
+                    *(g for _clip, g in chosen if g is not None and g.checked),
+                    *(g for _clip, g, _path in picture if g.checked),
+                ]
                 worst = min(judged, key=lambda g: g.score, default=None)
                 grounding_rows.append({
                     "beat": scene_id,
@@ -622,7 +710,10 @@ class ReelPipeline:
                     "required_labels": list(entity.labels),
                     "required_attributes": list(requirement.required_attributes),
                     "forbidden_attributes": list(requirement.forbidden_attributes),
-                    "sources": [c.clip.key for c, _g in chosen],
+                    "sources": ([c.clip.key for c, _g in chosen]
+                                + [c.key for c, _g, _p in picture]),
+                    "media": "image" if picture else "video",
+                    "ungrounded_fallback": ungrounded,
                     "score": round(worst.score, 3) if worst else 0.0,
                     "entity_presence_score": (
                         round(worst.entity_presence_score, 3) if worst else 0.0),
@@ -637,18 +728,21 @@ class ReelPipeline:
                     "distractor_dominance_score": (
                         round(worst.distractor_dominance_score, 3) if worst else 0.0),
                     "failed_on": list(worst.failed_on) if worst else [],
-                    "checked": bool(worst and worst.checked),
-                    "passed": bool(worst and worst.passed),
+                    "checked": bool(worst and worst.checked) or ungrounded,
+                    "passed": bool(worst and worst.passed) and not ungrounded,
                     "looked_like": worst.top_distractor if worst else "",
                     "rejected_candidates": rejected,
                     "repair_rounds": attempts,
                 })
 
-            per = span / len(chosen)
+            laid: list[tuple[str, Path, bool]] = [
+                (r.clip.key, Path(r.path), False) for r, _g in chosen
+            ] + [(c.key, path, True) for c, _g, path in picture]
+            per = span / len(laid)
             offset = start
-            for position, (result, _grounding) in enumerate(chosen):
+            for position, (clip_key, source, is_still) in enumerate(laid):
                 length = min(MAX_SHOT, max(MIN_SHOT * 0.6, per))
-                if position == len(chosen) - 1:
+                if position == len(laid) - 1:
                     # The beat's last shot runs to the exact second the next
                     # beat speaks. A floor here would make the picture longer
                     # than the audio and push every later beat off its words,
@@ -658,11 +752,12 @@ class ReelPipeline:
                 shots.append(
                     Shot(
                         scene_id=scene_id,
-                        clip_key=result.clip.key,
-                        source=Path(result.path),
+                        clip_key=clip_key,
+                        source=source,
                         start=0.0,
                         duration=round(length, 3),
                         motion="zoom_in" if position % 2 == 0 else "pan_left",
+                        still=is_still,
                     )
                 )
                 offset += length
@@ -689,6 +784,7 @@ class ReelPipeline:
             "analysed": analysed,
             "item_grounding_results": grounding_rows,
             "repaired_item_shot_count": repaired_shots,
+            "image_fallback_shot_count": image_shots,
             "repair_rounds_used": rounds_used,
             "frozen_tail_duration": frozen_tail,
         }
@@ -749,6 +845,8 @@ class ReelPipeline:
             # downstream can reconstruct them from the finished shot list.
             "item_grounding_results": list(clips.get("item_grounding_results", []) or []),
             "repaired_item_shot_count": int(clips.get("repaired_item_shot_count", 0) or 0),
+            "image_fallback_shot_count": int(clips.get("image_fallback_shot_count", 0) or 0),
+            "still_shot_count": sum(1 for s in shots if getattr(s, "still", False)),
             "repair_rounds_used": int(clips.get("repair_rounds_used", 0) or 0),
             "frozen_tail_duration": float(clips.get("frozen_tail_duration", 0.0) or 0.0),
         }
