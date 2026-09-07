@@ -81,6 +81,8 @@
   },
   "burned_queries": [
     "a bare peeled apple with the skin removed",
+    "a bright red apple against a plain backdrop",
+    "a child holding an apple with both hands",
     "a glass of apple juice on a counter",
     "a heap of avocados in a crate",
     "a mound of apples at an autumn fruit stand",
@@ -89,9 +91,12 @@
     "a single glossy apple on a bare surface",
     "a slice of apple cake on a fork",
     "a whole apple next to a knife blade",
+    "a whole apple placed beside a chef's knife",
     "an apple resting on a wooden chopping board",
     "an apple stripped bare of its peel",
     "apple beside a knife on a cutting board",
+    "apple crumble served warm in a bowl",
+    "apple halves showing the skin and the core",
     "apple juice being poured from a bottle",
     "apple pie cooling on a rack",
     "apple pie slice dessert on a plate",
@@ -124,6 +129,7 @@
     "bowl of guacamole with tortilla chips",
     "boxes of apples at a farmers market",
     "cat lying beside a fruit basket",
+    "cloudy apple juice in a tall tumbler",
     "courgettes and green peppers on a board",
     "dog begging next to a plate of food",
     "dog with strawberries",
@@ -146,6 +152,7 @@
     "hand peeling apple skin into a spiral",
     "holding a green apple up to the camera",
     "homemade apple crumble in a baking dish",
+    "hundreds of apples filling a harvest bin",
     "kiwi cut into rounds beside a knife",
     "kiwi cut into thin green wheels",
     "kiwi fruit sliced on a wooden chopping board",
@@ -156,6 +163,7 @@
     "mashed guacamole being stirred in a bowl",
     "one red apple standing alone",
     "one ripe apple photographed up close",
+    "orange fruit stacked in a greengrocer window",
     "oranges heaped in a wicker display",
     "oranges piled on a market stall",
     "pears and oranges together in a fruit bowl",
@@ -174,6 +182,7 @@
     "raspberries tipped onto a slate slab",
     "red apples on a branch in an orchard",
     "red apples resting on a windowsill",
+    "removing every bit of skin from an apple",
     "ripe avocados stacked in a bowl",
     "ripe raspberries harvest closeup macro",
     "shiny apples in a wooden crate at a market",
@@ -243,6 +252,10 @@
     {
       "id": 34162048979,
       "what": "the held-out apple set; it graded the shipped wording and is spent"
+    },
+    {
+      "id": 34162945046,
+      "what": "the third apple set; it refused the one-prompt change and is spent"
     }
   ]
 }

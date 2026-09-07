@@ -668,6 +668,72 @@ in the report has to come from a measurement - applies here to the **words**.
   their skin on" scored 0.958 on the pile that chose it and a single apple
   on a cutting board is not on a tree. That is the next calibration, on its
   own piles.
+* **The apple state, and a hypothesis that did not survive its own
+  measurement** (runs 34162044863, 34162048979 and 34162945046 - three
+  independent apple sets, thirty-three fresh queries, no clip and no query
+  reused). The presentation run put ``manzana`` at entity recall 0.800 and
+  conjunction recall 0.400, and the obvious reading was that the state
+  prompt encodes a *location*: "apples on a tree with their skin on", and a
+  single apple on a board is not on a tree. Eight formulations were written
+  to test that, none of whose positives names a tree, a plate, a table, a
+  basket, a kitchen or a board:
+
+      formulation                     precision  recall  state-blamed
+      shipped                            1.000    0.472       13
+      no orchard                         1.000    0.444       14
+      visible skin                       1.000    0.306       19
+      unpeeled                           1.000    0.389       16
+      natural peel                       1.000    0.417       15
+      all three skin wordings            1.000    0.472       11
+      skin wordings, state negatives     0.880    0.611        4
+      visible skin, state negatives      1.000    0.333       16
+
+  **Every rewording of the positives is worse, and deleting the orchard
+  clause is the second worst of them.** The location was not the cost. Only
+  the variant that replaced the *negatives* recovers recall, and it does so
+  at precision 0.880 with two peeled apples and one juice accepted - the
+  three things the brief names as must-be-zero - so it was refused on those
+  grounds rather than on its total.
+
+  The held-out apple set agreed and said why. Fifty-four clips, precision
+  **1.000**, recall 0.300, every one of the twenty-four invalid clips
+  rejected: no orange, no dessert, no peeled apple. Of the twenty-one valid
+  clips it lost, **fourteen name "pale wet apple flesh being cut" as the
+  closest distractor** - six of six apples on a board, four of five wedges
+  with the peel still on the edge. Both are presentations a ``con piel``
+  beat must accept, and the mechanism is legible: a wedge does have pale
+  flesh, and a whole apple beside a knife looks like an apple about to be
+  cut.
+
+  So one prompt was rewritten to name what a peeled apple actually has -
+  that the pale surface is the *whole fruit* - the positives were left
+  exactly as they were, and it was validated on a third apple set with the
+  accept rule fixed before the run. **It lost.** Board recovers 0/6 to 1/6
+  and the hand loses 3/6 to 1/6; recall 0.367 to 0.333 at the same
+  precision. Whatever the "state negatives" variant bought on the
+  calibration pile came from changing the positives and all three negatives
+  together, and does not survive being isolated to the one prompt two
+  measurements had blamed.
+
+  **Nothing was applied.** The apple ships the wording it already had, and
+  the honest state of it is three numbers on three sets: precision 1.000,
+  1.000, 0.917 and recall 0.472, 0.300, 0.367. The one blemish is new and
+  is *not* the state layer: on the third set the entity probe accepted one
+  orange in six and the conjunction let it through, which is the first
+  apple/orange leak measured since the identification probe was built. The
+  state probe is doing its job on the invalid side throughout - on that
+  same set it rejected five of six peeled apples and three of three
+  desserts that the entity probe had waved past.
+
+  What this cycle actually establishes is that the apple's recall is a
+  **state-probe** cost (fifteen to eighteen of every twenty lost clips),
+  that it concentrates almost entirely in one presentation - an apple on a
+  board is 0/6 in all three sets - and that neither rewording the positives
+  nor replacing the blamed negative fixes it. That is a real limit and it
+  is written down rather than tuned around: the remaining lever is the
+  verifier, and the verifier benchmark already says the two ViT-L/14
+  builds score identically and no other candidate loads.
+
 * **The raspberry candidate, decided at last** (runs 34113587132 and
   34155581648, two independent fresh four-berry sets). Adopt the
   arrangement wording, refuse the centre crop:
