@@ -42,7 +42,6 @@ from ..logging_utils import get_logger
 from ..ranking import ClipRanker, RankingContext
 from ..stock.registry import build_providers
 from ..subtitles import generate_subtitles
-from ..tts import NarrationBuilder, build_engine  # noqa: F401  (Piper fallback)
 from .narration import narrate
 from .voice import build_reel_engine, licence_report, prosody
 from .captions import REEL_HEIGHT, REEL_WIDTH, safe_area_report, write_reel_ass
@@ -60,22 +59,9 @@ log = get_logger("REEL")
 MIN_SHOT = 2.0
 MAX_SHOT = 4.0
 
-#: Reels breathe less than long-form. The long-form pauses would add four
-#: seconds of silence to a forty second video.
-SENTENCE_PAUSE = 0.16
-BEAT_PAUSE = 0.10
-
 #: A short hold after the last word. Long enough not to cut the CTA off,
 #: short enough that the loop comes round quickly.
 TAIL_SECONDS = 0.4
-
-
-@dataclass
-class _BeatScene:
-    """What :class:`NarrationBuilder` needs from a beat."""
-
-    scene_id: str
-    narration: str
 
 
 @dataclass
