@@ -145,18 +145,25 @@ APPLE_PILES: tuple[Pile, ...] = (
     Pile("apple juice", "pouring apple juice into a glass", "juice", False, "manzana"),
 )
 
+#: The held-out set. Every query here is new again: the calibration run
+#: above spent its own, and a pile that decided a rule cannot also grade it.
 HOLDOUT_PILES: tuple[Pile, ...] = (
-    Pile("raw apple with skin", "red apples on a branch in an orchard", "raw", True, "manzana"),
-    Pile("peeled apple", "peeling an apple with a knife", "peeled", False, "manzana"),
-    Pile("apple dessert", "homemade apple crumble in a baking dish", "dessert", False, "manzana"),
-    Pile("strawberries", "strawberries on a rustic wooden board", "raw", True, "fresas"),
-    Pile("strawberry dessert", "strawberry milkshake in a tall glass", "processed", False, "fresas"),
-    Pile("raspberries", "ripe raspberries harvest closeup macro", "raw", True, "frambuesas"),
-    Pile("kiwi", "kiwi halves on a marble surface", "raw", True, "kiwi"),
-    Pile("kiwi in a mixed platter", "exotic fruit platter mango papaya coconut", "mixed", False, "kiwi"),
-    Pile("halved avocado", "avocado cut open showing the pit", "halved", True, "aguacate"),
-    Pile("whole avocado", "whole avocados in a basket", "whole", True, "aguacate"),
-    Pile("food with an animal", "cat sitting next to a bowl of fruit", "animal", False, "fresas"),
+    Pile("raw apple with skin", "shiny apples in a wooden crate at a market", "raw", True, "manzana"),
+    Pile("peeled apple", "hand peeling apple skin into a spiral", "peeled", False, "manzana"),
+    Pile("apple dessert", "apple tart with cream on a plate", "dessert", False, "manzana"),
+    Pile("strawberries", "strawberries in a punnet at a farm stall", "raw", True, "fresas"),
+    Pile("strawberry dessert", "strawberry ice cream in a cone", "processed", False, "fresas"),
+    Pile("raspberries", "raspberries on a branch in a garden", "raw", True, "frambuesas"),
+    Pile("kiwi", "kiwi fruit sliced on a wooden chopping board", "raw", True, "kiwi"),
+    Pile("kiwi in a mixed platter", "fruit salad bowl with pineapple and melon", "mixed", False, "kiwi"),
+    # The avocado states the calibration decided, on footage it never saw.
+    Pile("whole avocado", "avocados piled at a grocery market", "whole", True, "aguacate"),
+    Pile("halved avocado", "avocado halves with lime on a board", "halved", True, "aguacate"),
+    Pile("sliced avocado", "avocado slices arranged on a salad", "sliced", True, "aguacate"),
+    Pile("avocado toast", "toast with sliced avocado on top", "toast", True, "aguacate"),
+    Pile("guacamole", "guacamole dip in a molcajete bowl", "guacamole", False, "aguacate"),
+    Pile("avocado smoothie", "green avocado milkshake in a glass", "smoothie", False, "aguacate"),
+    Pile("food with an animal", "dog begging next to a plate of food", "animal", False, "fresas"),
 )
 
 

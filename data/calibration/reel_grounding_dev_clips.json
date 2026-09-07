@@ -81,14 +81,43 @@
   },
   "burned_queries": [
     "apple pie slice dessert on a plate",
+    "avocado cut open showing the pit",
+    "avocado slices fanned on a plate",
+    "avocado toast breakfast plate",
+    "bowl of guacamole with tortilla chips",
     "dog with strawberries",
+    "fresh blackberries in a ceramic bowl",
+    "fresh blueberries in a wooden spoon",
+    "fresh green peas and broccoli on a table",
     "fresh raspberries close up bowl",
     "fresh strawberries in a white bowl",
+    "green avocado smoothie in a tall glass",
     "halved avocado on a wooden board",
+    "homemade apple crumble in a baking dish",
     "peeled apple without skin on a plate",
+    "peeling an apple with a knife",
+    "pouring apple juice into a glass",
+    "red apples on a branch in an orchard",
+    "ripe raspberries harvest closeup macro",
     "sliced kiwi fruit on a plate",
+    "strawberries on a rustic wooden board",
     "tropical fruit platter coconut pineapple",
+    "whole avocados in a basket",
     "whole raw red apple with skin on a wooden table"
   ],
-  "note": "Run 34109716760 chose the nine piles and run 34109726602 the raspberry wordings. Both are development evidence: a prompt rewritten after seeing which of these clips it failed on cannot then be scored on them. Every held-out pile excludes these ids and these queries by construction."
+  "note": "Run 34109716760 chose the nine piles and run 34109726602 the raspberry wordings. Both are development evidence: a prompt rewritten after seeing which of these clips it failed on cannot then be scored on them. Every held-out pile excludes these ids and these queries by construction.",
+  "runs": [
+    {
+      "id": 34109716760,
+      "what": "the nine piles that shaped the four-probe conjunction"
+    },
+    {
+      "id": 34109726602,
+      "what": "the raspberry wordings"
+    },
+    {
+      "id": 34113587132,
+      "what": "berries, avocado states and the apple verifier benchmark"
+    }
+  ]
 }

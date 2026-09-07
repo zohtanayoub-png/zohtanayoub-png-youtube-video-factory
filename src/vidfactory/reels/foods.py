@@ -564,18 +564,23 @@ REQUIREMENTS: dict[str, VisualRequirement] = {
     # peeled apple against a line that says "con piel".
     "manzana": _requirement(
         "manzana",
+        # Not "is the skin absent". Absence is the question a contrastive
+        # model is worst at, and the benchmark says so plainly: asking it
+        # (run 34113587132, "absence") keeps five of six raw apples and
+        # rejects four of six peeled ones. Describing the *surface* on one
+        # side and the cut flesh on the other - both positives, both about
+        # something visible - keeps six of six and rejects five of six, on
+        # the same clips and the same model. The backend was never the
+        # limit: full-precision ViT-L/14 scores identically to the quantized
+        # one on all three formulations.
         required=(
-            "a fresh raw apple with its skin on",
-            "a whole unpeeled apple",
-            "raw apple slices with the red skin still on",
+            "apples with glossy red and green surfaces",
+            "apples on a tree with their skin on",
         ),
         forbidden=(
-            "a peeled apple with no skin",
-            "a slice of apple cake",
-            "apple pie",
-            "a glass of apple juice",
-            "cooked apple or apple sauce",
-            "a processed apple dessert with cream",
+            "pale wet apple flesh being cut",
+            "apple pieces in pastry and syrup",
+            "an apple drink in a glass",
         ),
         context=(
             "fresh whole apples on a kitchen table",
@@ -671,14 +676,23 @@ REQUIREMENTS: dict[str, VisualRequirement] = {
     # fruit is visible - which is what WRONG_CONTEXT is for.
     "aguacate": _requirement(
         "aguacate",
+        # The state probe here was asking the wrong question. It described
+        # cuts - halved, sliced - so a *whole* avocado, which is dark bumpy
+        # skin and no green flesh at all, lost to "a tub of packaged
+        # guacamole dip" on five clips in six (run 34113587132). The brief
+        # is right that whole, halved and sliced should all pass, and the
+        # reason they can is that the entity probe has already established
+        # this is an avocado: the only thing left for the state to exclude
+        # is the form where the fruit stops being visible food - a drink or
+        # a puree.
         required=(
-            "a fresh raw avocado",
-            "an avocado cut in half showing the stone",
-            "sliced green avocado flesh",
+            "a whole or cut avocado",
+            "avocado halves or slices on a plate",
+            "avocado slices on toast",
         ),
         forbidden=(
-            "a tub of packaged guacamole dip",
-            "an avocado smoothie",
+            "a green drink in a tall glass",
+            "a bowl of smooth green puree with no fruit visible",
         ),
         context=(
             "fresh avocados on a wooden board as the main subject",

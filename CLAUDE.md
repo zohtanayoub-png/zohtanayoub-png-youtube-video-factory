@@ -484,6 +484,50 @@ in the report has to come from a measurement - applies here to the **words**.
   sampling luck, and that is exactly what the crop fixes. None of this has
   been applied: the numbers come first, and a prompt rewritten after seeing
   which clips it failed on needs a fresh pile to be worth anything.
+* **The held-out cycle, and the two results that only a held-out cycle
+  could give** (run 34113587132; every pile excludes the fifty-four
+  development clips by provider id and their nine queries by text).
+
+  **The raspberry was never broken.** The development run measured the
+  shipped prompts at 1 clip in 8 and pointed at a wording+crop candidate at
+  5 in 8. On fresh footage the shipped prompts keep **6 of 6 raspberries and
+  reject 6 of 6 strawberries, 6 of 6 blackberries and 6 of 6 blueberries** -
+  a perfect production gate. The four-way confusion matrix moves from 0.750
+  to 0.792 for the candidate, which is one clip in twenty-four, and it costs
+  a strawberry. So the candidate was **not applied**: what the first number
+  measured was a pile, not a probe, and re-tuning against it would have
+  written a worse rule with a better-looking table. The probe's real
+  weakness is blueberries against blackberries (recall 0.333), which is a
+  confusion no reel narrates.
+
+  **The apple was the question, not the backend.** Three formulations on
+  four apple piles, on the quantized ViT-L/14 in production and on the same
+  model at full precision:
+
+      formulation            raw kept   peeled rejected   accuracy
+      absence (shipped)        5/6           4/6           0.875
+      positive-vs-positive     6/6           5/6           0.917
+      colour-and-surface       6/6           5/6           0.958
+
+  and the two backends score **identically on every row**, so quantization
+  was never the limit. Describing the surface on one side and the cut flesh
+  on the other - two positives, both about something visible - beats asking
+  whether the skin is absent, which is what a contrastive model is worst at.
+  Cost, measured on the runner: 0.55 s per frame and about 713 MB peak RSS,
+  the same for both. SigLIP was the third candidate and **did not load**:
+  its tokenizer.json is a Unigram model and the reader here is CLIP's BPE,
+  so adding it is a tokenizer's worth of work rather than a config line.
+  That is the honest state of "add a stronger verifier": nothing measured
+  needs one yet.
+
+  **The avocado state was asking about the cut.** It described halves and
+  slices, so a *whole* avocado - dark bumpy skin, no green flesh anywhere -
+  lost to "a tub of packaged guacamole dip" in five clips of six. The brief
+  is right that whole, halved and sliced must all pass, and the reason they
+  can is that the entity probe has already established the fruit: the only
+  thing left for the state to exclude is the form where the food stops being
+  visible, a drink or a puree. Rewritten that way and validated on a fresh
+  avocado set rather than on the piles that exposed it.
 * **The CTA may not play over a frozen frame, and the gap is between the
   beats rather than after them.** The editor holds the last frame when the
   picture is shorter than the narration: run 34093462658 held it for 1.7

@@ -1130,7 +1130,7 @@ def test_an_apple_cake_is_not_an_apple_beat():
     apple = REQUIREMENTS["manzana"]
     _prompts, offset = requirement_prompts(apple)
     cake = offset["state"] + len(apple.required_attributes) + 1
-    assert "cake" in apple.forbidden_attributes[1]
+    assert "pastry" in apple.forbidden_attributes[1]
 
     verdict = score_requirement(apple, _matrix(apple, {0: 0.9, cake: 0.9,
                                                        offset["context"]: 0.9}))
@@ -1140,7 +1140,7 @@ def test_an_apple_cake_is_not_an_apple_beat():
     assert verdict.state_match_score == 0.0
     assert not verdict.passed
     assert verdict.failed_on == ("state",)
-    assert "cake" in verdict.top_distractor
+    assert "pastry" in verdict.top_distractor
     # A conjunction, not an average: a perfect food score may not buy a pass.
     assert verdict.score == 0.0
 
@@ -1153,7 +1153,8 @@ def test_a_peeled_apple_fails_a_beat_that_says_con_piel():
     apple = REQUIREMENTS["manzana"]
     _prompts, offset = requirement_prompts(apple)
     peeled = offset["state"] + len(apple.required_attributes)
-    assert apple.forbidden_attributes[0] == "a peeled apple with no skin"
+    # The benchmark's wording: the cut flesh, not the absent skin.
+    assert apple.forbidden_attributes[0] == "pale wet apple flesh being cut"
 
     verdict = score_requirement(apple, _matrix(apple, {0: 0.9, peeled: 0.9,
                                                        offset["context"]: 0.9}))
@@ -1324,13 +1325,17 @@ def test_the_five_fruits_of_the_test_reel_all_have_a_state():
         assert requirement.required_attributes, name
         assert requirement.context_requirements, name
         assert requirement.queries, name
-    # The specific rejections the brief lists, by name.
+    # The rejections the brief lists, in the wording the benchmark chose:
+    # peeled reads as cut flesh, cake and pie as pastry, juice as a drink.
     apple = REQUIREMENTS["manzana"].forbidden_attributes
-    assert any("peeled" in p for p in apple)
-    assert any("cake" in p for p in apple)
-    assert any("pie" in p for p in apple)
-    assert any("juice" in p for p in apple)
-    assert any("cooked" in p for p in apple)
+    assert any("flesh being cut" in p for p in apple)
+    assert any("pastry" in p for p in apple)
+    assert any("drink" in p for p in apple)
+    # And whole, halved and sliced avocado all have to survive, which is why
+    # the avocado state no longer describes a cut at all.
+    avocado = REQUIREMENTS["aguacate"]
+    assert any("whole" in p for p in avocado.required_attributes)
+    assert all("smoothie" not in p for p in avocado.forbidden_attributes)
     assert "a coconut" in REQUIREMENTS["kiwi"].forbidden_dominant_entities
     assert any("dog" in p for p in REQUIREMENTS["fresas"].forbidden_dominant_entities)
 
@@ -1559,11 +1564,19 @@ def test_the_held_out_piles_never_reuse_a_development_query_or_clip():
     assert len(manifest["clips"]) == 54
     assert burned
 
-    piles = (*module.BERRY_PILES, *module.AVOCADO_PILES,
-             *module.APPLE_PILES, *module.HOLDOUT_PILES)
-    assert piles
-    for pile in piles:
+    # The calibration piles are *in* the burned list - they were spent
+    # deciding the rules - and the held-out piles must avoid all of it.
+    spent = {p.query.strip().lower()
+             for p in (*module.BERRY_PILES, *module.AVOCADO_PILES,
+                       *module.APPLE_PILES)}
+    assert spent <= burned, sorted(spent - burned)
+    assert module.HOLDOUT_PILES
+    for pile in module.HOLDOUT_PILES:
         assert pile.query.strip().lower() not in burned, pile.name
+    # Every food a held-out pile names has to be one the registry knows.
+    from vidfactory.reels.foods import BY_NAME
+    for pile in module.HOLDOUT_PILES:
+        assert pile.food in BY_NAME, pile.name
     # And the loader hands the id filter to every pile builder.
     clips, queries = module.frozen()
     assert len(clips) == 54 and queries == burned
