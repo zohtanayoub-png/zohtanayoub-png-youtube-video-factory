@@ -415,6 +415,75 @@ in the report has to come from a measurement - applies here to the **words**.
   first. Every clip's provider id, score and a JPEG of it go in the
   artifact, because the pile labels are a search intent rather than ground
   truth and "peeled apple" returns the odd unpeeled one.
+* **What the nine piles measured, run 34109716760.** Fifty-four clips, six
+  per pile, on the validated ViT-L/14, scored twice:
+
+      probe set                false negatives    false positives
+      entity only (shipped)     8/30  (26.7%)      16/24 (66.7%)
+      the four-probe and       15/30  (50.0%)       5/24 (20.8%)
+
+  The conjunction cuts the failures that reach the screen by two thirds and
+  doubles the good footage it throws away. That is the trade, stated as a
+  trade: the second number is a repair pass, not a defect, but it is not
+  free and no threshold makes it free.
+
+  Per pile it is not one effect but four, and they are not equally good:
+
+      pile                       before   after   caught by
+      apple cake or pie            5/6     0/6    state, 6 of 6
+      kiwi in a tropical mix       2/6     0/6    dominant subject, 6 of 6
+      strawberries with a dog      3/6     1/6    all three, 3 each
+      peeled apple                 6/6     4/6    state, 2 of 6
+
+      raw apple with skin          4/6     3/6    (entity rejected 2)
+      strawberries                 5/6     4/6
+      kiwi                         6/6     5/6
+      avocado                      6/6     2/6    state rejected 3
+      raspberries                  1/6     1/6    entity rejected 5
+
+  **The cake is solved and the peeled apple is not.** Every apple dessert is
+  caught, and the brief's first example - "a peeled apple with no skin" -
+  catches two in six, because absence is what a contrastive model is worst
+  at: "a peeled apple with no skin" scores about as well against a whole
+  apple as against a peeled one. The dominance probe is the cleanest of the
+  three, taking the whole tropical pile at a cost of one kiwi.
+
+  **The avocado is the price, and it is a prompt rather than a principle.**
+  Three of six real halved avocados lost to "an avocado smoothie" - green
+  flesh against green pulp - which is a badly chosen negative, not evidence
+  that state cannot be scored. It is written down here rather than quietly
+  reworded, because rewriting a prompt after seeing which clips it failed on
+  is how a validation set stops measuring anything.
+* **The raspberry is a wording problem, and the crop is worth more than the
+  frames** (run 34109726602). Eight raspberry clips against eight strawberry
+  clips, every combination of three wordings and three frame shapes:
+
+      wording      shape      kept of raspberry   rejected of strawberry
+      shipped      3 frames        1/8                    8/8
+      shipped      7 frames        1/8                    8/8
+      shipped      centre crop     1/8                    8/8
+      texture      3 frames        1/8                    8/8
+      texture      7 frames        1/8                    8/8
+      texture      centre crop     1/8                    8/8
+      arrangement  3 frames        3/8                    8/8
+      arrangement  7 frames        2/8                    8/8
+      arrangement  centre crop     5/8                    8/8
+
+  So 0.0 against 0.0 was never the threshold's fault and never the model's.
+  "Fresh raspberries", "a bowl of raspberries", "raspberries close up" -
+  the shipped wording - identifies one clip in eight. Describing the *pile*
+  instead ("a punnet of raspberries stacked in rows", "many small
+  raspberries filling a bowl") reaches three, and scoring the middle of a
+  frame decoded at twice the model's input reaches **five, with every
+  strawberry clip still rejected**. Naming the berry's own features
+  ("hollow centre", "drupelets") buys nothing at all: the model has no
+  vocabulary for the thing that actually distinguishes them.
+
+  More frames is not the answer either - seven frames scores slightly worse
+  than three - which says the failure is per-frame resolution rather than
+  sampling luck, and that is exactly what the crop fixes. None of this has
+  been applied: the numbers come first, and a prompt rewritten after seeing
+  which clips it failed on needs a fresh pile to be worth anything.
 * **The CTA may not play over a frozen frame, and the gap is between the
   beats rather than after them.** The editor holds the last frame when the
   picture is shorter than the narration: run 34093462658 held it for 1.7
