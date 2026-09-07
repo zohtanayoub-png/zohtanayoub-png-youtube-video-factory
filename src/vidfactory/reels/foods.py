@@ -501,6 +501,13 @@ COMMON_DOMINANT_DISTRACTORS: tuple[str, ...] = (
 #: What a food shot must not be *about*, whichever food it is. Packaging and
 #: branding rather than the thing itself: the brief's "avocado-branded
 #: product where the fruit is not actually visible".
+#:
+#: The positives beside these describe the **food** and never the crockery.
+#: "In a bowl as the main subject" and "on a kitchen table" rejected
+#: strawberries on linen, raspberries in a glass jar and apples in market
+#: boxes in run 34154410206 - valid footage with the wrong furniture - and a
+#: prompt naming a container is a prompt about that container. Presentation
+#: is not something a beat about fruit gets to require.
 WRONG_CONTEXT: tuple[str, ...] = (
     "a branded supermarket product in printed packaging",
     "a printed logo or an advertisement",
@@ -591,8 +598,8 @@ REQUIREMENTS: dict[str, VisualRequirement] = {
             "an apple drink in a glass",
         ),
         context=(
-            "fresh whole apples on a kitchen table",
-            "raw apples in a bowl as the main subject",
+            "fresh apples clearly visible as the main subject",
+            "apples filling the frame",
         ),
         queries=(
             "whole raw red apple with skin close up",
@@ -619,8 +626,8 @@ REQUIREMENTS: dict[str, VisualRequirement] = {
             "a mixed fruit platter of many different fruits",
         ),
         context=(
-            "fresh strawberries in a bowl as the main subject",
-            "whole strawberries on a kitchen table",
+            "fresh strawberries clearly visible as the main subject",
+            "strawberries filling the frame",
         ),
         queries=(
             "fresh whole strawberries in a bowl close up",
@@ -646,8 +653,8 @@ REQUIREMENTS: dict[str, VisualRequirement] = {
             "a mixed fruit platter of many different fruits",
         ),
         context=(
-            "fresh raspberries in a bowl as the main subject",
-            "whole raspberries on a wooden table",
+            "fresh raspberries clearly visible as the main subject",
+            "raspberries filling the frame",
         ),
         queries=(
             "fresh whole raspberries in a punnet close up",
@@ -672,8 +679,8 @@ REQUIREMENTS: dict[str, VisualRequirement] = {
             "a pineapple",
         ),
         context=(
-            "fresh kiwi fruit on a plate as the main subject",
-            "whole and halved kiwi fruit on a table",
+            "fresh kiwi fruit clearly visible as the main subject",
+            "kiwi fruit filling the frame",
         ),
         queries=(
             "fresh kiwi fruit cut in half close up",
@@ -703,8 +710,8 @@ REQUIREMENTS: dict[str, VisualRequirement] = {
             "a bowl of smooth green puree with no fruit visible",
         ),
         context=(
-            "fresh avocados on a wooden board as the main subject",
-            "a halved avocado on a plate",
+            "avocado clearly visible and identifiable as the main subject",
+            "avocados filling the frame",
         ),
         queries=(
             "fresh raw avocado cut in half close up",
@@ -724,8 +731,11 @@ REQUIREMENTS: dict[str, VisualRequirement] = {
         forbidden=(
             "whole uncut fruit with no glass",
         ),
+        # The one place a container belongs: "cambiar la fruta entera por
+        # zumo" warns about the drink, so a picture of it has to contain the
+        # glass. Everywhere else the container is furniture.
         context=(
-            "a glass of juice on a table as the main subject",
+            "a glass of juice clearly visible as the main subject",
         ),
         queries=(
             "glass of fresh orange juice on a table close up",
@@ -744,7 +754,7 @@ REQUIREMENTS: dict[str, VisualRequirement] = {
             "a sweet pastry or cake",
         ),
         context=(
-            "a loaf of wholegrain bread on a board as the main subject",
+            "wholegrain bread clearly visible as the main subject",
         ),
         queries=(
             "dark whole grain bread loaf sliced close up",
@@ -890,7 +900,9 @@ class FoodGrounding:
         }
 
 
-def requirement_prompts(requirement: VisualRequirement) -> tuple[list[str], dict[str, int]]:
+def requirement_prompts(
+    requirement: VisualRequirement, wrong_context: Sequence[str] = WRONG_CONTEXT
+) -> tuple[list[str], dict[str, int]]:
     """Every prompt the four probes need, and where each one starts.
 
     One list, because one encode of the frames answers all four questions and
@@ -912,7 +924,7 @@ def requirement_prompts(requirement: VisualRequirement) -> tuple[list[str], dict
     offsets["context"] = len(prompts)
     prompts.extend(requirement.context_requirements)
     if requirement.context_requirements:
-        prompts.extend(WRONG_CONTEXT)
+        prompts.extend(wrong_context)
 
     # The dominance probe reuses the entity's own positives - the question is
     # whether the food outranks the dog, and "a bowl of red strawberries" is
@@ -924,7 +936,9 @@ def requirement_prompts(requirement: VisualRequirement) -> tuple[list[str], dict
 
 
 def score_requirement(
-    requirement: VisualRequirement, per_frame: Sequence[Sequence[float]]
+    requirement: VisualRequirement,
+    per_frame: Sequence[Sequence[float]],
+    wrong_context: Sequence[str] = WRONG_CONTEXT,
 ) -> FoodGrounding:
     """The four probes, combined as a conjunction.
 
@@ -940,7 +954,7 @@ def score_requirement(
     if not per_frame:
         return blank
 
-    prompts, offsets = requirement_prompts(requirement)
+    prompts, offsets = requirement_prompts(requirement, wrong_context)
     presence, presence_loser, counted = _identify(
         per_frame, offsets["entity"], len(entity.positives), entity.competitors
     )
@@ -953,7 +967,7 @@ def score_requirement(
     )
     context, context_loser, context_frames = _identify(
         per_frame, offsets["context"], len(requirement.context_requirements),
-        WRONG_CONTEXT if requirement.context_requirements else (),
+        wrong_context if requirement.context_requirements else (),
     )
     # The food against what owns the frame instead. The positives are the
     # entity's, which sit at the front of the matrix, so this probe reads two
@@ -1062,7 +1076,10 @@ def _identify_split(
 
 
 def ground_requirement(
-    analyzer: Any, frames: Sequence[Any], requirement: VisualRequirement | None
+    analyzer: Any,
+    frames: Sequence[Any],
+    requirement: VisualRequirement | None,
+    wrong_context: Sequence[str] = WRONG_CONTEXT,
 ) -> FoodGrounding:
     """Score one clip against one beat's whole requirement.
 
@@ -1074,9 +1091,9 @@ def ground_requirement(
 
     if requirement is None:
         return FoodGrounding()
-    prompts, _ = requirement_prompts(requirement)
+    prompts, _ = requirement_prompts(requirement, wrong_context)
     per_frame = analyzer.probe_frames(frames, prompts, use_claim_model=True)
-    return score_requirement(requirement, per_frame)
+    return score_requirement(requirement, per_frame, wrong_context)
 
 
 def state_repair_queries(

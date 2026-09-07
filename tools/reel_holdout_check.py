@@ -15,6 +15,10 @@ seen.
 
 Four questions, four commands, and they are deliberately separate runs:
 
+``presentation`` is a valid strawberry still a strawberry when it is not in
+               a bowl? The entity probe alone and the whole conjunction on
+               the same frames, because reporting one without the other is
+               what made "the conjunction is too strict" look true.
 ``entity``     can the probe see the fruit in every shape it arrives in -
                whole, cut and piled? The layer under all the others, and the
                one the second held-out benchmark pointed at.
@@ -52,6 +56,7 @@ from vidfactory.downloader import ClipDownloader
 from vidfactory.logging_utils import get_logger, setup_logging
 from vidfactory.reels.foods import (
     BY_NAME,
+    WRONG_CONTEXT,
     FOOD_IDENTIFY_PASS,
     identify_food,
     requirement_for_food,
@@ -98,10 +103,10 @@ class Pile:
 # ---------------------------------------------------------------------------
 
 BERRY_PILES: tuple[Pile, ...] = (
-    Pile("raspberries", "ripe raspberries harvest closeup macro", "frambuesas"),
-    Pile("strawberries", "strawberries on a rustic wooden board", "fresas"),
-    Pile("blackberries", "fresh blackberries in a ceramic bowl", "moras"),
-    Pile("blueberries", "fresh blueberries in a wooden spoon", "arandanos"),
+    Pile("raspberries", "raspberries tipped onto a slate slab", "frambuesas"),
+    Pile("strawberries", "strawberries hulled and heaped in a colander", "fresas"),
+    Pile("blackberries", "blackberries gathered in cupped hands", "moras"),
+    Pile("blueberries", "blueberries spilling from a paper bag", "arandanos"),
 )
 
 #: Label groups for the berry confusion matrix. Local to the measurement -
@@ -189,6 +194,91 @@ ENTITY_CANDIDATES: dict[str, dict[str, tuple[str, ...]]] = {
     },
 }
 
+#: Presentation. The third benchmark rejected strawberries on linen, apples
+#: in market boxes and raspberries in a glass jar - and the context prompts
+#: say "in a bowl as the main subject" and "on a kitchen table". A prompt
+#: naming the crockery is a prompt about the crockery, so these piles vary
+#: the presentation on purpose and hold the food constant.
+PRESENTATION_PILES: tuple[Pile, ...] = (
+    Pile("strawberries in a bowl", "strawberries heaped in a white bowl", "bowl", True, "fresas"),
+    Pile("strawberries on a plate", "strawberries arranged on a dessert plate", "plate", True, "fresas"),
+    Pile("strawberries on linen", "strawberries resting on folded linen", "linen", True, "fresas"),
+    Pile("strawberries on wood", "strawberries on a dark wooden board", "board", True, "fresas"),
+    Pile("strawberries in a box", "punnets of strawberries in a supermarket box", "box", True, "fresas"),
+    Pile("strawberries held", "hand holding a single ripe strawberry", "held", True, "fresas"),
+    Pile("not strawberries", "fresh cherries with stalks in a dish", "other", False, "fresas"),
+
+    Pile("raspberries in a bowl", "raspberries in a shallow ceramic bowl", "bowl", True, "frambuesas"),
+    Pile("raspberries in a jar", "raspberries filling a clear glass jar", "jar", True, "frambuesas"),
+    Pile("raspberries in a punnet", "raspberries in a cardboard punnet", "punnet", True, "frambuesas"),
+    Pile("raspberries loose", "raspberries scattered loose on a surface", "loose", True, "frambuesas"),
+    Pile("raspberries held", "hand holding a few raspberries", "held", True, "frambuesas"),
+    Pile("not raspberries", "blackberries and blueberries mixed together", "other", False, "frambuesas"),
+
+    Pile("a single apple", "one red apple standing alone", "single", True, "manzana"),
+    Pile("apples in a box", "apples packed in a cardboard box", "box", True, "manzana"),
+    Pile("apples piled", "apples heaped high at a fruit stand", "pile", True, "manzana"),
+    Pile("an apple held", "hand holding up a red apple", "held", True, "manzana"),
+    Pile("apple on a board", "apple beside a knife on a cutting board", "board", True, "manzana"),
+    Pile("not apples", "pears and oranges together in a fruit bowl", "other", False, "manzana"),
+
+    Pile("whole avocados", "avocados resting on a stone counter", "whole", True, "aguacate"),
+    Pile("halved avocado", "avocado opened to show the stone", "halved", True, "aguacate"),
+    Pile("sliced avocado", "avocado cut into thin green slices", "sliced", True, "aguacate"),
+    Pile("many avocados", "many avocados spread across a surface", "many", True, "aguacate"),
+    Pile("not avocados", "courgettes and green peppers on a board", "other", False, "aguacate"),
+
+    Pile("whole kiwi", "kiwi fruit with fuzzy brown skin", "whole", True, "kiwi"),
+    Pile("halved kiwi", "kiwi opened to show the green centre", "halved", True, "kiwi"),
+    Pile("sliced kiwi", "kiwi cut into thin green wheels", "sliced", True, "kiwi"),
+    Pile("not kiwi", "limes and green apples side by side", "other", False, "kiwi"),
+
+    # The rejections that must survive the rewrite. A context prompt that
+    # stops naming the crockery must not also stop rejecting the dessert.
+    Pile("apple dessert", "apple pie cooling on a rack", "dessert", False, "manzana"),
+    Pile("peeled apple", "apple stripped of its skin on a chopping block", "peeled", False, "manzana"),
+    Pile("strawberry dessert", "strawberry mousse in a dessert glass", "processed", False, "fresas"),
+    Pile("avocado smoothie", "avocado shake blended in a tall tumbler", "smoothie", False, "aguacate"),
+    Pile("tropical platter", "sliced mango papaya and pineapple platter", "mixed", False, "kiwi"),
+)
+
+#: Candidate context wordings. The shipped one names the container; the
+#: others name the food. The third exists because one of the shared
+#: wrong-context prompts is "a supermarket shelf full of packaged goods",
+#: and a supermarket box of strawberries is a presentation the brief wants
+#: kept - so whether that negative is doing harm is a question, not a guess.
+CONTEXT_CANDIDATES: dict[str, dict[str, Any]] = {
+    # The wording that shipped before this cycle, written out here rather
+    # than read from the module: the module has moved on, and "before" has
+    # to keep meaning what it meant.
+    "container-named (before)": {
+        "context": {
+            "fresas": ("fresh strawberries in a bowl as the main subject",
+                       "whole strawberries on a kitchen table"),
+            "frambuesas": ("fresh raspberries in a bowl as the main subject",
+                           "whole raspberries on a wooden table"),
+            "manzana": ("fresh whole apples on a kitchen table",
+                        "raw apples in a bowl as the main subject"),
+            "aguacate": ("fresh avocados on a wooden board as the main subject",
+                         "a halved avocado on a plate"),
+            "kiwi": ("fresh kiwi fruit on a plate as the main subject",
+                     "whole and halved kiwi fruit on a table"),
+        },
+        "wrong": None,
+    },
+    # What the module now says.
+    "food-centred (after)": {"context": None, "wrong": None},
+    # One of the shared negatives is "a supermarket shelf full of packaged
+    # goods", and a supermarket box of strawberries is a presentation worth
+    # keeping - so whether that prompt costs anything is a question rather
+    # than a guess.
+    "food-centred, no shelf": {
+        "context": None,
+        "wrong": ("a branded supermarket product in printed packaging",
+                  "a printed logo or an advertisement"),
+    },
+}
+
 #: The held-out set. Every query here is new again: the calibration run
 #: above spent its own, and a pile that decided a rule cannot also grade it.
 HOLDOUT_PILES: tuple[Pile, ...] = (
@@ -217,6 +307,7 @@ HOLDOUT_PILES: tuple[Pile, ...] = (
 PILES_FOR: dict[str, tuple[Pile, ...]] = {
     "berries": BERRY_PILES,
     "entity": ENTITY_PILES,
+    "presentation": PRESENTATION_PILES,
     "avocado": AVOCADO_PILES,
     "apple": APPLE_PILES,
     "holdout": HOLDOUT_PILES,
@@ -478,6 +569,114 @@ def run_avocado(args, analyzer, providers, downloader, excluded) -> dict[str, An
         log.info("avocado %s: valid %s, invalid %s", name,
                  report["rules"][name]["accepted_of_valid"],
                  report["rules"][name]["accepted_of_invalid"])
+    return report
+
+
+# ---------------------------------------------------------------------------
+# presentation - does the context prompt describe the food or the crockery
+# ---------------------------------------------------------------------------
+
+def _rates(rows: Sequence[dict[str, Any]], key: str) -> dict[str, Any]:
+    """Precision, recall and both error rates for one verdict column."""
+
+    good = [r for r in rows if r["should_accept"]]
+    bad = [r for r in rows if not r["should_accept"]]
+    tp = sum(1 for r in good if r[key])
+    fp = sum(1 for r in bad if r[key])
+    return {
+        "accepted_of_valid": f"{tp}/{len(good)}",
+        "accepted_of_invalid": f"{fp}/{len(bad)}",
+        "precision": round(tp / (tp + fp), 3) if (tp + fp) else None,
+        "recall": round(tp / len(good), 3) if good else None,
+        "false_negative_rate": round(100.0 * (len(good) - tp) / len(good), 1) if good else None,
+        "false_positive_rate": round(100.0 * fp / len(bad), 1) if bad else None,
+    }
+
+
+def run_presentation(args, analyzer, providers, downloader, excluded) -> dict[str, Any]:
+    """Is a valid strawberry still a strawberry when it is not in a bowl?
+
+    Two questions at once, because they are answered by the same frames. The
+    **entity probe alone** is where the third benchmark said most of the
+    recall went, and the **whole conjunction** is what actually gates a beat;
+    reporting one without the other is what made "the conjunction is too
+    strict" look true when it was not.
+
+    The piles hold the food constant and vary the presentation - bowl, plate,
+    linen, board, supermarket box, a hand - and the rejections that must
+    survive the rewrite are in here too, because a context prompt that stops
+    naming the crockery must not also stop rejecting the dessert.
+    """
+
+    edge = analyzer.decode_size[0]
+    clips = {p.name: collect(providers, downloader, p, args.clips, excluded, edge, 3)
+             for p in PRESENTATION_PILES}
+
+    report: dict[str, Any] = {"command": "presentation", "variants": {}}
+    for title, spec in CONTEXT_CANDIDATES.items():
+        overrides = spec["context"]
+        wrong = spec["wrong"] or WRONG_CONTEXT
+        rows: list[dict[str, Any]] = []
+        for pile in PRESENTATION_PILES:
+            entity = BY_NAME[pile.food]
+            requirement = requirement_for_food(entity)
+            if overrides and pile.food in overrides:
+                requirement = replace(
+                    requirement,
+                    context_requirements=tuple(overrides[pile.food]),
+                )
+            prompts, _ = requirement_prompts(requirement, wrong)
+            for clip, frames, _big in clips[pile.name]:
+                matrix = analyzer.probe_frames(frames, prompts, use_claim_model=True)
+                if not matrix:
+                    continue
+                full = score_requirement(requirement, matrix, wrong)
+                alone = identify_food(
+                    entity,
+                    [row[:len(entity.positives) + len(entity.competitors)]
+                     for row in matrix],
+                )
+                rows.append({
+                    "pile": pile.name, "food": pile.food,
+                    "presentation": pile.truth, "source": clip.key,
+                    "should_accept": pile.accept,
+                    "entity_alone": bool(alone.passed),
+                    "conjunction": bool(full.passed),
+                    "context_score": (round(full.context_match_score, 3)
+                                      if full.context_checked else None),
+                    "failed_on": list(full.failed_on),
+                })
+        per_food = {
+            food: {
+                "entity_alone": _rates([r for r in rows if r["food"] == food],
+                                       "entity_alone"),
+                "conjunction": _rates([r for r in rows if r["food"] == food],
+                                      "conjunction"),
+            }
+            for food in sorted({r["food"] for r in rows})
+        }
+        per_presentation = {}
+        for shape in sorted({r["presentation"] for r in rows}):
+            subset = [r for r in rows if r["presentation"] == shape]
+            per_presentation[shape] = {
+                "clips": len(subset),
+                "should_accept": subset[0]["should_accept"],
+                "entity_alone": sum(1 for r in subset if r["entity_alone"]),
+                "conjunction": sum(1 for r in subset if r["conjunction"]),
+            }
+        report["variants"][title] = {
+            "context_overrides": overrides or "shipped",
+            "wrong_context": list(wrong),
+            "clips": len(rows),
+            "entity_alone": _rates(rows, "entity_alone"),
+            "conjunction": _rates(rows, "conjunction"),
+            "per_food": per_food,
+            "per_presentation": per_presentation,
+            "per_clip": rows,
+        }
+        log.info("%s: entity alone %s, conjunction %s", title,
+                 report["variants"][title]["entity_alone"]["recall"],
+                 report["variants"][title]["conjunction"]["recall"])
     return report
 
 
@@ -826,6 +1025,7 @@ def main(argv: list[str] | None = None) -> int:
         analyzer = VisualAnalyzer(model=model, claim_model=model,
                                   frames_per_clip=3, allow_remote_video=False)
         runner = {"berries": run_berries, "entity": run_entity,
+                  "presentation": run_presentation,
                   "avocado": run_avocado, "holdout": run_holdout}[args.command]
         report = runner(args, analyzer, providers, downloader, excluded)
 

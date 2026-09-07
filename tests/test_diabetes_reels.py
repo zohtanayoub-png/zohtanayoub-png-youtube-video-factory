@@ -1620,7 +1620,55 @@ def test_every_command_the_cli_offers_has_piles_recorded():
 
     # Every command has a runner, and every runner has piles.
     assert set(module.PILES_FOR) == {
-        "berries", "entity", "avocado", "apple", "holdout"
+        "berries", "entity", "presentation", "avocado", "apple", "holdout"
     }
     for command, piles in module.PILES_FOR.items():
         assert piles, command
+
+
+def test_no_context_prompt_describes_the_crockery():
+    """The context is about the food, not what it is served on.
+
+    "In a bowl as the main subject" rejected strawberries on linen and
+    raspberries in a glass jar - valid footage, wrong furniture - and the
+    prompt was the reason. The one exception is the juice, where the glass
+    *is* the food: "cambiar la fruta entera por zumo" is a warning about the
+    drink, and a picture of it has to contain the drink.
+    """
+
+    from vidfactory.reels.foods import REQUIREMENTS
+
+    furniture = ("bowl", "plate", "kitchen table", "wooden board", "board",
+                 "counter", "tray", "basket", "punnet", "jar")
+    allowed = {"zumo"}
+    for name, requirement in REQUIREMENTS.items():
+        if name in allowed:
+            continue
+        for prompt in requirement.context_requirements:
+            lowered = prompt.lower()
+            for word in furniture:
+                assert word not in lowered, f"{name} context names the {word}: {prompt!r}"
+
+
+def test_the_wrong_context_list_can_be_varied_for_a_measurement():
+    """One of the shared negatives is a supermarket shelf, and a supermarket
+    box of strawberries is footage worth keeping - so whether that prompt
+    costs anything has to be answerable without editing the module."""
+
+    from vidfactory.reels.foods import (
+        REQUIREMENTS, requirement_prompts, score_requirement,
+    )
+
+    requirement = REQUIREMENTS["fresas"]
+    full, _ = requirement_prompts(requirement)
+    fewer, offsets = requirement_prompts(requirement, ("a printed logo",))
+    assert len(fewer) == len(full) - 2
+    # And the scorer reads the same list it was given, so the two cannot
+    # silently disagree about where the context block ends.
+    rows = [[0.1] * len(fewer) for _ in range(3)]
+    for row in rows:
+        row[0] = 0.9
+        row[offsets["state"]] = 0.9
+        row[offsets["context"]] = 0.9
+    verdict = score_requirement(requirement, rows, ("a printed logo",))
+    assert verdict.checked and verdict.passed

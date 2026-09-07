@@ -133,7 +133,8 @@ on:
         default: "render"
         options: [render, calibrate-entities, premium-check, instruction-check, reel,
                   reel-entity-check, reel-grounding-check, reel-raspberry-check,
-                  reel-holdout-calibration, reel-holdout-entity, reel-holdout-final]
+                  reel-holdout-calibration, reel-holdout-entity,
+                  reel-holdout-presentation, reel-holdout-final]
       upload_to_youtube:
         description: "Upload to YouTube when it is finished"
         required: false
@@ -1102,6 +1103,70 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: reel-holdout-entity
+          path: output/holdout/*.json
+          retention-days: 14
+          if-no-files-found: warn
+
+  reel-holdout-presentation:
+    name: Does the context describe the food or the crockery
+    if: inputs.task == 'reel-holdout-presentation'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    # Least privilege: a probe reads the code and writes nothing back.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ffmpeg
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+          pip install onnxruntime
+      - name: Restore the cached model files
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: vidfactory-reel-cache-v1
+      - name: Measure
+        env:
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+        run: |
+          set -euo pipefail
+          # Two questions, two piles, one job: whether a food-centred
+          # context recovers the presentations the last benchmark lost, and
+          # whether the raspberry candidate survives a fourth berry set.
+          python tools/reel_holdout_check.py presentation --clips 3 \
+            --out output/holdout/presentation.json
+          python tools/reel_holdout_check.py berries --clips 6 \
+            --out output/holdout/berries.json
+      - name: Report
+        if: always()
+        run: |
+          {
+            echo "## Presentation calibration"
+            for f in output/holdout/*.json; do
+              echo "### $f"
+              echo '```json'
+              cat "$f"
+              echo '```'
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload the scores
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reel-holdout-presentation
           path: output/holdout/*.json
           retention-days: 14
           if-no-files-found: warn
