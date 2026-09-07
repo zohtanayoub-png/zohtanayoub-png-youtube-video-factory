@@ -97,6 +97,7 @@ src/vidfactory/
     knowledge.py     Spanish diabetes/glucose topics, claims and their sources
     sources.py       the organisations every claim rests on
     safety.py        what a reel about diabetes may never say
+    foods.py         the food a beat names, and whether the shot shows it
     hooks.py         8-12 candidate openings, scored, one chosen
     script.py        hook/answer/value/retention/takeaway/CTA, fitted to length
     voice.py         Kokoro first, Piper as the fallback; licence + prosody
@@ -279,6 +280,80 @@ in the report has to come from a measurement - applies here to the **words**.
   they can be compared between two files. An engine asked for by name that
   quietly falls back is flagged `substituted`, because a comparison that
   compares Piper with Piper is worse than no comparison at all.
+* **A beat that names one food has to show that food.** Run 34093462658
+  narrated "la manzana con piel conserva la fibra" over a close-up of an
+  **orange**, and nothing in the reel pipeline was in a position to notice:
+  entity grounding is long-form's, and the reel asked only whether a clip was
+  semantically similar to a sentence. A bowl of citrus on a wooden table is
+  extremely similar to a sentence about fruit on a table.
+
+  `reels/foods.py` is `entities.py` pointed at food - the machinery is
+  imported, not copied, and `score_from_similarities` takes its thresholds as
+  arguments so the long-form verdict is byte-identical. The registry is
+  eighteen foods with Spanish triggers, English prompts, and the competitors a
+  stock search actually returns instead; the apple's first competitor is an
+  orange because that is what shipped.
+
+  One rule the interiors never needed: **a beat naming one food requires that
+  food; a beat naming several requires none.** "Fresas, frambuesas, kiwi,
+  manzana con piel y aguacate" is the answer beat and a mixed bowl is the
+  right picture for it. Where a sentence names two, the item's key decides -
+  "cambiar la fruta entera por zumo" is about the juice. Abstract advice
+  requires nothing, exactly as on the long-form side.
+
+  Grounding follows the **narration timeline**, never the reel. Every beat
+  knows when it is spoken and what it must show; a candidate that fails is put
+  back before it is ever assigned, and the beat re-searches the *object* for
+  up to three rounds, because the beat's own query is what returned the wrong
+  food. A correct strawberry clip earlier cannot excuse an orange during the
+  apple beat, because nothing is averaged across the reel.
+* **The interiors' probe does not work on food, and the fix was the question
+  rather than the prompts.** Measured before it was trusted, over 28 clips
+  found by searching for the food and 28 found by searching for the food that
+  turns up instead:
+
+      cut   kept of correct   rejected of wrong
+      0.20    12/28 (43%)        16/28 (57%)
+      0.40    14/28 (50%)        12/28 (43%)
+      0.60    17/28 (61%)         5/28 (18%)
+      0.80    20/28 (71%)         3/28 (11%)
+
+  kept% + rejected% is ~100 at every cut, which is one distribution rather
+  than two: the threshold trades one error for the other along the same curve
+  and buys nothing. `manzana` came back **inverted** - real apple footage at a
+  median of 0.131 against orange footage at 0.508 - and `aguacate` did not
+  separate at all, 0.958 against 0.910 on kiwi footage.
+
+  This is the mirror image of the long-form result, and for the mirror-image
+  reason. There, "does this room contain a wall" is true of every room, so
+  presence separated nothing and displacement was the only answerable
+  question. Here the opposite holds: a fruit close-up is *of one fruit*, and
+  apple, orange and pear are mutually exclusive in a way a wall and a sofa are
+  not. So `identify_food` ranks every prompt and asks which came first,
+  scoring the share of frames in which the right food won. No margin band - a
+  frame that looks marginally more like an orange than an apple is a frame of
+  an orange. Both probes are kept and `reel-entity-check` sweeps all four
+  combinations, both probes on MobileCLIP-S0 and on the validated ViT-L/14,
+  because "the backend was the limit" is what the instruction check found and
+  it deserves measuring rather than assuming here too.
+* **The CTA may not play over a frozen frame.** The editor holds the last
+  frame when the picture is shorter than the narration, and run 34093462658
+  held it for 1.7 seconds - across the whole call to action. The shot plan now
+  covers `narration + TAIL_SECONDS` by stretching the final beat, which buys
+  real footage rather than a still, and `frozen_tail_duration` is measured and
+  gated at 0.2s.
+* **The reel is spelled in correct Spanish.** ración, azúcar, síguenos,
+  última: Kokoro is handed the script verbatim and a Spanish G2P front end
+  does not read "racion" as "ración". `safety._flat` folds accents, because a
+  medical check that stops matching the moment a word is spelled properly is
+  not a check - only the *matching* is accentless, never the spoken text. The
+  provider queries stay English, and a test enforces both halves.
+* **A frame is labelled by the beat it lands in.** `inspect_reel_frames.py`
+  mapped a sampled timestamp to the *first* beat of that kind, so a frame of
+  the manzana line was reported as the fresas line and sent a reviewer looking
+  for the wrong defect. It now maps the timestamp against each beat's own
+  span, samples every item beat rather than two of them, and prints the
+  required food, the source, the score and the verdict.
 * **A vertical frame is not a small landscape one.** Captions at 68px with
   24-character lines, 430px clear of the bottom where Instagram, TikTok and
   Shorts draw their own furniture; one fixed ExtraBold title across the top
