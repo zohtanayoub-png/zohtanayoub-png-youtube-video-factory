@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from dataclasses import dataclass
 from typing import Any, Sequence
 
 from ..entities import (
@@ -447,13 +448,631 @@ def food_prompts(entity: VisualEntity) -> tuple[list[str], int]:
     return grounding_prompts(entity)
 
 
-def repair_queries(entity: VisualEntity, spent: Sequence[str] = ()) -> list[str]:
-    """Explicit object searches for a food the footage failed to show.
 
-    Phrased around the food and nothing else. The beat's own query is what
-    returned the orange, so repeating it with more pages would keep returning
-    the orange.
+
+# ---------------------------------------------------------------------------
+# Entity + state + context, because the entity alone was not enough
+# ---------------------------------------------------------------------------
+#
+# ``identify_food`` fixed the failure it was written for: the apple beat no
+# longer settles for an orange, and over three renders it never did again.
+# What those renders then shipped is the next failure along, and it is the
+# same failure the long-form side hit between ``entities.py`` and
+# ``instructions.py``: a frame can contain the right noun and still be the
+# wrong picture.
+#
+#     "la manzana con piel conserva la fibra"  over an apple **cake**
+#     "la manzana con piel conserva la fibra"  over a **peeled** apple
+#     "las fresas suelen aportar menos ..."    over a **dog**, with
+#                                              strawberries somewhere behind it
+#     "el kiwi ..."                            over a **coconut**, kiwi beside
+#
+# Every one of those scores ``manzana = 1.00``. They are apples. A cake made
+# of apples is more like "a red apple" than like "an orange", so the
+# identification probe is answering its own question correctly and the
+# question is too small. An apple beat needs an apple **that is raw and has
+# its skin on**, presented **as food**, and **not standing behind a dog**.
+#
+# So a requirement here has the four parts the failures have, and they are
+# scored as a conjunction rather than as a sum. A strong entity score may not
+# buy a failed state: that is the whole point of the layer, and an average
+# would hand the cake exactly the compensation it needs.
+
+#: The animals and objects that turned up owning a food frame. Shared,
+#: because a dog in front of the strawberries is a dog in front of anything.
+#: Deliberately **not** "a person's hands" or "a person holding fruit": a
+#: hand holding an apple is a normal, good food shot, and half of the stock
+#: footage in this niche has one in it. What is wrong is a face where the
+#: food should be.
+COMMON_DOMINANT_DISTRACTORS: tuple[str, ...] = (
+    "a dog",
+    "a cat",
+    "a close-up of a person's face with no food visible",
+)
+
+#: What a food shot must not be *about*, whichever food it is. Packaging and
+#: branding rather than the thing itself: the brief's "avocado-branded
+#: product where the fruit is not actually visible".
+WRONG_CONTEXT: tuple[str, ...] = (
+    "a branded supermarket product in printed packaging",
+    "a printed logo or an advertisement",
+    "a supermarket shelf full of packaged goods",
+)
+
+
+@dataclass(frozen=True)
+class VisualRequirement:
+    """Everything one beat's footage has to satisfy, not just the noun.
+
+    The fields are prompts as well as requirements, and that is deliberate:
+    a requirement written as a sentence CLIP can score is a requirement a
+    reviewer can also read, and keeping two parallel lists in step is how
+    they stop being in step.
+
+    ``required_attributes`` / ``forbidden_attributes`` are the **state**:
+    raw against cooked, whole against peeled, the fruit against the dessert
+    made of it. ``context_requirements`` is the kind of scene, scored against
+    :data:`WRONG_CONTEXT`. ``forbidden_dominant_entities`` are the things
+    that turned up owning the frame while the food sat in the background.
+
+    Empty lists are not a weak requirement, they are *no* requirement: a food
+    that has not been measured does not get gated on a guess, exactly as
+    abstract advice requires no entity on the long-form side.
+    """
+
+    required_entity: str
+    required_attributes: tuple[str, ...] = ()
+    forbidden_attributes: tuple[str, ...] = ()
+    forbidden_dominant_entities: tuple[str, ...] = COMMON_DOMINANT_DISTRACTORS
+    context_requirements: tuple[str, ...] = ()
+    #: Searches that name the state rather than the food, for the repair pass.
+    #: "manzana" is what returned the cake; "whole raw apple with the skin on"
+    #: is what does not.
+    queries: tuple[str, ...] = ()
+
+    @property
+    def entity(self) -> VisualEntity:
+        return BY_NAME[self.required_entity]
+
+
+def _requirement(
+    food: str,
+    required: Sequence[str] = (),
+    forbidden: Sequence[str] = (),
+    dominant: Sequence[str] = (),
+    context: Sequence[str] = (),
+    queries: Sequence[str] = (),
+) -> VisualRequirement:
+    return VisualRequirement(
+        required_entity=food,
+        required_attributes=tuple(required),
+        forbidden_attributes=tuple(forbidden),
+        forbidden_dominant_entities=(*COMMON_DOMINANT_DISTRACTORS, *dominant),
+        context_requirements=tuple(context),
+        queries=tuple(queries),
+    )
+
+
+#: The foods whose state has been written down, which is the five the test
+#: reel names plus the two whose state is the entire point of the item.
+#:
+#: Written from observed failures and nothing else. Speculating about the
+#: state of a food no render has got wrong would add gates with no evidence
+#: behind them, and every gate costs good footage.
+REQUIREMENTS: dict[str, VisualRequirement] = {
+    # The brief's own example, and the one that shipped twice: a cake and a
+    # peeled apple against a line that says "con piel".
+    "manzana": _requirement(
+        "manzana",
+        required=(
+            "a fresh raw apple with its skin on",
+            "a whole unpeeled apple",
+            "raw apple slices with the red skin still on",
+        ),
+        forbidden=(
+            "a peeled apple with no skin",
+            "a slice of apple cake",
+            "apple pie",
+            "a glass of apple juice",
+            "cooked apple or apple sauce",
+            "a processed apple dessert with cream",
+        ),
+        context=(
+            "fresh whole apples on a kitchen table",
+            "raw apples in a bowl as the main subject",
+        ),
+        queries=(
+            "whole raw red apple with skin close up",
+            "unpeeled apples on a wooden table",
+            "fresh apple with skin sliced on a board",
+        ),
+    ),
+    # A dog owned one strawberry frame; "strawberry" also returns milkshakes,
+    # ice cream and cake, which are not what "menos carbohidratos por racion"
+    # is about.
+    "fresas": _requirement(
+        "fresas",
+        required=(
+            "fresh raw whole strawberries",
+            "ripe red strawberries with green leaves",
+        ),
+        forbidden=(
+            "a strawberry milkshake",
+            "strawberry ice cream",
+            "a strawberry cake or dessert",
+            "a strawberry flavoured yogurt drink",
+        ),
+        dominant=(
+            "a mixed fruit platter of many different fruits",
+        ),
+        context=(
+            "fresh strawberries in a bowl as the main subject",
+            "whole strawberries on a kitchen table",
+        ),
+        queries=(
+            "fresh whole strawberries in a bowl close up",
+            "ripe raw strawberries on a table",
+        ),
+    ),
+    # The one food the probe cannot identify on its own (0.0/0.0 against
+    # strawberries). Its state requirement is written the same way as the
+    # others so the measurement covers it, and nothing here tries to buy the
+    # entity number back.
+    "frambuesas": _requirement(
+        "frambuesas",
+        required=(
+            "fresh raw whole raspberries",
+            "ripe red raspberries in a punnet",
+        ),
+        forbidden=(
+            "raspberry jam",
+            "a raspberry dessert or cake",
+            "a raspberry smoothie",
+        ),
+        dominant=(
+            "a mixed fruit platter of many different fruits",
+        ),
+        context=(
+            "fresh raspberries in a bowl as the main subject",
+            "whole raspberries on a wooden table",
+        ),
+        queries=(
+            "fresh whole raspberries in a punnet close up",
+            "ripe raw raspberries in a white bowl",
+        ),
+    ),
+    # A coconut shared the kiwi frame, and "tropical fruit" is what a kiwi
+    # search drifts into.
+    "kiwi": _requirement(
+        "kiwi",
+        required=(
+            "fresh raw kiwi fruit with green flesh",
+            "a kiwi fruit cut in half showing its seeds",
+        ),
+        forbidden=(
+            "a kiwi smoothie or juice",
+            "a kiwi dessert or cake",
+        ),
+        dominant=(
+            "a coconut",
+            "a tropical fruit platter of many different fruits",
+            "a pineapple",
+        ),
+        context=(
+            "fresh kiwi fruit on a plate as the main subject",
+            "whole and halved kiwi fruit on a table",
+        ),
+        queries=(
+            "fresh kiwi fruit cut in half close up",
+            "raw green kiwi slices on a plate",
+        ),
+    ),
+    # The brief accepts whole or cut, and rejects the branded tub where no
+    # fruit is visible - which is what WRONG_CONTEXT is for.
+    "aguacate": _requirement(
+        "aguacate",
+        required=(
+            "a fresh raw avocado",
+            "an avocado cut in half showing the stone",
+            "sliced green avocado flesh",
+        ),
+        forbidden=(
+            "a tub of packaged guacamole dip",
+            "an avocado smoothie",
+        ),
+        context=(
+            "fresh avocados on a wooden board as the main subject",
+            "a halved avocado on a plate",
+        ),
+        queries=(
+            "fresh raw avocado cut in half close up",
+            "whole avocados on a wooden board",
+        ),
+    ),
+    # The juice item is about the juice, and the state is inverted: here the
+    # glass is right and the whole fruit is the failure. Written because
+    # "cambiar la fruta entera por zumo" is the one item whose picture the
+    # entity probe would happily satisfy with the thing the line warns about.
+    "zumo": _requirement(
+        "zumo",
+        required=(
+            "a glass of fruit juice",
+            "juice being poured into a glass",
+        ),
+        forbidden=(
+            "whole uncut fruit with no glass",
+        ),
+        context=(
+            "a glass of juice on a table as the main subject",
+        ),
+        queries=(
+            "glass of fresh orange juice on a table close up",
+        ),
+    ),
+    # "que ponga integral en el envase" is advice about a label, and the
+    # failure is white bread, which is a state rather than a different food.
+    "pan_integral": _requirement(
+        "pan_integral",
+        required=(
+            "dark wholegrain bread with visible grains",
+            "sliced brown wholemeal bread",
+        ),
+        forbidden=(
+            "white bread with a pale crumb",
+            "a sweet pastry or cake",
+        ),
+        context=(
+            "a loaf of wholegrain bread on a board as the main subject",
+        ),
+        queries=(
+            "dark whole grain bread loaf sliced close up",
+        ),
+    ),
+}
+
+
+def requirement_for_food(entity: VisualEntity | None) -> VisualRequirement | None:
+    """The full requirement for a food, or the bare-entity one.
+
+    A food with nothing written down still gets the dominance check, because
+    a dog owning the frame is wrong whatever is behind it and that list is
+    not a guess about this food - it is a list of what actually happened.
+    """
+
+    if entity is None:
+        return None
+    existing = REQUIREMENTS.get(entity.name)
+    if existing is not None:
+        return existing
+    return VisualRequirement(required_entity=entity.name, queries=entity.queries)
+
+
+def required_visual_for(beat: Any) -> VisualRequirement | None:
+    """What this beat's footage has to satisfy, if anything."""
+
+    return requirement_for_food(required_food_for(beat))
+
+
+# ---------------------------------------------------------------------------
+# Scoring
+# ---------------------------------------------------------------------------
+
+#: The cuts for the three new probes.
+#:
+#: Same shape as :data:`FOOD_IDENTIFY_PASS` - the share of frames in which
+#: the required side ranks above every forbidden one - and set at the middle
+#: of the range on purpose, because with three frames the only reachable
+#: values are 0, 1/3, 2/3 and 1 and 0.5 means "most frames". They are a
+#: hypothesis until ``tools/reel_grounding_check.py`` has scored the nine
+#: piles of real footage; what the measurement is allowed to move is these
+#: numbers, and never the definition of a pass.
+FOOD_STATE_PASS = 0.5
+FOOD_CONTEXT_PASS = 0.5
+FOOD_SUBJECT_PASS = 0.5
+
+
+def _identify(
+    rows: Sequence[Sequence[float]],
+    start: int,
+    positives: int,
+    negatives: Sequence[str],
+) -> tuple[float, str, int]:
+    """Share of frames where a positive outranks every negative.
+
+    ``rows`` is the whole similarity matrix and ``start`` is where this
+    probe's prompts begin in it, so four questions share one encode. Returns
+    (share, the negative that won most often, frames counted).
+    """
+
+    if positives <= 0 or not negatives:
+        return 0.0, "", 0
+    stop = start + positives + len(negatives)
+    wins = counted = 0
+    losers: dict[str, int] = {}
+    for row in rows:
+        if len(row) < stop:
+            continue
+        counted += 1
+        window = row[start:stop]
+        best = max(range(len(window)), key=lambda i: window[i])
+        if best < positives:
+            wins += 1
+        else:
+            name = negatives[best - positives]
+            losers[name] = losers.get(name, 0) + 1
+    if not counted:
+        return 0.0, "", 0
+    top = max(losers.items(), key=lambda kv: kv[1])[0] if losers else ""
+    return wins / counted, top, counted
+
+
+@dataclass
+class FoodGrounding:
+    """Whether one clip shows the right food, in the right state, as the subject.
+
+    Compatible with :class:`~vidfactory.entities.EntityGrounding` where the
+    pipeline and the report already read it - ``checked``, ``passed``,
+    ``score``, ``failed``, ``top_distractor`` - and richer where the verdict
+    now has more than one reason to be no.
+
+    ``score`` is the **weakest** probe that ran, not their average. An
+    average is exactly the compensation this layer exists to refuse: apple
+    1.00 and state 0.00 must not come out at 0.50 and pass.
+    """
+
+    entity: str = ""
+    labels: tuple[str, ...] = ()
+    checked: bool = False
+    passed: bool = True
+    score: float = 0.0
+    entity_presence_score: float = 0.0
+    entity_presence_passed: bool = True
+    entity_presence_checked: bool = False
+    state_match_score: float = 0.0
+    state_passed: bool = True
+    state_checked: bool = False
+    context_match_score: float = 0.0
+    context_passed: bool = True
+    context_checked: bool = False
+    dominant_subject_score: float = 0.0
+    distractor_dominance_score: float = 0.0
+    subject_passed: bool = True
+    subject_checked: bool = False
+    top_distractor: str = ""
+    failed_on: tuple[str, ...] = ()
+    detail: str = ""
+
+    @property
+    def required(self) -> bool:
+        return bool(self.entity)
+
+    @property
+    def failed(self) -> bool:
+        return self.required and self.checked and not self.passed
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "required_visual_entity": self.entity,
+            "required_visual_labels": list(self.labels),
+            "entity_grounding_checked": self.checked,
+            "entity_grounding_passed": self.passed,
+            "entity_grounding_score": round(self.score, 3),
+            "entity_presence_score": round(self.entity_presence_score, 3),
+            "state_match_score": round(self.state_match_score, 3),
+            "context_match_score": round(self.context_match_score, 3),
+            "dominant_subject_score": round(self.dominant_subject_score, 3),
+            "distractor_dominance_score": round(self.distractor_dominance_score, 3),
+            "failed_on": list(self.failed_on),
+            "looked_like": self.top_distractor,
+            "entity_grounding_detail": self.detail,
+        }
+
+
+def requirement_prompts(requirement: VisualRequirement) -> tuple[list[str], dict[str, int]]:
+    """Every prompt the four probes need, and where each one starts.
+
+    One list, because one encode of the frames answers all four questions and
+    four encodes would answer them no better at four times the cost.
+    """
+
+    entity = requirement.entity
+    prompts: list[str] = []
+    offsets: dict[str, int] = {}
+
+    offsets["entity"] = len(prompts)
+    prompts.extend(entity.positives)
+    prompts.extend(entity.competitors)
+
+    offsets["state"] = len(prompts)
+    prompts.extend(requirement.required_attributes)
+    prompts.extend(requirement.forbidden_attributes)
+
+    offsets["context"] = len(prompts)
+    prompts.extend(requirement.context_requirements)
+    if requirement.context_requirements:
+        prompts.extend(WRONG_CONTEXT)
+
+    # The dominance probe reuses the entity's own positives - the question is
+    # whether the food outranks the dog, and "a bowl of red strawberries" is
+    # already the best statement of the food there is - so only the
+    # distractors are added here, and the scorer is given both slices.
+    offsets["dominant"] = len(prompts)
+    prompts.extend(requirement.forbidden_dominant_entities)
+    return prompts, offsets
+
+
+def score_requirement(
+    requirement: VisualRequirement, per_frame: Sequence[Sequence[float]]
+) -> FoodGrounding:
+    """The four probes, combined as a conjunction.
+
+    Each is the same question in a different vocabulary: of the frames we
+    could read, in how many did the required side rank above every forbidden
+    one? Each has its own cut, each is reported separately, and the verdict
+    is the ``and`` of the ones that ran - so a probe with nothing written
+    down for this food abstains rather than passing something.
+    """
+
+    entity = requirement.entity
+    blank = FoodGrounding(entity=entity.name, labels=entity.labels)
+    if not per_frame:
+        return blank
+
+    prompts, offsets = requirement_prompts(requirement)
+    presence, presence_loser, counted = _identify(
+        per_frame, offsets["entity"], len(entity.positives), entity.competitors
+    )
+    if not counted:
+        return blank
+
+    state, state_loser, state_frames = _identify(
+        per_frame, offsets["state"], len(requirement.required_attributes),
+        requirement.forbidden_attributes,
+    )
+    context, context_loser, context_frames = _identify(
+        per_frame, offsets["context"], len(requirement.context_requirements),
+        WRONG_CONTEXT if requirement.context_requirements else (),
+    )
+    # The food against what owns the frame instead. The positives are the
+    # entity's, which sit at the front of the matrix, so this probe reads two
+    # separate slices and cannot use ``_identify``'s single window.
+    subject, subject_loser, subject_frames = _identify_split(
+        per_frame,
+        (offsets["entity"], len(entity.positives)),
+        (offsets["dominant"], requirement.forbidden_dominant_entities),
+    )
+
+    failed: list[str] = []
+    scores: list[float] = [presence]
+    presence_ok = presence >= FOOD_IDENTIFY_PASS
+    if not presence_ok:
+        failed.append("entity")
+    state_ok = state >= FOOD_STATE_PASS if state_frames else True
+    if state_frames:
+        scores.append(state)
+        if not state_ok:
+            failed.append("state")
+    context_ok = context >= FOOD_CONTEXT_PASS if context_frames else True
+    if context_frames:
+        scores.append(context)
+        if not context_ok:
+            failed.append("context")
+    subject_ok = subject >= FOOD_SUBJECT_PASS if subject_frames else True
+    if subject_frames:
+        scores.append(subject)
+        if not subject_ok:
+            failed.append("dominant_subject")
+
+    passed = not failed
+    # Whichever probe came closest to saying no, named. The entity probe's
+    # loser is the right answer when the food itself is wrong; otherwise the
+    # thing that actually beat it is more useful to a reviewer than the
+    # runner-up fruit.
+    loser = (
+        presence_loser if "entity" in failed
+        else state_loser if "state" in failed
+        else subject_loser if "dominant_subject" in failed
+        else context_loser if "context" in failed
+        else presence_loser
+    )
+    label = entity.labels[0]
+    return FoodGrounding(
+        entity=entity.name,
+        labels=entity.labels,
+        checked=True,
+        passed=passed,
+        score=round(min(scores), 3),
+        entity_presence_score=round(presence, 3),
+        entity_presence_passed=presence_ok,
+        entity_presence_checked=True,
+        state_match_score=round(state, 3),
+        state_passed=state_ok,
+        state_checked=bool(state_frames),
+        context_match_score=round(context, 3),
+        context_passed=context_ok,
+        context_checked=bool(context_frames),
+        dominant_subject_score=round(subject, 3),
+        distractor_dominance_score=round(1.0 - subject, 3),
+        subject_passed=subject_ok,
+        subject_checked=bool(subject_frames),
+        top_distractor=loser,
+        failed_on=tuple(failed),
+        detail=(
+            f"{label}: entity {presence:.2f}, state {state:.2f}, "
+            f"context {context:.2f}, subject {subject:.2f}"
+            + ("" if passed else
+               f" - failed on {', '.join(failed)}"
+               + (f"; looked like {loser!r}" if loser else ""))
+        ),
+    )
+
+
+def _identify_split(
+    rows: Sequence[Sequence[float]],
+    positives: tuple[int, int],
+    negatives: tuple[int, Sequence[str]],
+) -> tuple[float, str, int]:
+    """:func:`_identify` where the two sides are not adjacent in the matrix."""
+
+    start, count = positives
+    neg_start, names = negatives
+    if count <= 0 or not names:
+        return 0.0, "", 0
+    wins = counted = 0
+    losers: dict[str, int] = {}
+    for row in rows:
+        if len(row) < max(start + count, neg_start + len(names)):
+            continue
+        counted += 1
+        best_positive = max(row[start:start + count])
+        window = row[neg_start:neg_start + len(names)]
+        best_negative = max(window)
+        if best_positive >= best_negative:
+            wins += 1
+        else:
+            losers[names[window.index(best_negative)]] = (
+                losers.get(names[window.index(best_negative)], 0) + 1
+            )
+    if not counted:
+        return 0.0, "", 0
+    top = max(losers.items(), key=lambda kv: kv[1])[0] if losers else ""
+    return wins / counted, top, counted
+
+
+def ground_requirement(
+    analyzer: Any, frames: Sequence[Any], requirement: VisualRequirement | None
+) -> FoodGrounding:
+    """Score one clip against one beat's whole requirement.
+
+    On the validated verifier, never on the ranker. MobileCLIP-S0 was
+    measured at chance on plain "which fruit is this"; asking it which
+    *state* the fruit is in would be asking a harder question of a model that
+    failed the easier one.
+    """
+
+    if requirement is None:
+        return FoodGrounding()
+    prompts, _ = requirement_prompts(requirement)
+    per_frame = analyzer.probe_frames(frames, prompts, use_claim_model=True)
+    return score_requirement(requirement, per_frame)
+
+
+def state_repair_queries(
+    requirement: VisualRequirement, spent: Sequence[str] = ()
+) -> list[str]:
+    """What to search when the food was right and the shot was not.
+
+    The requirement's own queries first, because they name the state that
+    failed - "whole raw apple with the skin on" is a different search from
+    "manzana", and the second one is what returned the cake.
     """
 
     used = {str(q).strip().lower() for q in spent}
-    return [q for q in entity.queries if q.strip().lower() not in used]
+    ordered = [*requirement.queries, *requirement.entity.queries]
+    out: list[str] = []
+    for query in ordered:
+        key = query.strip().lower()
+        if key and key not in used:
+            used.add(key)
+            out.append(query.strip())
+    return out

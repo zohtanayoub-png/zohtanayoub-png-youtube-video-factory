@@ -995,6 +995,33 @@ def downsample(frame: Frame, size: tuple[int, int] = STAT_SIZE) -> Frame:
     return Frame(width, height, bytes(out), frame.source, frame.timestamp)
 
 
+def crop_center(frame: Frame, fraction: float = 0.6,
+                size: tuple[int, int] | None = None) -> Frame:
+    """The middle of a frame, rescaled back to the model's input size.
+
+    Decoding at twice the model's input and cropping the middle is the only
+    way to ask a contrastive model about detail it never received: a
+    raspberry's hollow core is four pixels wide in a squashed 224px frame of
+    a wide shot, and no prompt can recover what the resize threw away.
+    Whether that helps is a measurement, which is what
+    ``tools/reel_grounding_check.py raspberry`` makes.
+    """
+
+    fraction = min(1.0, max(0.05, float(fraction)))
+    width = max(1, int(frame.width * fraction))
+    height = max(1, int(frame.height * fraction))
+    left = (frame.width - width) // 2
+    top = (frame.height - height) // 2
+    out = bytearray(width * height * 3)
+    for y in range(height):
+        row = (top + y) * frame.width + left
+        source = row * 3
+        target = y * width * 3
+        out[target:target + width * 3] = frame.pixels[source:source + width * 3]
+    cropped = Frame(width, height, bytes(out), frame.source, frame.timestamp)
+    return downsample(cropped, size) if size else cropped
+
+
 class VisualAnalyzer:
     """Turns sampled frames into a judgement about one clip.
 
@@ -1312,6 +1339,43 @@ class VisualAnalyzer:
             merged[flag] = round(values[len(values) // 2], 3)
         return {k: v for k, v in merged.items() if v >= 0.12}
 
+    def probe_frames(
+        self,
+        frames: Sequence[Frame],
+        prompts: Sequence[str],
+        use_claim_model: bool = False,
+    ) -> list[list[float]]:
+        """Every frame against every prompt, as cosine similarities.
+
+        The neutral primitive under :meth:`ground_entity`, split out because
+        a caller can have more than one question about the same frames. A
+        reel beat asks four - which food is this, what state is it in, what
+        kind of scene is it, and is the food the subject at all - and paying
+        for the pixels once and slicing one similarity matrix is the whole
+        difference between four probes and four decodes.
+
+        Returns ``[]`` rather than raising when there is no model, no usable
+        frame or nothing to ask: an unanswered question is not a failure, and
+        every caller here already reads it that way.
+        """
+
+        model = self.claim_model if use_claim_model else self.model
+        usable = [f for f in frames if f and f.ok]
+        if model is None or not usable or not prompts:
+            return []
+        encode = self._claim_texts if use_claim_model else self._encode_texts
+        try:
+            image_vectors = list(model.encode_images(usable))
+            text_vectors = encode(
+                [PROMPT_TEMPLATE.format(p) for p in prompts]
+            )
+        except Exception as exc:                          # pragma: no cover
+            log.warning("visual model failed on %d prompts: %s", len(prompts), exc)
+            return []
+        return [
+            [_cosine(image, t) for t in text_vectors] for image in image_vectors
+        ]
+
     def ground_entity(
         self,
         frames: Sequence[Frame],
@@ -1329,30 +1393,19 @@ class VisualAnalyzer:
         against a room and should not be judged at the interiors' cut.
         """
 
-        usable = [f for f in frames if f and f.ok]
         blank = EntityGrounding(
             entity=getattr(entity, "name", ""),
             labels=tuple(getattr(entity, "labels", ()) or ()),
         )
+        if entity is None:
+            return blank
         # Which backend answers is a measured decision, not a preference. On
         # food, MobileCLIP-S0 is at chance and the validated ViT-L/14 keeps
         # 82% of correct footage while rejecting 100% of the wrong food.
-        model = self.claim_model if use_claim_model else self.model
-        if entity is None or not usable or model is None:
+        prompts, _ = grounding_prompts(entity)
+        per_frame = self.probe_frames(frames, prompts, use_claim_model)
+        if not per_frame:
             return blank
-        try:
-            image_vectors = list(model.encode_images(usable))
-            prompts, _ = grounding_prompts(entity)
-            encode = self._claim_texts if use_claim_model else self._encode_texts
-            text_vectors = encode(
-                [PROMPT_TEMPLATE.format(p) for p in prompts]
-            )
-        except Exception as exc:                          # pragma: no cover
-            log.warning("visual model failed grounding %s: %s", blank.entity, exc)
-            return blank
-        per_frame = [
-            [_cosine(image, t) for t in text_vectors] for image in image_vectors
-        ]
         score = scorer or score_from_similarities
         return score(entity, per_frame, _ramp)
 

@@ -1095,3 +1095,328 @@ def test_the_shot_plan_covers_the_pauses_between_beats():
         last = index == len(spans) - 1
         covered += (timeline_end if last else max(end, starts[index + 1])) - start
     assert covered == pytest.approx(timeline_end, abs=0.01)
+
+
+# ---------------------------------------------------------------------------
+# Entity + state + context: the shot has to be the right *picture*, not only
+# the right noun. Three renders shipped an apple cake, a peeled apple, a dog
+# and a coconut, and every one of them scores the food at 1.00.
+# ---------------------------------------------------------------------------
+
+def _matrix(requirement, wins: dict, frames: int = 3):
+    """Similarities where the named prompt indexes lead and nothing else does.
+
+    Built from numbers rather than pixels so the test needs no model: what is
+    being pinned is the verdict, and the verdict is what shipped the cake.
+    """
+
+    from vidfactory.reels.foods import requirement_prompts
+
+    prompts, _ = requirement_prompts(requirement)
+    return [[wins.get(i, 0.10) for i in range(len(prompts))] for _ in range(frames)]
+
+
+def test_an_apple_cake_is_not_an_apple_beat():
+    """The brief's own example: apple = 1.00, state = fail, FINAL = REJECT."""
+
+    from vidfactory.reels.foods import (
+        REQUIREMENTS, requirement_prompts, score_requirement,
+    )
+
+    apple = REQUIREMENTS["manzana"]
+    _prompts, offset = requirement_prompts(apple)
+    cake = offset["state"] + len(apple.required_attributes) + 1
+    assert "cake" in apple.forbidden_attributes[1]
+
+    verdict = score_requirement(apple, _matrix(apple, {0: 0.9, cake: 0.9,
+                                                       offset["context"]: 0.9}))
+    assert verdict.checked
+    # The entity probe is right and it is not enough. That is the whole layer.
+    assert verdict.entity_presence_score == 1.0
+    assert verdict.state_match_score == 0.0
+    assert not verdict.passed
+    assert verdict.failed_on == ("state",)
+    assert "cake" in verdict.top_distractor
+    # A conjunction, not an average: a perfect food score may not buy a pass.
+    assert verdict.score == 0.0
+
+
+def test_a_peeled_apple_fails_a_beat_that_says_con_piel():
+    from vidfactory.reels.foods import (
+        REQUIREMENTS, requirement_prompts, score_requirement,
+    )
+
+    apple = REQUIREMENTS["manzana"]
+    _prompts, offset = requirement_prompts(apple)
+    peeled = offset["state"] + len(apple.required_attributes)
+    assert apple.forbidden_attributes[0] == "a peeled apple with no skin"
+
+    verdict = score_requirement(apple, _matrix(apple, {0: 0.9, peeled: 0.9,
+                                                       offset["context"]: 0.9}))
+    assert not verdict.passed and verdict.failed_on == ("state",)
+
+
+def test_a_dog_owning_the_frame_fails_the_strawberry_beat():
+    """Strawberries visible, dog dominant. The brief rejects it; so does this."""
+
+    from vidfactory.reels.foods import (
+        REQUIREMENTS, requirement_prompts, score_requirement,
+    )
+
+    fresas = REQUIREMENTS["fresas"]
+    _prompts, offset = requirement_prompts(fresas)
+    verdict = score_requirement(fresas, _matrix(fresas, {
+        0: 0.40,                       # the strawberries are there
+        offset["state"]: 0.9,          # and they are raw
+        offset["context"]: 0.9,        # in a kitchen
+        offset["dominant"]: 0.95,      # and the dog is bigger than all of it
+    }))
+    assert not verdict.passed
+    assert verdict.failed_on == ("dominant_subject",)
+    assert verdict.top_distractor == "a dog"
+    assert verdict.dominant_subject_score == 0.0
+    assert verdict.distractor_dominance_score == 1.0
+
+
+def test_a_coconut_fails_the_kiwi_beat():
+    from vidfactory.reels.foods import (
+        REQUIREMENTS, requirement_prompts, score_requirement,
+    )
+
+    kiwi = REQUIREMENTS["kiwi"]
+    _prompts, offset = requirement_prompts(kiwi)
+    coconut = offset["dominant"] + kiwi.forbidden_dominant_entities.index("a coconut")
+    verdict = score_requirement(kiwi, _matrix(kiwi, {
+        0: 0.40, offset["state"]: 0.9, offset["context"]: 0.9, coconut: 0.95,
+    }))
+    assert not verdict.passed and verdict.top_distractor == "a coconut"
+
+
+def test_the_right_shot_passes_every_probe():
+    from vidfactory.reels.foods import (
+        REQUIREMENTS, requirement_prompts, score_requirement,
+    )
+
+    for name in ("manzana", "fresas", "kiwi", "aguacate", "frambuesas"):
+        requirement = REQUIREMENTS[name]
+        _prompts, offset = requirement_prompts(requirement)
+        verdict = score_requirement(requirement, _matrix(requirement, {
+            0: 0.9, offset["state"]: 0.9, offset["context"]: 0.9,
+        }))
+        assert verdict.passed, (name, verdict.detail)
+        assert verdict.score == 1.0
+        assert verdict.failed_on == ()
+
+
+def test_a_food_with_no_state_written_down_is_not_gated_on_a_guess():
+    """An unmeasured probe abstains. It does not pass, and it does not fail.
+
+    Requiring a state nobody has observed going wrong would reject good
+    footage for a rule written from imagination, which is what
+    ``entities.py`` says about abstract advice and is true here too.
+    """
+
+    from vidfactory.reels.foods import (
+        BY_NAME, requirement_for_food, requirement_prompts, score_requirement,
+    )
+
+    grapes = requirement_for_food(BY_NAME["uvas"])
+    assert grapes.required_attributes == ()
+    assert grapes.context_requirements == ()
+    # The dominance list is not a guess about grapes - it is a list of what
+    # actually turned up owning a food frame - so it still applies.
+    assert "a dog" in grapes.forbidden_dominant_entities
+
+    _prompts, offset = requirement_prompts(grapes)
+    verdict = score_requirement(grapes, _matrix(grapes, {0: 0.9}))
+    assert verdict.passed
+    assert not verdict.state_checked and not verdict.context_checked
+    assert verdict.subject_checked
+
+
+def test_a_strong_entity_score_cannot_compensate_for_a_failed_state():
+    """The scoring property the brief states, on every food that declares one."""
+
+    from vidfactory.reels.foods import (
+        REQUIREMENTS, requirement_prompts, score_requirement,
+    )
+
+    for name, requirement in REQUIREMENTS.items():
+        if not requirement.forbidden_attributes:
+            continue
+        _prompts, offset = requirement_prompts(requirement)
+        forbidden = offset["state"] + len(requirement.required_attributes)
+        verdict = score_requirement(requirement, _matrix(requirement, {
+            0: 0.99,                   # a perfect food score
+            forbidden: 0.98,           # and the wrong state
+            offset["context"]: 0.9,
+        }))
+        assert verdict.entity_presence_score == 1.0, name
+        assert not verdict.passed, name
+        assert verdict.score == 0.0, name
+
+
+def test_the_juice_item_wants_the_glass_and_not_the_fruit():
+    """The one requirement whose state is inverted.
+
+    "Cambiar la fruta entera por zumo le quita la fibra" is a warning about
+    the juice, and a bowl of oranges is the picture of the thing it warns
+    against.
+    """
+
+    from vidfactory.reels.foods import (
+        REQUIREMENTS, requirement_prompts, score_requirement,
+    )
+
+    zumo = REQUIREMENTS["zumo"]
+    _prompts, offset = requirement_prompts(zumo)
+    whole = offset["state"] + len(zumo.required_attributes)
+    verdict = score_requirement(zumo, _matrix(zumo, {
+        0: 0.9, whole: 0.95, offset["context"]: 0.9,
+    }))
+    assert not verdict.passed and "state" in verdict.failed_on
+
+
+def test_the_repair_searches_the_state_before_the_food():
+    """"manzana" is what found the cake, so it is not what the repair asks."""
+
+    from vidfactory.reels.foods import REQUIREMENTS, state_repair_queries
+
+    queries = state_repair_queries(REQUIREMENTS["manzana"])
+    assert queries[0] == "whole raw red apple with skin close up"
+    assert any("unpeeled" in q for q in queries)
+    # The entity's own searches follow rather than disappear.
+    assert "red apple close up" in queries
+    # Nothing is searched twice.
+    assert len(queries) == len(set(queries))
+    assert "red apple close up" not in state_repair_queries(
+        REQUIREMENTS["manzana"], ["red apple close up"]
+    )
+
+
+def test_every_requirement_names_a_food_that_exists():
+    from vidfactory.reels.foods import BY_NAME, REQUIREMENTS
+
+    for name, requirement in REQUIREMENTS.items():
+        assert requirement.required_entity == name
+        assert name in BY_NAME
+        assert requirement.entity is BY_NAME[name]
+        # Prompts are English, like every other prompt that reaches CLIP.
+        for prompt in (*requirement.required_attributes,
+                       *requirement.forbidden_attributes,
+                       *requirement.context_requirements,
+                       *requirement.forbidden_dominant_entities,
+                       *requirement.queries):
+            assert prompt == prompt.encode("ascii", "ignore").decode(), prompt
+
+
+def test_the_five_fruits_of_the_test_reel_all_have_a_state():
+    """The brief writes out five and this is the check that none was skipped."""
+
+    from vidfactory.reels.foods import REQUIREMENTS
+
+    for name in ("fresas", "frambuesas", "kiwi", "manzana", "aguacate"):
+        requirement = REQUIREMENTS[name]
+        assert requirement.required_attributes, name
+        assert requirement.context_requirements, name
+        assert requirement.queries, name
+    # The specific rejections the brief lists, by name.
+    apple = REQUIREMENTS["manzana"].forbidden_attributes
+    assert any("peeled" in p for p in apple)
+    assert any("cake" in p for p in apple)
+    assert any("pie" in p for p in apple)
+    assert any("juice" in p for p in apple)
+    assert any("cooked" in p for p in apple)
+    assert "a coconut" in REQUIREMENTS["kiwi"].forbidden_dominant_entities
+    assert any("dog" in p for p in REQUIREMENTS["fresas"].forbidden_dominant_entities)
+
+
+def test_the_shot_plan_covers_every_pause_and_the_tail():
+    """The frozen frame was between the beats, not after the last one.
+
+    A beat's ``scene_timings`` span covers only its own spoken chunks, so a
+    plan summed from the spans is short by every pause in the reel: run
+    34093462658 held its last frame for 1.7s and stretching only the final
+    beat still left 1.52s.
+    """
+
+    from vidfactory.reels.pipeline import shot_spans
+
+    beats = [object() for _ in range(4)]
+    timings = {
+        "beat-00": (0.0, 2.0), "beat-01": (2.4, 6.0),
+        "beat-02": (6.3, 9.0), "beat-03": (9.4, 12.0),
+    }
+    spans = shot_spans(beats, timings, 12.4)
+    # No gap and no overlap: the picture tiles the whole audio plus the tail.
+    assert spans[0][0] == 0.0
+    assert spans[-1][1] == 12.4
+    for (_first, end), (start, _last) in zip(spans, spans[1:]):
+        assert end == start
+    assert round(sum(end - start for start, end in spans), 3) == 12.4
+
+
+def test_a_beat_that_was_never_spoken_gets_no_picture():
+    """``(0.0, 0.0)`` used to mean "the whole reel" rather than "nothing"."""
+
+    from vidfactory.reels.pipeline import shot_spans
+
+    beats = [object() for _ in range(4)]
+    spans = shot_spans(beats, {"beat-00": (0.0, 2.0), "beat-02": (3.0, 5.0)}, 6.0)
+    assert spans[1] == (0.0, 0.0) and spans[3] == (0.0, 0.0)
+    assert spans[0] == (0.0, 3.0) and spans[2] == (3.0, 6.0)
+    assert round(sum(end - start for start, end in spans), 3) == 6.0
+
+
+def test_the_report_says_which_probe_refused_the_shot():
+    """One failure count cannot tell an orange from an apple cake."""
+
+    from vidfactory.reels.qc import build_report
+
+    script = fitted(BY_SLUG[FIRST], 45)
+    visual = {"item_grounding_results": [
+        {"beat": "beat-05", "item": "manzana", "required_entity": "manzana",
+         "checked": True, "passed": False, "score": 0.0, "failed_on": ["state"],
+         "looked_like": "a slice of apple cake"},
+        {"beat": "beat-07", "item": "fresas", "required_entity": "fresas",
+         "checked": True, "passed": False, "score": 0.0,
+         "failed_on": ["dominant_subject"], "looked_like": "a dog"},
+        {"beat": "beat-09", "item": "kiwi", "required_entity": "kiwi",
+         "checked": True, "passed": True, "score": 1.0, "failed_on": []},
+    ]}
+    report = build_report(
+        script, production=True, visual=visual, sources=[{"key": "x"}],
+        cta_start=script.estimated_seconds - 3,
+    )
+    assert report.metrics["entity_grounding_failure_count"] == 2
+    assert report.metrics["wrong_state_failure_count"] == 1
+    assert report.metrics["distractor_dominance_failure_count"] == 1
+    assert report.metrics["wrong_food_failure_count"] == 0
+    assert report.metrics["entity_grounding_pass_percentage"] == 33.3
+    detail = [c for c in report.checks if c.name == "every_item_shows_its_food"][0]
+    assert "state" in detail.detail and "apple cake" in detail.detail
+
+
+def test_the_inspector_prints_the_four_probes():
+    import importlib.util
+    import pathlib
+
+    tool = pathlib.Path(__file__).resolve().parents[1] / "tools" / "inspect_reel_frames.py"
+    spec = importlib.util.spec_from_file_location("inspect_reel_frames", tool)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    row = {
+        "beat": "beat-05", "required_entity": "manzana", "sources": ["pexels:1"],
+        "score": 0.0, "passed": False, "entity_presence_score": 1.0,
+        "state_match_score": 0.0, "state_checked": True,
+        "context_match_score": 1.0, "context_checked": True,
+        "dominant_subject_score": 1.0, "failed_on": ["state"],
+        "looked_like": "a slice of apple cake",
+        "required_attributes": ["a fresh raw apple with its skin on"],
+    }
+    line = module.describe(
+        5, {"kind": "item", "text": "La manzana con piel..."}, {"beat-05": row}
+    )
+    assert "entity=1.00" in line and "state=0.00" in line
+    assert "FAILED ON state" in line and "apple cake" in line

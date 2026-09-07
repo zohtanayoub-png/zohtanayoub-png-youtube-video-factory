@@ -27,11 +27,22 @@ person.
 
 And five more once the reel narrated an apple over a picture of an orange:
 
-``entity_grounding_failure_count``   item beats whose footage is the wrong food
+``entity_grounding_failure_count``   item beats whose footage is the wrong shot
 ``entity_grounding_pass_percentage`` of the beats that required one
-``item_grounding_results``           per beat: food, source, score, verdict
+``item_grounding_results``           per beat: food, state, context, subject
 ``repaired_item_shot_count``         shots the repair pass replaced
 ``frozen_tail_duration``             seconds of held still frame at the end
+
+And four more once the right food arrived in the wrong state: an apple
+**cake** and a **peeled** apple under "la manzana con piel", a dog owning
+the strawberry frame and a coconut the kiwi one. All four score the food at
+1.00, which is the identification probe answering its own question correctly
+and the question being too small.
+
+``wrong_food_failure_count``          the food itself is wrong
+``wrong_state_failure_count``         right food, cooked, peeled or bottled
+``wrong_context_failure_count``       right food, but it is a packaged product
+``distractor_dominance_failure_count`` right food, and a dog owns the frame
 
 In production the two safety counts must be zero. That is not a threshold to
 be tuned later; it is the reason the safety module exists.
@@ -302,6 +313,13 @@ def build_report(
     grounding_rows = list(visual.pop("item_grounding_results", []) or [])
     checked_rows = [r for r in grounding_rows if r.get("checked")]
     failed_rows = [r for r in checked_rows if not r.get("passed")]
+    # Which of the four probes said no, counted separately. One number for
+    # "the footage was wrong" hides the difference between an orange and an
+    # apple cake, and those have different fixes: the first is a search that
+    # found the wrong fruit, the second a search that found the right fruit
+    # cooked.
+    def _failed_on(reason: str) -> int:
+        return sum(1 for r in failed_rows if reason in (r.get("failed_on") or []))
     grounding_pass_pct = (
         round(100.0 * (len(checked_rows) - len(failed_rows)) / len(checked_rows), 1)
         if checked_rows else 100.0
@@ -330,6 +348,10 @@ def build_report(
         "entity_grounding_failure_count": len(failed_rows),
         "entity_grounding_pass_percentage": grounding_pass_pct,
         "entity_grounding_checked_count": len(checked_rows),
+        "wrong_food_failure_count": _failed_on("entity"),
+        "wrong_state_failure_count": _failed_on("state"),
+        "wrong_context_failure_count": _failed_on("context"),
+        "distractor_dominance_failure_count": _failed_on("dominant_subject"),
         "item_grounding_results": grounding_rows,
         "repaired_item_shot_count": repaired_shots,
         "repair_rounds_used": repair_rounds,
@@ -425,8 +447,9 @@ def build_report(
             not failed_rows,
             (
                 "; ".join(
-                    f"{r['item'] or r['beat']} needed {r['required_entity']} and the "
-                    f"footage looked like {r['looked_like'] or 'something else'} "
+                    f"{r['item'] or r['beat']} needed {r['required_entity']} and "
+                    f"failed on {', '.join(r.get('failed_on') or ['grounding'])}: "
+                    f"the footage looked like {r['looked_like'] or 'something else'} "
                     f"({r['score']:.2f})"
                     for r in failed_rows[:3]
                 ) if failed_rows else

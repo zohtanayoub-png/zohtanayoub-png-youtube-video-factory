@@ -131,7 +131,7 @@ on:
         required: false
         type: choice
         default: "render"
-        options: [render, calibrate-entities, premium-check, instruction-check, reel, reel-entity-check]
+        options: [render, calibrate-entities, premium-check, instruction-check, reel, reel-entity-check, reel-grounding-check, reel-raspberry-check]
       upload_to_youtube:
         description: "Upload to YouTube when it is finished"
         required: false
@@ -728,6 +728,9 @@ jobs:
   calibrate-entities:
     name: Measure the required-entity probes
     if: inputs.task == 'calibrate-entities'
+    # Least privilege: a probe reads the code and writes nothing back.
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -786,6 +789,9 @@ jobs:
   reel-entity-check:
     name: Can MobileCLIP tell an apple from an orange
     if: inputs.task == 'reel-entity-check'
+    # Least privilege: a probe reads the code and writes nothing back.
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -837,11 +843,140 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+  # -------------------------------------------------------------------
+  #  Entity + state + context, on footage whose answer is already known.
+  #  Nine piles, five that must be accepted and four that must be rejected,
+  #  scored twice: by the entity probe that shipped and by the four-probe
+  #  conjunction that is proposed. Cheaper than a render and it answers the
+  #  question a render only illustrates.
+  # -------------------------------------------------------------------
+  reel-grounding-check:
+    name: Does the shot show the food in the right state
+    if: inputs.task == 'reel-grounding-check'
+    # Least privilege: a probe reads the code and writes nothing back.
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ffmpeg
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+          pip install onnxruntime
+      - name: Restore the cached model files
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: vidfactory-reel-cache-v1
+      - name: Measure the validation set
+        env:
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+        run: |
+          set -euo pipefail
+          python tools/reel_grounding_check.py validation \
+            --clips 6 --model claim \
+            --out output/grounding/validation.json
+      - name: Report
+        if: always()
+        run: |
+          {
+            echo "## Entity + state + context, before and after"
+            echo '```json'
+            cat output/grounding/validation.json || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload the scores and a frame of every clip
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reel-grounding-check
+          path: |
+            output/grounding/validation.json
+            output/grounding/frames/*.jpg
+          retention-days: 14
+          if-no-files-found: warn
+
+  # -------------------------------------------------------------------
+  #  The raspberry measured 0.0 against 0.0. Before that number is tuned
+  #  away, find out which of the wording, the frame count and the decode
+  #  resolution is responsible - if any of them is.
+  # -------------------------------------------------------------------
+  reel-raspberry-check:
+    name: Why can nothing identify a raspberry
+    if: inputs.task == 'reel-raspberry-check'
+    # Least privilege: a probe reads the code and writes nothing back.
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ffmpeg
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+          pip install onnxruntime
+      - name: Restore the cached model files
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: vidfactory-reel-cache-v1
+      - name: Measure every wording against every shape
+        env:
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+        run: |
+          set -euo pipefail
+          python tools/reel_grounding_check.py raspberry \
+            --clips 8 --model claim \
+            --out output/grounding/raspberry.json
+      - name: Report
+        if: always()
+        run: |
+          {
+            echo "## Raspberry probe variants"
+            echo '```json'
+            cat output/grounding/raspberry.json || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload the scores
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reel-raspberry-check
+          path: output/grounding/raspberry.json
+          retention-days: 14
+          if-no-files-found: warn
+
   reel:
     name: Render one vertical reel
     if: inputs.task == 'reel'
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    # Least privilege: the reel reads the code and writes nothing back.
     permissions:
       contents: read
 
@@ -1010,6 +1145,7 @@ jobs:
     if: inputs.task == 'instruction-check'
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    # Least privilege: a probe reads the code and writes nothing back.
     permissions:
       contents: read
 
@@ -1078,6 +1214,9 @@ jobs:
   premium-check:
     name: Analyse the candidate pool
     if: inputs.task == 'premium-check'
+    # Least privilege: a probe reads the code and writes nothing back.
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 60
 

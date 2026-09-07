@@ -359,6 +359,62 @@ in the report has to come from a measurement - applies here to the **words**.
   the "lower the threshold until it passes" this methodology exists to
   prevent. What it costs is that a raspberry beat gets repaired three times
   and is then reported, which is the right failure to have.
+* **Identifying the food is necessary and not sufficient.** The
+  identification probe fixed the failure it was written for - three renders
+  and the apple beat never showed an orange again - and the next three
+  renders shipped an apple **cake**, a **peeled** apple against the line
+  "la manzana con piel", a **dog** owning the strawberry frame and a
+  **coconut** in the kiwi one. Every one of those scores `manzana = 1.00`.
+  They are apples. Nothing is mis-scored; the question was too small.
+
+  This is the same step the long-form side took between `entities.py` and
+  `instructions.py`, for the same reason: presence is a property of an
+  object, and what a beat needs is a property of the picture. So a
+  requirement in `foods.py` has the parts the failures have -
+  `required_entity`, `required_attributes`, `forbidden_attributes`,
+  `forbidden_dominant_entities`, `context_requirements` - and they are the
+  prompts as well as the requirement, because two parallel lists of "what we
+  need" and "how we ask for it" stop being in step the first week.
+
+  Four probes, **combined as a conjunction and never as an average**: which
+  food is this, what state is it in, what kind of scene is it, and is the
+  food the subject at all. An average is exactly the compensation this layer
+  exists to refuse - apple 1.00 and state 0.00 must not come out at 0.50 -
+  so the reported `entity_grounding_score` is the *weakest* probe that ran,
+  and the report carries `wrong_food_failure_count`,
+  `wrong_state_failure_count`, `wrong_context_failure_count` and
+  `distractor_dominance_failure_count` separately, because an orange and an
+  apple cake have different fixes. One decode and one text encode answers
+  all four: `VisualAnalyzer.probe_frames` is the neutral primitive and
+  `ground_entity` now goes through it.
+
+  Two rules keep this from becoming a wall of guesses. **A probe with
+  nothing written down abstains** - it does not pass and does not fail -
+  because requiring a state nobody has observed going wrong rejects good
+  footage for a rule written from imagination; only seven foods declare one,
+  and each entry came from a frame somebody looked at. And **the dominance
+  list is not per-food speculation**: a dog in front of the strawberries is
+  a dog in front of anything. What is deliberately *not* in it is a person's
+  hands or a person holding fruit - half the good footage in this niche has
+  one - only "a close-up of a person's face with no food visible".
+
+  The repair searches the **state** first: "manzana" is what found the cake,
+  so `state_repair_queries` asks for "whole raw red apple with skin close
+  up" before it falls back to the food's own searches.
+* **The measurement comes before the render.** A forty second reel
+  illustrates a grounding change; it does not measure one, and three of them
+  had already been spent watching one failure class at a time. So
+  `tools/reel_grounding_check.py validation` scores nine piles of real
+  footage whose answer is already known - raw apple, peeled apple, apple
+  pie, strawberries, strawberries with a dog, raspberries, kiwi, a tropical
+  mix, avocado - twice: once by the entity probe that shipped, once by the
+  conjunction. It reports both rates, and only one of them is the point:
+  the **false positive** rate is the cake getting through, and the **false
+  negative** rate is good footage the repair pass now has to replace. A
+  stricter gate is only better when the second does not rise to meet the
+  first. Every clip's provider id, score and a JPEG of it go in the
+  artifact, because the pile labels are a search intent rather than ground
+  truth and "peeled apple" returns the odd unpeeled one.
 * **The CTA may not play over a frozen frame, and the gap is between the
   beats rather than after them.** The editor holds the last frame when the
   picture is shorter than the narration: run 34093462658 held it for 1.7

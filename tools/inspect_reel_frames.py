@@ -105,8 +105,25 @@ def describe(position: int, beat: dict, grounding: dict) -> str:
             f"source={','.join(row.get('sources', []) or []) or '-'} "
             f"score={float(row.get('score', 0.0)):.2f} {verdict}"
         )
-        if not row.get("passed") and row.get("looked_like"):
-            parts.append(f"looked like {row['looked_like']}")
+        # The four probes, separately. One combined number cannot tell a
+        # reviewer whether the frame held an orange or an apple cake, and
+        # those are different defects with different fixes.
+        parts.append(
+            "entity={:.2f} state={} context={} subject={:.2f}".format(
+                float(row.get("entity_presence_score", 0.0)),
+                f"{float(row.get('state_match_score', 0.0)):.2f}"
+                if row.get("state_checked") else "-",
+                f"{float(row.get('context_match_score', 0.0)):.2f}"
+                if row.get("context_checked") else "-",
+                float(row.get("dominant_subject_score", 0.0)),
+            )
+        )
+        if row.get("required_attributes"):
+            parts.append("must be " + "; ".join(row["required_attributes"][:2]))
+        if not row.get("passed"):
+            failed = ", ".join(row.get("failed_on") or []) or "grounding"
+            looked = row.get("looked_like") or "something else"
+            parts.append(f"FAILED ON {failed} - looked like {looked}")
     return " | ".join(parts)
 
 

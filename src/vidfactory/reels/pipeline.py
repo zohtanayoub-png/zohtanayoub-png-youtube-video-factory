@@ -49,7 +49,11 @@ from .knowledge import BY_SLUG, Topic, find_topic
 from .metadata import caption as build_caption
 from .metadata import publish_metadata
 from .qc import ReelReport, build_report
-from .foods import identify_food, repair_queries, required_food_for
+from .foods import (
+    ground_requirement,
+    required_visual_for,
+    state_repair_queries,
+)
 from .script import (
     ALLOWED_SECONDS,
     DEFAULT_SECONDS,
@@ -70,6 +74,47 @@ MAX_SHOT = 4.0
 #: A short hold after the last word. Long enough not to cut the CTA off,
 #: short enough that the loop comes round quickly.
 TAIL_SECONDS = 0.4
+
+
+def shot_spans(
+    beats: Sequence[Any],
+    scene_timings: Mapping[str, tuple[float, float]],
+    timeline_end: float,
+) -> list[tuple[float, float]]:
+    """When each beat's *picture* is on screen, from the synthesized audio.
+
+    Not when the beat is spoken - that is what ``scene_timings`` says, and
+    building the shot plan from it is what froze the last frame. A beat's
+    span covers only its own chunks: the sentence pause inside it, the beat
+    pause after it and the tail the reel ends on belong to no beat at all, so
+    the spans sum to less than the audio by *every pause in the reel*. Run
+    34093462658 held its final frame for 1.7 seconds, and stretching only the
+    last beat still left 1.52.
+
+    So the picture is continuous by construction: each beat holds the screen
+    until the next beat's first word, the last one until the end of the
+    audio plus the tail, and the first one from zero whatever its own timing
+    says. A beat that was never synthesized - an empty line - gets no time
+    rather than getting the whole reel, which is what ``(0.0, 0.0)`` used to
+    turn into.
+
+    The result tiles ``[0, timeline_end]`` exactly: no gap, no overlap, and
+    no frozen frame at the end.
+    """
+
+    end = max(0.0, float(timeline_end))
+    known: list[tuple[int, float]] = []
+    for index in range(len(beats)):
+        timing = scene_timings.get(f"beat-{index:02d}")
+        if timing is not None:
+            known.append((index, float(timing[0])))
+    spans = [(0.0, 0.0)] * len(beats)
+    for position, (index, start) in enumerate(known):
+        first = 0.0 if position == 0 else start
+        last = known[position + 1][1] if position + 1 < len(known) else end
+        spans[index] = (min(first, end), max(min(first, end), min(last, end)))
+    return spans
+
 
 
 @dataclass
@@ -453,7 +498,7 @@ class ReelPipeline:
             return [c for c in found if c.key not in used_keys]
 
         def take(
-            query: str, wanted: int, beat: Any, entity: Any, scene_id: str
+            query: str, wanted: int, beat: Any, requirement: Any, scene_id: str
         ) -> tuple[list[tuple[Any, Any]], list[dict[str, Any]]]:
             """Download and judge candidates until ``wanted`` of them pass.
 
@@ -489,17 +534,19 @@ class ReelPipeline:
                         "semantic_match": analysis.semantic_match,
                         "analyzed": analysis.analyzed,
                     })
-                    if entity is not None:
-                        grounding = analyzer.ground_entity(
-                            frames, entity, identify_food, use_claim_model=True
+                    if requirement is not None:
+                        grounding = ground_requirement(
+                            analyzer, frames, requirement
                         )
                         if grounding.failed:
-                            # Not this beat's food. Put the clip back rather
-                            # than shipping it: the whole point is that the
-                            # apple beat may not settle for an orange.
+                            # Not this beat's shot. Put the clip back rather
+                            # than shipping it: the apple beat may not settle
+                            # for an orange, and it may not settle for an
+                            # apple cake either.
                             rejected.append({
                                 "source": result.clip.key,
                                 "score": grounding.score,
+                                "failed_on": list(grounding.failed_on),
                                 "looked_like": grounding.top_distractor,
                             })
                             used_keys.append(result.clip.key)
@@ -508,37 +555,29 @@ class ReelPipeline:
                 used_keys.append(result.clip.key)
             return kept, rejected
 
-        # The picture is continuous; the narration is not. A beat's timing
-        # spans only its own spoken chunks, and the pause that follows it
-        # belongs to no beat at all - so a shot plan built from the spans is
-        # short by every pause in the reel. That is where the 1.52s of frozen
-        # frame came from, not from the tail: each beat's picture runs to the
-        # *next* beat's first word, and the last one runs to the end.
-        spans: list[tuple[float, float]] = []
-        for index in range(len(script.beats)):
-            start, end = narration.scene_timings.get(f"beat-{index:02d}", (0.0, 0.0))
-            spans.append((start, end))
-        starts = [s for s, _e in spans]
+        # The picture is continuous; the narration is not. Built against the
+        # synthesized audio - pauses, tail and all - by ``shot_spans``.
+        spans = shot_spans(script.beats, narration.scene_timings, timeline_end)
 
         for index, beat in enumerate(script.beats):
             scene_id = f"beat-{index:02d}"
             start, end = spans[index]
-            end = (
-                timeline_end if index == len(script.beats) - 1
-                else max(end, starts[index + 1])
-            )
-            span = max(0.6, end - start)
+            if end <= start:
+                continue                     # never synthesized; no picture owed
+            span = end - start
             wanted = max(1, int(round(span / MAX_SHOT + 0.35)))
-            entity = required_food_for(beat)
+            requirement = required_visual_for(beat)
+            entity = requirement.entity if requirement is not None else None
 
-            chosen, rejected = take(beat.query, wanted, beat, entity, scene_id)
+            chosen, rejected = take(beat.query, wanted, beat, requirement, scene_id)
 
             # Repair: the beat's own query is what returned the wrong food, so
-            # repeating it deeper would return it again. Search the object.
+            # repeating it deeper would return it again. Search the object,
+            # and the state - "manzana" is what found the cake.
             used_queries = [beat.query]
             attempts = 0
-            if entity is not None:
-                for query in repair_queries(entity, used_queries):
+            if requirement is not None:
+                for query in state_repair_queries(requirement, used_queries):
                     if len(chosen) >= wanted or attempts >= self.REPAIR_ROUNDS:
                         break
                     attempts += 1
@@ -548,14 +587,14 @@ class ReelPipeline:
                         attempts, scene_id, query, entity.name,
                     )
                     more, also = take(
-                        query, wanted - len(chosen), beat, entity, scene_id
+                        query, wanted - len(chosen), beat, requirement, scene_id
                     )
                     rejected.extend(also)
                     repaired_shots += len(more)
                     chosen.extend(more)
                 rounds_used = max(rounds_used, attempts)
 
-            if not chosen and entity is not None:
+            if not chosen and requirement is not None:
                 # Nothing showed the food. Take the best available rather than
                 # leaving a hole, and let the report say so - a missing beat is
                 # a worse reel than a flagged one.
@@ -568,22 +607,39 @@ class ReelPipeline:
                 log.warning("no footage for beat %s (%r)", scene_id, beat.query)
                 continue
 
-            if entity is not None:
-                best = max(
-                    (g for _clip, g in chosen if g is not None),
-                    key=lambda g: g.score, default=None,
-                )
+            if requirement is not None:
+                # The weakest shot the beat kept, not the strongest. Every
+                # shot in a beat is on screen while the line is spoken, so a
+                # good first clip cannot excuse a bad second one - the same
+                # reason the reel is graded per beat rather than per reel.
+                judged = [g for _clip, g in chosen if g is not None and g.checked]
+                worst = min(judged, key=lambda g: g.score, default=None)
                 grounding_rows.append({
                     "beat": scene_id,
                     "item": beat.item_key,
                     "narration": beat.text,
                     "required_entity": entity.name,
                     "required_labels": list(entity.labels),
+                    "required_attributes": list(requirement.required_attributes),
+                    "forbidden_attributes": list(requirement.forbidden_attributes),
                     "sources": [c.clip.key for c, _g in chosen],
-                    "score": round(best.score, 3) if best else 0.0,
-                    "checked": bool(best and best.checked),
-                    "passed": bool(best and best.passed),
-                    "looked_like": best.top_distractor if best else "",
+                    "score": round(worst.score, 3) if worst else 0.0,
+                    "entity_presence_score": (
+                        round(worst.entity_presence_score, 3) if worst else 0.0),
+                    "state_match_score": (
+                        round(worst.state_match_score, 3) if worst else 0.0),
+                    "state_checked": bool(worst and worst.state_checked),
+                    "context_match_score": (
+                        round(worst.context_match_score, 3) if worst else 0.0),
+                    "context_checked": bool(worst and worst.context_checked),
+                    "dominant_subject_score": (
+                        round(worst.dominant_subject_score, 3) if worst else 0.0),
+                    "distractor_dominance_score": (
+                        round(worst.distractor_dominance_score, 3) if worst else 0.0),
+                    "failed_on": list(worst.failed_on) if worst else [],
+                    "checked": bool(worst and worst.checked),
+                    "passed": bool(worst and worst.passed),
+                    "looked_like": worst.top_distractor if worst else "",
                     "rejected_candidates": rejected,
                     "repair_rounds": attempts,
                 })
@@ -593,7 +649,12 @@ class ReelPipeline:
             for position, (result, _grounding) in enumerate(chosen):
                 length = min(MAX_SHOT, max(MIN_SHOT * 0.6, per))
                 if position == len(chosen) - 1:
-                    length = max(0.5, end - offset)
+                    # The beat's last shot runs to the exact second the next
+                    # beat speaks. A floor here would make the picture longer
+                    # than the audio and push every later beat off its words,
+                    # which is the same defect as the frozen tail wearing a
+                    # different hat.
+                    length = max(0.1, end - offset)
                 shots.append(
                     Shot(
                         scene_id=scene_id,
@@ -618,6 +679,11 @@ class ReelPipeline:
             log.warning(
                 "the picture is %.2fs short of the narration; the last frame "
                 "would be held", frozen_tail,
+            )
+        elif covered > timeline_end + 0.05:
+            log.warning(
+                "the picture runs %.2fs past the narration; the later beats "
+                "are off their words", covered - timeline_end,
             )
         return shots, {
             "analysed": analysed,
