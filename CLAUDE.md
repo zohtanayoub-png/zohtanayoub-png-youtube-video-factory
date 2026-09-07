@@ -734,6 +734,52 @@ in the report has to come from a measurement - applies here to the **words**.
   verifier, and the verifier benchmark already says the two ViT-L/14
   builds score identically and no other candidate loads.
 
+* **The test reel, run 34165114277: every gate passed and the repair pass
+  was never needed.** Forty-seven seconds, sixteen shots from sixteen
+  distinct sources, five items each with a reason, in test mode. All
+  twenty-one checks pass. The seven grounding counters are all zero -
+  ``wrong_food``, ``wrong_state``, ``wrong_context``,
+  ``distractor_dominance``, ``image_fallback_shot_count``,
+  ``ungrounded_fallback_count``, ``repair_rounds_used`` - with
+  ``frozen_tail_duration`` at 0.00s and ``entity_grounding_pass_percentage``
+  at 100% over five checked beats.
+
+  **The prediction from the held-out numbers was wrong, and it is worth
+  saying why.** Conjunction recall of 0.37 on the apple and 0.133 on the
+  raspberry said those beats would burn their three repair rounds and reach
+  the image fallback. They used **zero rounds**. The held-out piles are
+  searched for awkward presentations on purpose - apples in market boxes,
+  raspberries in a glass jar, strawberries on linen - and a beat does not
+  search for those. It searches ``state_repair_queries`` and its own food,
+  and it needs two clips out of a ranked shortlist rather than six out of
+  six. A recall figure measured on hostile piles is a lower bound on what a
+  beat experiences, not an estimate of it.
+
+  **The manzana beat is the whole layer working, live.** It rejected six
+  candidates before it accepted one: three **oranges** (entity, 0.00),
+  a **tomato** (entity and dominant subject, 0.333), a **glass of orange
+  juice** (entity and state, 0.333) and one clip on state alone, and then
+  took ``pexels:5615187`` + ``pexels:33500303`` at 1.00 on all four probes.
+  An orange under "la manzana con piel" is the failure this entire layer was
+  built for, and it was refused three times in one forty-second render.
+
+  One honest wrinkle: ``pexels:37239365`` was **accepted** as a manzana
+  source in run 34164252796 and **rejected on state** in this one, as "pale
+  wet apple flesh being cut". Same clip, opposite verdicts, three frames
+  sampled each time - so that clip sits on the boundary and the sampling
+  decides it. That is the same negative prompt the apple-state cycle
+  blamed, behaving exactly as marginally in production as it did on the
+  piles.
+
+  Two things the report flags that grounding does not cover.
+  ``visual_semantic_match_average`` is **0.217** with nineteen of
+  twenty-three inspected clips at low relevance - that is MobileCLIP scoring
+  a Spanish narration sentence against fruit footage, which is the metric
+  the interior gates use and which this product deliberately does not gate
+  on, but 0.217 is low enough to be worth a look rather than a shrug. And
+  **Pixabay was unusable for want of a key**, so both renders drew on Pexels
+  alone: a narrower pool than the configuration claims.
+
 * **The raspberry candidate, decided at last** (runs 34113587132 and
   34155581648, two independent fresh four-berry sets). Adopt the
   arrangement wording, refuse the centre crop:
