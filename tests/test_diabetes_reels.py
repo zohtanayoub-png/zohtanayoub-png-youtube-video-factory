@@ -1620,10 +1620,15 @@ def test_every_command_the_cli_offers_has_piles_recorded():
 
     # Every command has a runner, and every runner has piles.
     assert set(module.PILES_FOR) == {
-        "berries", "entity", "presentation", "avocado", "apple", "holdout"
+        "berries", "entity", "presentation", "avocado", "apple",
+        "apple-state", "apple-holdout", "holdout",
     }
     for command, piles in module.PILES_FOR.items():
         assert piles, command
+        # And a command with no runner is an argparse choice that crashes on
+        # the dispatch table, which is a worse failure than a missing choice.
+        dispatch = source.split("runner = {", 1)[1].split("}[args.command]", 1)[0]
+        assert f'"{command}"' in dispatch or f'== "{command}"' in source, command
 
 
 def test_no_context_prompt_describes_the_crockery():

@@ -938,6 +938,33 @@ def _per_class(rows: Sequence[dict[str, Any]], key: str) -> dict[str, Any]:
     return out
 
 
+def _blamed(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    """Which probe threw away each piece of valid footage, counted.
+
+    ``lost_on`` is the union across a whole variant, so a run in which the
+    state probe rejects everything and the context probe rejects one clip
+    reads exactly like a run in which they share the work. This counts, and
+    counts per class, because "the state wording is wrong" and "the context
+    prompts reject a single apple" have different fixes and the first
+    calibration could not tell them apart.
+    """
+
+    lost = [r for r in rows if r["should_accept"] and not r["conjunction"]]
+    counts: dict[str, int] = {}
+    per_class: dict[str, dict[str, int]] = {}
+    for row in lost:
+        for probe in row["failed_on"]:
+            counts[probe] = counts.get(probe, 0) + 1
+            per_class.setdefault(row["presentation"], {})
+            per_class[row["presentation"]][probe] = (
+                per_class[row["presentation"]].get(probe, 0) + 1)
+    return {
+        "valid_clips_lost": len(lost),
+        "by_probe": dict(sorted(counts.items(), key=lambda kv: -kv[1])),
+        "by_class": per_class,
+    }
+
+
 def run_apple_state(args, analyzer, providers, downloader, excluded) -> dict[str, Any]:
     """Which wording of "manzana con piel" keeps the apples that are apples?
 
@@ -1025,6 +1052,8 @@ def run_apple_state(args, analyzer, providers, downloader, excluded) -> dict[str
             # underneath it.
             "lost_after_entity": len(lost),
             "lost_on": sorted({p for r in lost for p in r["failed_on"]}),
+            # Which probe did the rejecting, counted rather than unioned.
+            "blamed": _blamed(rows),
             "per_clip": rows,
         }
         log.info("%s: recall %s, precision %s, oranges %d, dessert %d, peeled %d",
@@ -1079,6 +1108,7 @@ def run_apple_holdout(args, analyzer, providers, downloader, excluded) -> dict[s
         "conjunction": _rates(rows, "conjunction"),
         "entity_per_class": _per_class(rows, "entity_alone"),
         "per_class": _per_class(rows, "conjunction"),
+        "blamed": _blamed(rows),
         "oranges_accepted": sum(1 for r in rows
                                 if r["presentation"] == "orange" and r["conjunction"]),
         "dessert_accepted": sum(1 for r in rows
