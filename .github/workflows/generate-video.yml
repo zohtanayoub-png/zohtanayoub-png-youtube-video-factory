@@ -217,11 +217,13 @@ concurrency:
 jobs:
   render:
     name: Render long-form video
+    # An allow-list, not a deny-list. As a deny-list every new task had to
+    # remember to exclude itself, and reel-entity-check did not: dispatching a
+    # sixty-clip calibration also started a five-hour long-form render, which
+    # then held the concurrency group against the calibration it was measuring
+    # for. The empty string is the scheduled/cron path, which passes no task.
     if: >-
-      inputs.task != 'calibrate-entities'
-      && inputs.task != 'premium-check'
-      && inputs.task != 'instruction-check'
-      && inputs.task != 'reel'
+      inputs.task == 'render' || inputs.task == '' || inputs.task == null
     runs-on: ubuntu-latest
     timeout-minutes: 300
 
