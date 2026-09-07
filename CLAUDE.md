@@ -590,6 +590,46 @@ in the report has to come from a measurement - applies here to the **words**.
   its wording and the bulk-apple weakness (2 of 6) stays recorded and
   unfixed. It is a real cost: a market-crate shot of apples is good footage
   the repair pass has to replace.
+* **The third held-out benchmark, run 34154410206: precision 1.000, and the
+  false negatives are no longer the conjunction's.** Ninety clips, fifteen
+  fresh piles, 48 valid against 42 invalid:
+
+      probe set                precision   recall   false pos   false neg
+      entity only (shipped)      0.600      0.562     42.9%       43.8%
+      the four-probe and         1.000      0.479      0.0%       52.1%
+
+  **Every one of the forty-two invalid clips is rejected.** Apple dessert 6
+  accepted -> 0, peeled apple 4 -> 0, a tropical platter 4 -> 0, a strawberry
+  cheesecake 2 -> 0, an avocado smoothie 2 -> 0, guacamole and an animal 0
+  throughout. Halved and sliced avocado are kept 6 of 6 each and whole
+  avocado 4 of 6, up from 2 of 6 before the entity rewrite.
+
+  The recall number is worse than the 50% that started this cycle, and the
+  breakdown says something different from what it says:
+
+      pile                  entity alone   after the conjunction
+      apples in bulk            1/6              1/6
+      raw apple with skin       3/6              3/6
+      kiwi                      3/6              3/6
+      raspberries               0/6              0/6
+      whole avocado             4/6              4/6
+      halved / sliced avocado   6/6              6/6
+      strawberries              4/6              0/6
+
+  **The conjunction costs four clips of forty-eight; the entity probe loses
+  the other twenty-one on its own.** These piles are deliberately awkward
+  presentations - strawberries scattered on linen, raspberries in a glass
+  jar, apples in market boxes - and what they expose is that the layer
+  underneath does not recognise fruit outside a bowl. The one pile the
+  conjunction does damage is the strawberries, rejected by state, context and
+  dominance together, and the reason is visible in the prompts: ``fresas``
+  asks for "in a bowl as the main subject" and "on a kitchen table", and
+  linen is neither. The context prompts name containers, which is a fact
+  about the wording rather than about the footage.
+
+  That is the next cycle's calibration - context prompts that describe the
+  food rather than the crockery - and it needs its own piles again. Sixty
+  queries are now spent across six runs.
 * **The CTA may not play over a frozen frame, and the gap is between the
   beats rather than after them.** The editor holds the last frame when the
   picture is shorter than the narration: run 34093462658 held it for 1.7

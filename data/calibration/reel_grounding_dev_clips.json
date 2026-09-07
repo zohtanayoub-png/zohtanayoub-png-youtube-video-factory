@@ -80,6 +80,7 @@
     "avocado": "halved avocado on a wooden board"
   },
   "burned_queries": [
+    "a heap of avocados in a crate",
     "apple pie slice dessert on a plate",
     "apple slices on a white plate",
     "apple tart with cream on a plate",
@@ -89,11 +90,17 @@
     "avocado sliced open on a chopping board",
     "avocado slices arranged on a salad",
     "avocado slices fanned on a plate",
+    "avocado split in two on a dark plate",
     "avocado toast breakfast plate",
     "avocados piled at a grocery market",
+    "baked apple strudel dusted with sugar",
+    "blended green smoothie poured from a jug",
     "bowl of guacamole with tortilla chips",
+    "boxes of apples at a farmers market",
+    "cat lying beside a fruit basket",
     "dog begging next to a plate of food",
     "dog with strawberries",
+    "fanned avocado slices beside bread",
     "fresh blackberries in a ceramic bowl",
     "fresh blueberries in a wooden spoon",
     "fresh green peas and broccoli on a table",
@@ -107,21 +114,29 @@
     "halved avocado on a wooden board",
     "hand peeling apple skin into a spiral",
     "homemade apple crumble in a baking dish",
+    "kiwi cut into rounds beside a knife",
     "kiwi fruit sliced on a wooden chopping board",
+    "mashed guacamole being stirred in a bowl",
     "oranges piled on a market stall",
+    "peeled apple pieces in a bowl of water",
     "peeled apple without skin on a plate",
     "peeling an apple with a knife",
     "pouring apple juice into a glass",
+    "raspberries in a small glass jar",
     "raspberries on a branch in a garden",
     "red apples on a branch in an orchard",
+    "red apples resting on a windowsill",
     "ripe avocados stacked in a bowl",
     "ripe raspberries harvest closeup macro",
     "shiny apples in a wooden crate at a market",
     "sliced kiwi fruit on a plate",
     "strawberries in a punnet at a farm stall",
     "strawberries on a rustic wooden board",
+    "strawberries scattered on a linen cloth",
+    "strawberry cheesecake slice on a plate",
     "strawberry ice cream in a cone",
     "toast with sliced avocado on top",
+    "tropical fruit buffet with dragon fruit",
     "tropical fruit platter coconut pineapple",
     "whole avocados in a basket",
     "whole raw red apple with skin on a wooden table"
@@ -147,6 +162,10 @@
     {
       "id": 34153962478,
       "what": "the entity layer: can the probe see whole fruit"
+    },
+    {
+      "id": 34154410206,
+      "what": "the third held-out benchmark; spent"
     }
   ]
 }
