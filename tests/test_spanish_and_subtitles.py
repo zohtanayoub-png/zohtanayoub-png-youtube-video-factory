@@ -66,18 +66,35 @@ class Chunk:
     end: float
 
 
+#: Why these fixtures name a seed, when the template engine is supposed to be
+#: deterministic already: it seeds itself from ``hash(topic.slug)``, and
+#: Python randomises string hashing per process. Two runs of the same topic
+#: therefore draw different ideas on different machines - which is how
+#: ``test_accents_and_enye_survive_generation`` came to pass locally in twelve
+#: consecutive processes and fail once on a runner: the draw it got had no
+#: word carrying an enye in it. That is worth fixing in
+#: ``script_generator`` rather than here, because it means a topic does not
+#: reproduce across runners; until it is, a test that asserts something about
+#: *the* script has to say which script it means.
+SCRIPT_SEED = 20260907
+
+
 @pytest.fixture(scope="module")
 def spanish_script():
     """Spanish is opt-in now, so every Spanish test says so explicitly."""
 
     topic = TopicEngine(language="es").from_user_input(SPANISH_TOPIC)
-    return generate_script(topic, duration_minutes=6.0, language="es")
+    return generate_script(
+        topic, duration_minutes=6.0, language="es", seed=SCRIPT_SEED
+    )
 
 
 @pytest.fixture(scope="module")
 def english_script():
     topic = TopicEngine(language="en").from_user_input(ENGLISH_TOPIC)
-    return generate_script(topic, duration_minutes=6.0, language="en")
+    return generate_script(
+        topic, duration_minutes=6.0, language="en", seed=SCRIPT_SEED
+    )
 
 
 # ---------------------------------------------------------------------------
