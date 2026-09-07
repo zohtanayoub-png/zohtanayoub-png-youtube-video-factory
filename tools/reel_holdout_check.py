@@ -982,6 +982,25 @@ def run_holdout(args, analyzer, providers, downloader, excluded) -> dict[str, An
 
 # ---------------------------------------------------------------------------
 
+#: Keys whose value is a long list of individual clips. Useful in the
+#: artifact, fatal in a log.
+BULKY = ("per_clip", "own_scores", "wrong_scores")
+
+
+def without_rows(value: Any) -> Any:
+    """The report with its per-clip arrays replaced by their length."""
+
+    if isinstance(value, dict):
+        return {
+            k: (f"<{len(v)} rows, in the artifact>"
+                if k in BULKY and isinstance(v, list) else without_rows(v))
+            for k, v in value.items()
+        }
+    if isinstance(value, list):
+        return [without_rows(v) for v in value]
+    return value
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=sorted(PILES_FOR))
@@ -1033,7 +1052,11 @@ def main(argv: list[str] | None = None) -> int:
     target = Path(args.out or f"output/holdout/{args.command}.json")
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(report, indent=2), encoding="utf-8")
-    print(json.dumps(report, indent=2))
+    # The file keeps everything; the log gets the summary. A per-clip dump of
+    # ninety-eight clips across three variants pushed the aggregates past the
+    # end of what GitHub will hand back from a job log, which is a measurement
+    # taken and then lost.
+    print(json.dumps(without_rows(report), indent=2))
     return 0
 
 
