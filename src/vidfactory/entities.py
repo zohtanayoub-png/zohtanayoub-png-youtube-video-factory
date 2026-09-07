@@ -497,6 +497,9 @@ def score_from_similarities(
     entity: VisualEntity,
     per_frame: Sequence[Sequence[float]],
     ramp: Any,
+    margin_low: float = ENTITY_MARGIN_LOW,
+    margin_high: float = ENTITY_MARGIN_HIGH,
+    dominance_fail: float = ENTITY_DOMINANCE_FAIL,
 ) -> EntityGrounding:
     """Is this shot about something *other* than the object it should show?
 
@@ -537,6 +540,12 @@ def score_from_similarities(
     The median over frames, for the reason the pixel flags use one: one frame
     where the camera has panned off the rug should not condemn a clip that
     shows it.
+
+    The thresholds are arguments because this function is no longer only
+    about rooms. :mod:`vidfactory.reels.foods` asks the same question of an
+    apple against an orange, which is a sharper separation than a rug against
+    a room and deserves its own numbers; the defaults are the interiors' and
+    leave the long-form verdict byte-identical.
     """
 
     offset = len(entity.positives)
@@ -555,7 +564,7 @@ def score_from_similarities(
             entity.competitors[competitors.index(best_distractor)],
         ))
         scores.append(
-            ramp(best_distractor - best_positive, ENTITY_MARGIN_LOW, ENTITY_MARGIN_HIGH)
+            ramp(best_distractor - best_positive, margin_low, margin_high)
         )
     if not scores:
         return EntityGrounding(entity=entity.name, labels=entity.labels)
@@ -563,7 +572,7 @@ def score_from_similarities(
     dominance = scores[len(scores) // 2]
     leaders.sort(key=lambda item: item[0], reverse=True)
     top_margin, top_name = leaders[0]
-    passed = dominance < ENTITY_DOMINANCE_FAIL
+    passed = dominance < dominance_fail
     return EntityGrounding(
         entity=entity.name,
         labels=entity.labels,

@@ -641,15 +641,26 @@ def test_the_long_form_pipeline_does_not_import_the_reels_package():
     """The whole point of a second product in one repo: it can be wrong
     without the first one noticing."""
 
+    import ast
     import pathlib
 
+    # Imports, read from the syntax tree rather than grepped for the word.
+    # The string search also fired on prose - entities.py explains that its
+    # scorer is shared with reels.foods, which is documentation of the very
+    # separation this test defends, not a violation of it.
     root = pathlib.Path(__file__).resolve().parents[1] / "src" / "vidfactory"
     for path in root.glob("*.py"):
-        body = path.read_text(encoding="utf-8")
         if path.name == "main.py":
             # The CLI dispatches to both, inside the command function.
             continue
-        assert "reels" not in body.replace("reels/", ""), path.name
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    assert "reels" not in alias.name.split("."), (path.name, alias.name)
+            elif isinstance(node, ast.ImportFrom):
+                module = node.module or ""
+                assert "reels" not in module.split("."), (path.name, module)
 
 
 def test_the_reels_package_reuses_rather_than_reimplements():
@@ -787,3 +798,227 @@ def test_piper_is_still_here():
 
     assert hasattr(tts, "PiperEngine")
     assert "piper" in build_reel_engine.__doc__.lower()
+
+
+# ---------------------------------------------------------------------------
+# Shot-to-item grounding: the apple beat may not show an orange
+# ---------------------------------------------------------------------------
+
+def test_a_beat_naming_one_food_requires_that_food():
+    from vidfactory.reels.foods import required_food
+
+    assert required_food("Las fresas suelen aportar menos carbohidratos").name == "fresas"
+    assert required_food(
+        "La manzana con piel conserva la fibra y suele absorberse mas despacio "
+        "que en zumo.", "manzana"
+    ).name == "manzana"
+
+
+def test_a_beat_naming_several_foods_requires_none():
+    """The answer beat lists five fruits, and the right picture for a list is
+    the mixed bowl that demanding any single one of them would reject."""
+
+    from vidfactory.reels.foods import required_food
+
+    assert required_food(
+        "Fresas, frambuesas, kiwi, manzana con piel y aguacate, en raciones normales."
+    ) is None
+
+
+def test_the_item_key_decides_when_the_sentence_names_two():
+    """"Cambiar la fruta entera por zumo" names both and is about the juice."""
+
+    from vidfactory.reels.foods import required_food
+
+    assert required_food(
+        "Cambiar la fruta entera por zumo le quita la fibra", "zumo_por_fruta"
+    ).name == "zumo"
+
+
+def test_abstract_advice_requires_no_food():
+    from vidfactory.reels.foods import required_food_for
+    from vidfactory.reels.script import Beat
+
+    for text, key in (
+        ("En la etiqueta mira carbohidratos, de los cuales azucares, y fibra", "etiqueta"),
+        ("Pesa una vez tu racion habitual", "pesar_una_vez"),
+    ):
+        assert required_food_for(Beat("item", text, item_key=key)) is None
+
+
+def test_only_item_beats_require_a_food():
+    """The hook, the answer, the takeaway and the CTA are about the reel."""
+
+    from vidfactory.reels.foods import required_food_for
+    from vidfactory.reels.script import Beat
+
+    for kind in ("hook", "answer", "takeaway", "cta", "retention", "lead"):
+        assert required_food_for(Beat(kind, "Las fresas aportan fibra")) is None
+
+
+def test_every_mapped_item_key_names_a_real_food():
+    from vidfactory.reels.foods import BY_NAME, ITEM_FOOD
+    from vidfactory.reels.knowledge import TOPICS
+
+    known = {item.key for topic in TOPICS for item in topic.items}
+    for key, food in ITEM_FOOD.items():
+        assert food in BY_NAME, (key, food)
+        assert key in known, key
+
+
+def test_the_apple_beat_rejects_orange_footage():
+    """The exact failure the last render shipped, as a scoring question.
+
+    Frames that look like an orange and not like an apple must fail the
+    manzana beat. Built from similarities rather than pixels so the test needs
+    no model: what it pins is the verdict, which is what shipped the orange.
+    """
+
+    from vidfactory.reels.foods import BY_NAME, score_food
+    from vidfactory.visual_analysis import _ramp
+
+    apple = BY_NAME["manzana"]
+    positives = len(apple.positives)
+    # An orange owns the frame: every competitor prompt beats every positive.
+    orange_frames = [
+        [0.18] * positives + [0.34] + [0.20] * (len(apple.competitors) - 1)
+        for _ in range(3)
+    ]
+    verdict = score_food(apple, orange_frames, _ramp)
+    assert verdict.checked
+    assert not verdict.passed, verdict.detail
+    assert verdict.top_distractor == "an orange"
+
+    # Real apple footage: the positives lead and nothing displaces them.
+    apple_frames = [
+        [0.31] * positives + [0.19] * len(apple.competitors) for _ in range(3)
+    ]
+    kept = score_food(apple, apple_frames, _ramp)
+    assert kept.checked and kept.passed, kept.detail
+
+
+def test_the_inspector_maps_a_frame_to_the_beat_it_lands_in():
+    """The manzana frame was reported as the fresas line.
+
+    kind -> first beat of that kind is the bug; timestamp against the beat's
+    own span is the fix, and this is the exact timestamp from run 34093462658.
+    """
+
+    import importlib.util
+    import pathlib
+
+    tool = pathlib.Path(__file__).resolve().parents[1] / "tools" / "inspect_reel_frames.py"
+    spec = importlib.util.spec_from_file_location("inspect_reel_frames", tool)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    beats = [
+        {"kind": "hook", "text": "Si te preocupa...", "start": 0.0, "end": 4.5},
+        {"kind": "answer", "text": "Fresas, frambuesas...", "start": 4.5, "end": 8.3},
+        {"kind": "item", "item_key": "fresas", "text": "Las fresas...",
+         "start": 8.3, "end": 14.0},
+        {"kind": "item", "item_key": "manzana", "text": "La manzana con piel...",
+         "start": 26.0, "end": 32.0},
+    ]
+    position, beat = module.beat_at(beats, 27.9)
+    assert position == 3 and beat["item_key"] == "manzana"
+
+    grounding = {"beat-03": {
+        "beat": "beat-03", "item": "manzana", "required_entity": "manzana",
+        "sources": ["pexels:99"], "score": 0.21, "passed": False,
+        "looked_like": "an orange",
+    }}
+    line = module.describe(position, beat, grounding)
+    assert "manzana" in line and "an orange" in line and "FAIL" in line
+    assert "fresas" not in line
+
+
+def test_a_frozen_tail_is_reported_and_gated():
+    from vidfactory.reels.qc import FROZEN_TAIL_LIMIT, build_report
+
+    script = fitted(BY_SLUG[FIRST], 45)
+    report = build_report(
+        script, production=True, sources=[{"key": "x"}],
+        cta_start=script.estimated_seconds - 3,
+        visual={"frozen_tail_duration": 1.7},
+    )
+    assert report.metrics["frozen_tail_duration"] == 1.7
+    assert "the_cta_is_not_a_frozen_frame" in [c.name for c in report.failures]
+    assert FROZEN_TAIL_LIMIT <= 0.2
+
+
+def test_production_fails_on_a_wrong_food_and_test_only_warns():
+    from vidfactory.reels.qc import build_report
+
+    script = fitted(BY_SLUG[FIRST], 45)
+    wrong = {"item_grounding_results": [{
+        "beat": "beat-05", "item": "manzana", "required_entity": "manzana",
+        "checked": True, "passed": False, "score": 0.2, "looked_like": "an orange",
+    }]}
+    kwargs = dict(sources=[{"key": "x"}], cta_start=script.estimated_seconds - 3)
+
+    strict = build_report(script, production=True, visual=dict(wrong), **kwargs)
+    assert strict.metrics["entity_grounding_failure_count"] == 1
+    assert strict.metrics["entity_grounding_pass_percentage"] == 0.0
+    assert "every_item_shows_its_food" in [c.name for c in strict.failures]
+
+    loose = build_report(script, production=False, visual=dict(wrong), **kwargs)
+    assert "every_item_shows_its_food" in [c.name for c in loose.warnings]
+
+
+# ---------------------------------------------------------------------------
+# Spanish orthography
+# ---------------------------------------------------------------------------
+
+def test_the_narration_is_written_in_correct_spanish():
+    """Accents reach the voice and the burned-in captions.
+
+    Kokoro is given the script verbatim, and "racion" and "ración" are not
+    the same word to a Spanish G2P front end. The four the brief names are
+    asserted by hand; the sweep below catches the rest.
+    """
+
+    script = fitted(BY_SLUG[FIRST], 45)
+    spoken = script.narration
+    for word in ("ración", "más", "proteína", "síguenos", "día", "última", "así"):
+        assert word in spoken, word
+
+
+def test_no_reel_text_is_missing_its_accents():
+    """The accentless spellings must not come back."""
+
+    import re
+
+    wrong = (
+        "racion", "azucar", "siguenos", "ultima", "proteina", "despues",
+        "mas rapido", "manana", "tambien", "pequena", "pequeno", "punado",
+        "dia:", "asi que", "segun", "opcion", "digestion", "platano",
+    )
+    for topic in TOPICS:
+        script = fitted(topic, 45)
+        flat = script.narration.lower()
+        for token in wrong:
+            assert not re.search(rf"\b{re.escape(token)}\b", flat), (topic.slug, token)
+
+
+def test_the_provider_queries_stay_english():
+    """Rule 8: a Spanish string must never reach a stock provider."""
+
+    import re
+
+    for topic in TOPICS:
+        for field in (topic.opening_query, topic.opening_search_text):
+            assert not re.search(r"[áéíóúñ]", field), (topic.slug, field)
+        for item in topic.items:
+            assert not re.search(r"[áéíóúñ]", item.query + item.search_text), item.key
+
+
+def test_the_medical_checks_still_see_accented_spanish():
+    """A safety layer that stops matching when a word is spelled correctly is
+    not a safety layer. The vocabularies are accentless; the scripts are not."""
+
+    assert [r.code for r in safety.find_risks("El azúcar cura la diabetes.")] == ["cure"]
+    assert [r.code for r in safety.find_risks("La fruta baja el azúcar en sangre.")] == [
+        "unhedged"
+    ]
+    assert safety.find_risks("La fruta suele bajar el azúcar en sangre.") == []

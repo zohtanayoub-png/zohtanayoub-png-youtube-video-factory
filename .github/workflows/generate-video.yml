@@ -131,7 +131,7 @@ on:
         required: false
         type: choice
         default: "render"
-        options: [render, calibrate-entities, premium-check, instruction-check, reel]
+        options: [render, calibrate-entities, premium-check, instruction-check, reel, reel-entity-check]
       upload_to_youtube:
         description: "Upload to YouTube when it is finished"
         required: false
@@ -781,6 +781,47 @@ jobs:
   #  the default branch, so this task exists to render and inspect the first
   #  reel from a feature branch. Delete it once generate-reel.yml has landed.
   # ---------------------------------------------------------------------------
+  reel-entity-check:
+    name: Can MobileCLIP tell an apple from an orange
+    if: inputs.task == 'reel-entity-check'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ffmpeg
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+          pip install onnxruntime
+      - name: Restore the cached model files
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: vidfactory-reel-cache-v1
+      - name: Measure the food probes
+        env:
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+        run: python tools/reel_entity_check.py --clips 6
+      - name: Report
+        if: always()
+        run: |
+          {
+            echo "## Food grounding calibration"
+            echo '```json'
+            cat output/reel-entity-check.json || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   reel:
     name: Render one vertical reel
     if: inputs.task == 'reel'

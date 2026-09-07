@@ -15,8 +15,11 @@ from .script import ReelScript
 #: Always present, always last before the hashtags. Not a legal formula: the
 #: point is that a person reading this knows where the boundary is.
 DISCLAIMER = (
-    "Contenido informativo. No sustituye la valoracion de tu equipo sanitario, "
-    "que es quien conoce tu caso y tu tratamiento."
+    (
+        "Contenido informativo. No sustituye la valoración de tu "
+        "equipo sanitario, que es quien conoce tu caso y tu "
+        "tratamiento."
+    )
 )
 
 #: Tags every reel on this account carries, before the topic's own.

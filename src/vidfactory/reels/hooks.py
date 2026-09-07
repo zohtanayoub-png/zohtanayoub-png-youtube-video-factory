@@ -308,12 +308,15 @@ def score_hook(text: str, topic: Topic) -> HookCandidate:
 TEMPLATES: tuple[str, ...] = (
     "Si tienes diabetes y te preocupa {worry}, escucha esto.",
     "Si te preocupa {worry}, esto te interesa.",
-    "Te preocupa {worry}? Presta atencion a esto.",
-    "Si {moment} notas que tu glucosa sube mas de lo que esperas, quedate.",
+    "Te preocupa {worry}? Presta atención a esto.",
+    "Si {moment} notas que tu glucosa sube más de lo que esperas, quédate.",
 )
 
 #: Used only when the topic names a moment.
-_MOMENT_TEMPLATE = "Si {moment} notas que tu glucosa sube mas de lo que esperas, quedate."
+_MOMENT_TEMPLATE = (
+                       "Si {moment} notas que tu glucosa sube más de lo que esperas, "
+                       "quédate."
+                   )
 
 
 def _capitalise(text: str) -> str:

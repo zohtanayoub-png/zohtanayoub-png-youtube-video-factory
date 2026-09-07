@@ -1312,6 +1312,44 @@ class VisualAnalyzer:
             merged[flag] = round(values[len(values) // 2], 3)
         return {k: v for k, v in merged.items() if v >= 0.12}
 
+    def ground_entity(
+        self,
+        frames: Sequence[Frame],
+        entity: Any,
+        scorer: Any = None,
+    ) -> EntityGrounding:
+        """Does this clip show the entity the *caller* names?
+
+        The public door onto the same machinery ``_entity_grounding`` uses,
+        for a caller that already knows what it is looking for. The long-form
+        side infers the object from the advice; a reel beat is handed one -
+        "las fresas" is not a deduction - and it also needs its own scorer,
+        because an apple against an orange separates far harder than a rug
+        against a room and should not be judged at the interiors' cut.
+        """
+
+        usable = [f for f in frames if f and f.ok]
+        blank = EntityGrounding(
+            entity=getattr(entity, "name", ""),
+            labels=tuple(getattr(entity, "labels", ()) or ()),
+        )
+        if entity is None or not usable or self.model is None:
+            return blank
+        try:
+            image_vectors = list(self.model.encode_images(usable))
+            prompts, _ = grounding_prompts(entity)
+            text_vectors = self._encode_texts(
+                [PROMPT_TEMPLATE.format(p) for p in prompts]
+            )
+        except Exception as exc:                          # pragma: no cover
+            log.warning("visual model failed grounding %s: %s", blank.entity, exc)
+            return blank
+        per_frame = [
+            [_cosine(image, t) for t in text_vectors] for image in image_vectors
+        ]
+        score = scorer or score_from_similarities
+        return score(entity, per_frame, _ramp)
+
     def _entity_grounding(
         self,
         image_vectors: Sequence[Sequence[float]],

@@ -25,6 +25,14 @@ person.
 ``items_with_a_reason``      every item says why, not just what
 ``second_person_ratio``      how much of the reel speaks to the viewer
 
+And five more once the reel narrated an apple over a picture of an orange:
+
+``entity_grounding_failure_count``   item beats whose footage is the wrong food
+``entity_grounding_pass_percentage`` of the beats that required one
+``item_grounding_results``           per beat: food, source, score, verdict
+``repaired_item_shot_count``         shots the repair pass replaced
+``frozen_tail_duration``             seconds of held still frame at the end
+
 In production the two safety counts must be zero. That is not a threshold to
 be tuned later; it is the reason the safety module exists.
 """
@@ -77,6 +85,13 @@ SECOND_PERSON_FLOOR = 0.45
 
 #: The duration bands the brief allows, as a tolerance around the request.
 DURATION_TOLERANCE = 0.18
+
+#: How much held still frame is tolerable at the end of a reel.
+#:
+#: The CTA is the reason the account exists and it may not play over a frozen
+#: image. Two frames of hold while the audio finishes is a rounding error; two
+#: seconds is a defect, and the last render had 1.7.
+FROZEN_TAIL_LIMIT = 0.2
 
 
 def _fold(text: str) -> str:
@@ -281,6 +296,20 @@ def build_report(
     visual = dict(visual or {})
     captions = dict(captions or {})
 
+    # Per-beat food grounding. A correct strawberry clip earlier in the reel
+    # does not excuse an orange during the apple beat, so these are counted
+    # per beat and never averaged across the reel.
+    grounding_rows = list(visual.pop("item_grounding_results", []) or [])
+    checked_rows = [r for r in grounding_rows if r.get("checked")]
+    failed_rows = [r for r in checked_rows if not r.get("passed")]
+    grounding_pass_pct = (
+        round(100.0 * (len(checked_rows) - len(failed_rows)) / len(checked_rows), 1)
+        if checked_rows else 100.0
+    )
+    frozen_tail = float(visual.pop("frozen_tail_duration", 0.0) or 0.0)
+    repaired_shots = int(visual.pop("repaired_item_shot_count", 0) or 0)
+    repair_rounds = int(visual.pop("repair_rounds_used", 0) or 0)
+
     metrics: dict[str, Any] = {
         "mode": "production" if production else "test",
         "slug": script.topic.slug,
@@ -298,6 +327,13 @@ def build_report(
         "items_with_a_reason": len(script.item_beats) - len(no_reason),
         "items_without_a_reason": len(no_reason),
         "second_person_ratio": person,
+        "entity_grounding_failure_count": len(failed_rows),
+        "entity_grounding_pass_percentage": grounding_pass_pct,
+        "entity_grounding_checked_count": len(checked_rows),
+        "item_grounding_results": grounding_rows,
+        "repaired_item_shot_count": repaired_shots,
+        "repair_rounds_used": repair_rounds,
+        "frozen_tail_duration": round(frozen_tail, 3),
         "cta_present": cta_present,
         "cta_position_ok": cta_position_ok,
         **summarise(risks, unsupported),
@@ -383,6 +419,33 @@ def build_report(
                 if cta_present else "no CTA to place"
             ),
             severity="error",
+        ),
+        ReelCheck(
+            "every_item_shows_its_food",
+            not failed_rows,
+            (
+                "; ".join(
+                    f"{r['item'] or r['beat']} needed {r['required_entity']} and the "
+                    f"footage looked like {r['looked_like'] or 'something else'} "
+                    f"({r['score']:.2f})"
+                    for r in failed_rows[:3]
+                ) if failed_rows else
+                f"all {len(checked_rows)} item beat(s) that name a food show it"
+            ),
+            # An error in production, a loud warning in test: the same split
+            # the long-form grounding gate uses, and for the same reason -
+            # a probe's false positives should not silently refuse a render
+            # nobody has looked at yet.
+            severity="error" if production else "warning",
+        ),
+        ReelCheck(
+            "the_cta_is_not_a_frozen_frame",
+            frozen_tail <= FROZEN_TAIL_LIMIT,
+            (
+                f"{frozen_tail:.2f}s of held still frame at the end "
+                f"(limit {FROZEN_TAIL_LIMIT:.1f}s)"
+            ),
+            severity="error" if production else "warning",
         ),
         ReelCheck(
             "value_starts_immediately",

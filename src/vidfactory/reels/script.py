@@ -38,10 +38,10 @@ DEFAULT_SECONDS = 45
 #: The CTA, with the natural variations the brief lists. Never a purchase,
 #: never a demand, and only ever at the end.
 CTA_VARIANTS: tuple[str, ...] = (
-    "Siguenos para mas consejos claros y sencillos sobre diabetes.",
-    "Si esto te ha aclarado algo, siguenos para mas.",
-    "Siguenos si quieres entender mejor tu alimentacion.",
-    "Te lo explicamos claro cada dia: siguenos.",
+    "Síguenos para más consejos claros y sencillos sobre diabetes.",
+    "Si esto te ha aclarado algo, síguenos para más.",
+    "Síguenos si quieres entender mejor tu alimentación.",
+    "Te lo explicamos claro cada día: síguenos.",
 )
 
 #: Small lines that buy attention across a list without promising anything.
@@ -54,9 +54,9 @@ CTA_VARIANTS: tuple[str, ...] = (
 _RETENTION_WORDS = 6
 
 RETENTION_LINES: tuple[str, ...] = (
-    "Pero atencion con la siguiente.",
-    "Y la ultima suele sorprender bastante.",
-    "Aqui es donde mucha gente se equivoca.",
+    "Pero atención con la siguiente.",
+    "Y la última suele sorprender bastante.",
+    "Aquí es donde mucha gente se equivoca.",
     "La cantidad sigue siendo importante.",
 )
 
@@ -113,6 +113,12 @@ class Beat:
     #: because "does this sentence contain a reason" is not a question a
     #: keyword search answers, and the builder already knows.
     has_reason: bool = False
+    #: When this beat is spoken, filled in once the narration exists. The
+    #: frame inspector needs it: mapping a sampled timestamp back to a beat by
+    #: kind picks the *first* beat of that kind, which is how a frame showing
+    #: the manzana line came to be reported as the fresas line.
+    start: float = 0.0
+    end: float = 0.0
 
     @property
     def word_count(self) -> int:
@@ -127,6 +133,8 @@ class Beat:
             "index": self.index,
             "item_key": self.item_key,
             "has_reason": self.has_reason,
+            "start": round(self.start, 3),
+            "end": round(self.end, 3),
             "sources": list(self.sources),
         }
 
@@ -387,7 +395,10 @@ def _item_text(item: Item) -> str:
 #: so a trimmed script that has lost them all gets one back rather than a
 #: warning: the warning tells an operator the reel is weaker, and the viewer
 #: is the one who needed the sentence.
-CAVEAT_LINE = "Recuerda que la cantidad y la respuesta de cada persona tambien cuentan."
+CAVEAT_LINE = (
+                  "Recuerda que la cantidad y la respuesta de cada persona "
+                  "también cuentan."
+              )
 
 
 def _ensure_caveat(beats: list[Beat]) -> None:

@@ -28,15 +28,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-#: Where in the reel to sample, as a fraction of the finished duration, with
-#: the two ends pinned to real seconds instead.
-SAMPLES: tuple[tuple[str, float], ...] = (
-    ("hook", 0.0),
-    ("answer", 0.16),
-    ("first-item", 0.35),
-    ("mid-item", 0.60),
-    ("takeaway", 0.85),
-    ("cta", 1.0),
+#: Full-resolution bands, sampled once. These are the two things a downscale
+#: lies about: the title's weight and the captions' outline.
+BANDS: tuple[tuple[str, str], ...] = (
+    ("title-band", "crop=1080:300:0:120"),
+    ("caption-band", "crop=1080:320:0:1300"),
 )
 
 
@@ -80,6 +76,40 @@ def grab(video: Path, at: float, target: Path, filters: str) -> None:
     )
 
 
+def beat_at(beats: list, at: float) -> tuple[int, dict]:
+    """The beat being spoken at this second.
+
+    By timestamp against the beat's own span, not by kind. Mapping kind to the
+    first beat of that kind is what reported a frame of the *manzana* line as
+    the *fresas* line, and sent a reviewer looking for the wrong defect.
+    """
+
+    for index, beat in enumerate(beats):
+        first, last = float(beat.get("start", 0.0)), float(beat.get("end", 0.0))
+        if last > first and first <= at < last:
+            return index, beat
+    return -1, {}
+
+
+def describe(position: int, beat: dict, grounding: dict) -> str:
+    """Everything a reviewer needs to judge one frame, on one line."""
+
+    if not beat:
+        return "no beat covers this timestamp"
+    parts = [f"beat-{position:02d} [{beat.get('kind', '?')}] {beat.get('text', '')}"]
+    row = grounding.get(f"beat-{position:02d}")
+    if row:
+        verdict = "PASS" if row.get("passed") else "FAIL"
+        parts.append(
+            f"requires={row.get('required_entity', '')} "
+            f"source={','.join(row.get('sources', []) or []) or '-'} "
+            f"score={float(row.get('score', 0.0)):.2f} {verdict}"
+        )
+        if not row.get("passed") and row.get("looked_like"):
+            parts.append(f"looked like {row['looked_like']}")
+    return " | ".join(parts)
+
+
 def main(argument: str) -> int:
     root = Path(argument)
     run_dir = root if (root / "reel.mp4").exists() else newest(root)
@@ -98,42 +128,54 @@ def main(argument: str) -> int:
         except Exception:                                  # pragma: no cover
             script = {}
     beats = script.get("beats", [])
-    by_kind = {}
-    for beat in beats:
-        by_kind.setdefault(beat.get("kind"), beat.get("text", ""))
-
-    notes = {
-        "hook": by_kind.get("hook", ""),
-        "answer": by_kind.get("answer", ""),
-        "first-item": by_kind.get("item", ""),
-        "mid-item": by_kind.get("item", ""),
-        "takeaway": by_kind.get("takeaway", ""),
-        "cta": by_kind.get("cta", ""),
+    report = {}
+    report_path = run_dir / "reel_quality_report.json"
+    if report_path.exists():
+        try:
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+        except Exception:                                  # pragma: no cover
+            report = {}
+    grounding = {
+        str(row.get("beat", "")): row
+        for row in report.get("item_grounding_results", []) or []
     }
 
-    for name, fraction in SAMPLES:
-        if name == "hook":
-            at = min(2.0, max(0.5, total * 0.05))
-        elif name == "cta":
-            at = max(0.5, total - 2.0)
-        else:
-            at = max(0.5, total * fraction)
+    # One frame per beat, sampled in the middle of the beat and labelled with
+    # the beat that timestamp actually lands in. Every item beat is sampled,
+    # because "does the apple line show an apple" is a question about the
+    # apple line and no other.
+    samples: list[tuple[str, float]] = []
+    for index, beat in enumerate(beats):
+        kind = str(beat.get("kind", ""))
+        if kind in ("lead", "retention"):
+            continue
+        first, last = float(beat.get("start", 0.0)), float(beat.get("end", 0.0))
+        if last <= first:
+            continue
+        name = f"{index:02d}-{kind}"
+        if kind == "item" and beat.get("item_key"):
+            name = f"{index:02d}-item-{beat['item_key']}"
+        samples.append((name, first + (last - first) / 2.0))
+
+    if not samples:                                        # pragma: no cover
+        samples = [("mid", total * 0.5)]
+
+    for name, at in samples:
+        at = max(0.3, min(at, max(0.3, total - 0.2)))
+        position, beat = beat_at(beats, at)
         frame = run_dir / f"inspect-{name}.jpg"
         # Scaled to 540 wide: half the reel's own width, which keeps the log
         # payload reasonable and the layout readable.
         grab(video, at, frame, "scale=540:-2")
-        emit(name, frame, at, notes.get(name, ""))
+        emit(name, frame, at, describe(position, beat, grounding))
 
-    # Full resolution bands: the title across the top and the captions where
-    # they sit. These are the two things a downscale lies about.
     mid = max(0.5, total * 0.45)
-    title_band = run_dir / "inspect-title-band.jpg"
-    grab(video, mid, title_band, "crop=1080:300:0:120")
-    emit("title-band", title_band, mid, script.get("top_title", ""))
-
-    caption_band = run_dir / "inspect-caption-band.jpg"
-    grab(video, mid, caption_band, "crop=1080:320:0:1300")
-    emit("caption-band", caption_band, mid, "captions at full resolution")
+    for name, filters in BANDS:
+        band = run_dir / f"inspect-{name}.jpg"
+        grab(video, mid, band, filters)
+        emit(name, band, mid,
+             script.get("top_title", "") if name == "title-band"
+             else "captions at full resolution")
     return 0
 
 

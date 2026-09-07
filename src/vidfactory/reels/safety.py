@@ -29,6 +29,7 @@ sentence that keeps people watching and makes them worse off.
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass
 from typing import Any, Iterable, Sequence
 
@@ -114,7 +115,18 @@ CAVEATS: tuple[str, ...] = (
 
 
 def _flat(text: str) -> str:
-    return " " + re.sub(r"\s+", " ", str(text or "").lower()).strip() + " "
+    """Lowercase, accent-folded, single-spaced and padded.
+
+    Folded on purpose. The vocabularies below are written without accents and
+    the scripts are written with them, and a medical check that stops seeing
+    "azúcar" the moment somebody spells it correctly is not a check. Only the
+    *matching* is accentless; nothing here rewrites the text that is spoken or
+    burned into the frame.
+    """
+
+    flat = unicodedata.normalize("NFKD", str(text or "").lower())
+    flat = "".join(c for c in flat if not unicodedata.combining(c))
+    return " " + re.sub(r"\s+", " ", flat).strip() + " "
 
 
 @dataclass

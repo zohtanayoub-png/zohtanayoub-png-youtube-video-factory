@@ -49,6 +49,7 @@ from .knowledge import BY_SLUG, Topic, find_topic
 from .metadata import caption as build_caption
 from .metadata import publish_metadata
 from .qc import ReelReport, build_report
+from .foods import repair_queries, required_food_for, score_food
 from .script import (
     ALLOWED_SECONDS,
     DEFAULT_SECONDS,
@@ -213,6 +214,13 @@ class ReelPipeline:
         log.info("Hook: %s", script.hook.hook)
 
         narration = self._narrate(script, work, engine)
+        # Stamp each beat with when it is actually spoken, so everything
+        # downstream - the planner, the report and the frame inspector - maps
+        # a moment in the reel to the sentence being said at that moment.
+        for index, beat in enumerate(script.beats):
+            span = narration.scene_timings.get(f"beat-{index:02d}")
+            if span:
+                beat.start, beat.end = float(span[0]), float(span[1])
         shots, clips = self._plan_visuals(script, narration, work)
 
         # Captions and the fixed title are written *before* the render,
@@ -387,10 +395,19 @@ class ReelPipeline:
             already_selected=list(used),
         )
 
+    #: How many times a beat may go back out to search for its food.
+    REPAIR_ROUNDS = 3
+
     def _plan_visuals(
         self, script: ReelScript, narration: Any, work: Path
     ) -> tuple[list[Shot], dict[str, Any]]:
-        """One or more 2-4 second shots per beat, all from distinct sources."""
+        """One or more 2-4 second shots per beat, all from distinct sources.
+
+        Every shot belongs to exactly one beat and is judged against *that*
+        beat. A correct strawberry clip earlier in the reel does not excuse an
+        orange during the apple beat: the last render shipped precisely that,
+        and no whole-reel average would have seen it.
+        """
 
         providers = [
             p for p in build_providers(dict(self.config.get("sources", {}) or {}))
@@ -417,62 +434,147 @@ class ReelPipeline:
         shots: list[Shot] = []
         analyzer = self._analyzer()
         analysed: list[dict[str, Any]] = []
+        grounding_rows: list[dict[str, Any]] = []
+        repaired_shots = 0
+        rounds_used = 0
 
-        for index, beat in enumerate(script.beats):
-            scene_id = f"beat-{index:02d}"
-            start, end = narration.scene_timings.get(scene_id, (0.0, 0.0))
-            span = max(0.6, end - start)
-            wanted = max(1, int(round(span / MAX_SHOT + 0.35)))
+        # The picture has to cover the whole narration plus the hold at the
+        # end. Falling short is what made the editor freeze the final frame
+        # over the CTA, and a still image is not a shot.
+        timeline_end = float(narration.duration) + TAIL_SECONDS
 
-            candidates: list[Any] = []
+        def search(query: str) -> list[Any]:
+            found: list[Any] = []
             for provider in providers:
                 try:
-                    candidates.extend(
-                        provider.search(beat.query, per_page=20, page=1)
-                    )
+                    found.extend(provider.search(query, per_page=20, page=1))
                 except Exception as exc:
-                    log.warning("search failed for %r: %s", beat.query, exc)
-            fresh = [c for c in candidates if c.key not in used_keys]
-            ranked = ranker.rank(fresh, self._ranking_context(beat.query, used_keys))
-            if not ranked:
-                ranked = fresh[:wanted]
+                    log.warning("search failed for %r: %s", query, exc)
+            return [c for c in found if c.key not in used_keys]
 
-            chosen: list[Any] = []
+        def take(
+            query: str, wanted: int, beat: Any, entity: Any, scene_id: str
+        ) -> tuple[list[tuple[Any, Any]], list[dict[str, Any]]]:
+            """Download and judge candidates until ``wanted`` of them pass.
+
+            Returns (clip, grounding) pairs. The grounding rides alongside
+            rather than on the download result, which is shared machinery and
+            has no business growing a reels-only attribute.
+            """
+
+            ranked = ranker.rank(search(query), self._ranking_context(query, used_keys))
+            kept: list[tuple[Any, Any]] = []
+            rejected: list[dict[str, Any]] = []
             for clip in ranked:
-                if len(chosen) >= wanted:
+                if len(kept) >= wanted:
                     break
                 fetched = downloader.fetch_many([clip], needed=1)
                 if not fetched:
                     continue
                 result = fetched[0]
+                grounding = None
                 if analyzer is not None:
-                    analysis = analyzer.analyze_clip(
-                        result.clip,
-                        query=beat.search_text,
-                        narration=beat.search_text,
-                        video=result.clip.local_path or result.path,
+                    frames = analyzer.sample(
+                        result.clip, video=result.clip.local_path or result.path
+                    )
+                    analysis = analyzer.analyze(
+                        frames, query=beat.search_text, narration=beat.search_text
                     )
                     result.clip.visual = analysis.to_dict()
                     result.clip.visual_semantic_match = analysis.semantic_match
-                    analysed.append(
-                        {
-                            "beat": scene_id,
-                            "kind": beat.kind,
-                            "query": beat.query,
-                            "semantic_match": analysis.semantic_match,
-                            "analyzed": analysis.analyzed,
-                        }
-                    )
-                chosen.append(result)
+                    analysed.append({
+                        "beat": scene_id,
+                        "kind": beat.kind,
+                        "query": query,
+                        "semantic_match": analysis.semantic_match,
+                        "analyzed": analysis.analyzed,
+                    })
+                    if entity is not None:
+                        grounding = analyzer.ground_entity(frames, entity, score_food)
+                        if grounding.failed:
+                            # Not this beat's food. Put the clip back rather
+                            # than shipping it: the whole point is that the
+                            # apple beat may not settle for an orange.
+                            rejected.append({
+                                "source": result.clip.key,
+                                "score": grounding.score,
+                                "looked_like": grounding.top_distractor,
+                            })
+                            used_keys.append(result.clip.key)
+                            continue
+                kept.append((result, grounding))
                 used_keys.append(result.clip.key)
+            return kept, rejected
+
+        for index, beat in enumerate(script.beats):
+            scene_id = f"beat-{index:02d}"
+            start, end = narration.scene_timings.get(scene_id, (0.0, 0.0))
+            if index == len(script.beats) - 1:
+                end = max(end, timeline_end)
+            span = max(0.6, end - start)
+            wanted = max(1, int(round(span / MAX_SHOT + 0.35)))
+            entity = required_food_for(beat)
+
+            chosen, rejected = take(beat.query, wanted, beat, entity, scene_id)
+
+            # Repair: the beat's own query is what returned the wrong food, so
+            # repeating it deeper would return it again. Search the object.
+            used_queries = [beat.query]
+            attempts = 0
+            if entity is not None:
+                for query in repair_queries(entity, used_queries):
+                    if len(chosen) >= wanted or attempts >= self.REPAIR_ROUNDS:
+                        break
+                    attempts += 1
+                    used_queries.append(query)
+                    log.info(
+                        "repair %d for %s: searching %r for %s",
+                        attempts, scene_id, query, entity.name,
+                    )
+                    more, also = take(
+                        query, wanted - len(chosen), beat, entity, scene_id
+                    )
+                    rejected.extend(also)
+                    repaired_shots += len(more)
+                    chosen.extend(more)
+                rounds_used = max(rounds_used, attempts)
+
+            if not chosen and entity is not None:
+                # Nothing showed the food. Take the best available rather than
+                # leaving a hole, and let the report say so - a missing beat is
+                # a worse reel than a flagged one.
+                log.warning(
+                    "no footage showing %s for %s; falling back", entity.name, scene_id
+                )
+                chosen, _ = take(beat.query, wanted, beat, None, scene_id)
 
             if not chosen:
                 log.warning("no footage for beat %s (%r)", scene_id, beat.query)
                 continue
 
+            if entity is not None:
+                best = max(
+                    (g for _clip, g in chosen if g is not None),
+                    key=lambda g: g.score, default=None,
+                )
+                grounding_rows.append({
+                    "beat": scene_id,
+                    "item": beat.item_key,
+                    "narration": beat.text,
+                    "required_entity": entity.name,
+                    "required_labels": list(entity.labels),
+                    "sources": [c.clip.key for c, _g in chosen],
+                    "score": round(best.score, 3) if best else 0.0,
+                    "checked": bool(best and best.checked),
+                    "passed": bool(best and best.passed),
+                    "looked_like": best.top_distractor if best else "",
+                    "rejected_candidates": rejected,
+                    "repair_rounds": attempts,
+                })
+
             per = span / len(chosen)
             offset = start
-            for position, result in enumerate(chosen):
+            for position, (result, _grounding) in enumerate(chosen):
                 length = min(MAX_SHOT, max(MIN_SHOT * 0.6, per))
                 if position == len(chosen) - 1:
                     length = max(0.5, end - offset)
@@ -488,11 +590,26 @@ class ReelPipeline:
                 )
                 offset += length
 
+        covered = sum(s.duration for s in shots)
+        frozen_tail = round(max(0.0, timeline_end - covered), 3)
         log.info(
-            "%d shots from %d distinct sources across %d beats",
+            "%d shots from %d distinct sources across %d beats "
+            "(%.1fs of picture for %.1fs of reel)",
             len(shots), len(set(s.clip_key for s in shots)), len(script.beats),
+            covered, timeline_end,
         )
-        return shots, {"analysed": analysed}
+        if frozen_tail > 0.05:
+            log.warning(
+                "the picture is %.2fs short of the narration; the last frame "
+                "would be held", frozen_tail,
+            )
+        return shots, {
+            "analysed": analysed,
+            "item_grounding_results": grounding_rows,
+            "repaired_item_shot_count": repaired_shots,
+            "repair_rounds_used": rounds_used,
+            "frozen_tail_duration": frozen_tail,
+        }
 
     def _analyzer(self) -> Any | None:
         if self._injected_analyzer is not None:
@@ -527,6 +644,13 @@ class ReelPipeline:
             "average_shot_seconds": (
                 round(sum(s.duration for s in shots) / len(shots), 2) if shots else 0.0
             ),
+            # Carried through rather than recomputed: these are per-beat facts
+            # the planner established while it was choosing, and nothing
+            # downstream can reconstruct them from the finished shot list.
+            "item_grounding_results": list(clips.get("item_grounding_results", []) or []),
+            "repaired_item_shot_count": int(clips.get("repaired_item_shot_count", 0) or 0),
+            "repair_rounds_used": int(clips.get("repair_rounds_used", 0) or 0),
+            "frozen_tail_duration": float(clips.get("frozen_tail_duration", 0.0) or 0.0),
         }
 
     # ------------------------------------------------------------------
