@@ -59,7 +59,7 @@ def caption(script: ReelScript, sources: Sequence[dict[str, Any]] = ()) -> str:
         lines.append("")
 
     conclusion = next(
-        (b.text for b in script.beats if b.kind == "conclusion"), ""
+        (b.text for b in script.beats if b.kind == "takeaway"), ""
     )
     if conclusion:
         lines.extend([conclusion, ""])

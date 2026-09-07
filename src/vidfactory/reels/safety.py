@@ -167,16 +167,67 @@ def makes_effect_claim(sentence: str) -> bool:
     return any(re.search(w, haystack) for w in EFFECT_WORDS)
 
 
+#: Openings that describe what the viewer notices rather than what food does.
+#: A conditional about the viewer opens with one of these...
+VIEWER_CONDITIONAL: tuple[str, ...] = ("si", "cuando")
+
+#: ...and speaks to the viewer inside its own clause with one of these.
+#:
+#: Second person rather than a list of situations. The first version was the
+#: list of situations - "si tienes", "si comes", "si a media" - and every hook
+#: that opened a way nobody had thought of had to be appended to it before it
+#: could be written. "Si a otra persona le sienta bien el mismo desayuno y a
+#: ti te sube la glucosa" is the same kind of sentence as "si tu glucosa
+#: sube": it reports what the viewer sees and asserts nothing. Only the
+#: wording of the condition is new, and a rule that has to be extended for
+#: each new wording is not reading the sentence.
+VIEWER_MARKERS: frozenset[str] = frozenset({
+    "te", "ti", "tu", "tus", "tuyo", "tuya", "contigo",
+    "tienes", "comes", "tomas", "ves", "notas", "sueles", "desayunas",
+    "cenas", "meriendas", "picas", "compras", "sigues", "llevas", "eliges",
+    "quieres", "crees", "haces", "mides", "pesas", "sirves", "has", "estas",
+})
+
+
+def _is_viewer_observation(sentence: str) -> bool:
+    """Does the effect word sit inside a conditional about the viewer?
+
+    "Si comes fruta sola y despues ves un pico grande, hay algo importante que
+    debes saber" asserts nothing about fruit: it describes something the
+    viewer has already seen and offers to explain it. Demanding a hedge there
+    would refuse one of the strongest openings available, and the rule exists
+    to stop *claims*, not to stop second-person writing.
+
+    Deliberately narrow. The conditional has to open the sentence, it has to
+    address the viewer, and the effect word has to be inside it - so "Si comes
+    fruta, tu glucosa sube", which does make a claim, in the main clause, is
+    still caught.
+    """
+
+    words = _flat(sentence).split()
+    if not words or words[0] not in VIEWER_CONDITIONAL:
+        return False
+    head, _, tail = sentence.partition(",")
+    if not set(_flat(head).split()) & VIEWER_MARKERS:
+        return False
+    if not tail:
+        return makes_effect_claim(sentence)
+    return makes_effect_claim(head) and not makes_effect_claim(tail)
+
+
 def find_unhedged(text: str) -> list[MedicalRisk]:
     """Effect claims stated more strongly than the evidence allows.
 
     A question is exempt: "?Hay que dejar la fruta?" asserts nothing, and it
-    is how the myth format has to open.
+    is how the myth format has to open. So is a conditional about what the
+    viewer notices - see :func:`_is_viewer_observation`.
     """
 
     found: list[MedicalRisk] = []
     for sentence in sentences(text):
         if sentence.strip().startswith("¿") or sentence.strip().endswith("?"):
+            continue
+        if _is_viewer_observation(sentence):
             continue
         if makes_effect_claim(sentence) and not is_hedged(sentence):
             found.append(

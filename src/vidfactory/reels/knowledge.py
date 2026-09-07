@@ -78,6 +78,20 @@ class Topic:
     conclusion: str
     items: tuple[Item, ...]
     hashtags: tuple[str, ...] = ()
+    #: The viewer's actual worry, as a clause that follows "te preocupa".
+    #: This is what the hook attacks in the first two seconds, and it is
+    #: written per topic because "te preocupa la glucosa" is nobody's real
+    #: concern - "que la fruta te dispare la glucosa" is.
+    worry: str = ""
+    #: The moment it happens, when the topic has one: "despues del desayuno".
+    moment: str = ""
+    #: The answer, delivered in the third second. Not a description of what
+    #: the reel contains: the reel's own point, said immediately. Falls back
+    #: to ``promise`` for a topic that has not been given one.
+    answer: str = ""
+    #: The one practical thing to do, said just before the CTA. Falls back to
+    #: ``conclusion``.
+    takeaway: str = ""
     #: Candidate openings, written for this topic rather than generated from
     #: a template. Five to eight each: :mod:`vidfactory.reels.hooks` scores
     #: them and picks one, and a real choice needs real alternatives. Generic
@@ -89,6 +103,38 @@ class Topic:
     #: item has been named.
     opening_query: str = "healthy food on a kitchen table"
     opening_search_text: str = "a bowl of fresh fruit on a kitchen counter"
+
+    @property
+    def required_item_count(self) -> int:
+        """The number the title promises, if it names one.
+
+        A reel titled "5 frutas" that lists four has a false first line, and
+        the title is burned into the frame for the whole reel saying so. The
+        same rule the long-form side applies to "10 Small Living Room Tricks".
+        """
+
+        import re
+
+        words = {
+            "dos": 2, "tres": 3, "cuatro": 4, "cinco": 5, "seis": 6,
+            "siete": 7, "ocho": 8, "nueve": 9, "diez": 10,
+        }
+        # Only a number the title *opens* with. Scanning further in reads
+        # "Por que dos personas pueden responder distinto" as a promise of two
+        # items, and that title promises no list at all.
+        head = self.title.lower().split()
+        first = head[0] if head else ""
+        if first.isdigit():
+            return int(first)
+        return words.get(first, 0)
+
+    @property
+    def answer_line(self) -> str:
+        return (self.answer or self.promise).rstrip(" .") + "."
+
+    @property
+    def takeaway_line(self) -> str:
+        return (self.takeaway or self.conclusion).rstrip(" .") + "."
 
     @property
     def all_sources(self) -> list[str]:
@@ -107,10 +153,9 @@ FRESAS = Item(
     key="fresas",
     display="las fresas",
     claim=(
-        "Las fresas suelen aportar menos carbohidratos por racion que muchas "
-        "otras frutas"
+        "Las fresas suelen aportar menos carbohidratos por racion"
     ),
-    why="y su fibra puede hacer que la subida sea mas gradual",
+    why="y su fibra suaviza la subida",
     query="fresh strawberries in a white bowl",
     search_text="a bowl of fresh red strawberries",
     sources=("harvard_carbs", "harvard_fiber", "ada_nutrition"),
@@ -120,10 +165,9 @@ FRAMBUESAS = Item(
     key="frambuesas",
     display="las frambuesas",
     claim=(
-        "Las frambuesas destacan por su fibra: aportan bastante para los "
-        "carbohidratos que llevan"
+        "Las frambuesas aportan mucha fibra y pocos carbohidratos"
     ),
-    why="y la fibra es justo lo que suele moderar la respuesta",
+    why="y la fibra suele moderar la respuesta",
     query="fresh raspberries close up bowl",
     search_text="a bowl of fresh raspberries",
     sources=("harvard_fiber", "ada_nutrition"),
@@ -146,10 +190,9 @@ KIWI = Item(
     key="kiwi",
     display="el kiwi",
     claim=(
-        "El kiwi aporta fibra y suele tener un impacto moderado en una racion "
-        "normal"
+        "El kiwi aporta fibra y suele tener un impacto moderado"
     ),
-    why="ademas de mucha vitamina C para las calorias que tiene",
+    why="en una racion de una pieza",
     query="sliced kiwi fruit on a plate",
     search_text="sliced green kiwi fruit",
     sources=("harvard_fiber", "who_diet"),
@@ -159,10 +202,9 @@ MANZANA = Item(
     key="manzana",
     display="la manzana con piel",
     claim=(
-        "La manzana con piel conserva la fibra, y eso puede hacer que se "
-        "absorba mas despacio que en zumo"
+        "La manzana con piel conserva la fibra"
     ),
-    why="al quitar la piel o exprimirla, esa ventaja se pierde",
+    why="y suele absorberse mas despacio que en zumo",
     query="whole red apple with skin on a wooden table",
     search_text="a whole red apple on a wooden table",
     sources=("harvard_fiber", "ada_nutrition", "fundacion_diabetes"),
@@ -185,10 +227,9 @@ AGUACATE = Item(
     key="aguacate",
     display="el aguacate",
     claim=(
-        "El aguacate apenas aporta carbohidratos, asi que su efecto sobre la "
-        "glucosa suele ser muy pequeno"
+        "El aguacate apenas aporta carbohidratos"
     ),
-    why="por eso funciona tan bien acompanando a otros alimentos",
+    why="asi que su efecto suele ser minimo",
     query="halved avocado on a wooden board",
     search_text="a halved fresh avocado",
     sources=("harvard_carbs", "ada_nutrition"),
@@ -198,10 +239,9 @@ PLATANO_MADURO = Item(
     key="platano",
     display="el platano muy maduro",
     claim=(
-        "El platano muy maduro suele tener mas azucares libres que el poco "
-        "maduro"
+        "El platano maduro suele llevar mas azucares libres"
     ),
-    why="cuanto mas madura la fruta, mas rapido se absorbe normalmente",
+    why="y cuanto mas maduro, mas rapido se absorbe",
     query="ripe yellow bananas on a table",
     search_text="ripe yellow bananas",
     sources=("harvard_carbs", "diabetes_uk_food"),
@@ -211,10 +251,9 @@ UVAS = Item(
     key="uvas",
     display="las uvas",
     claim=(
-        "Las uvas se comen de una en una y es muy facil pasarse de racion sin "
-        "darse cuenta"
+        "Con las uvas es muy facil pasarse de racion"
     ),
-    why="y la cantidad es lo que mas suele pesar en la respuesta",
+    why="porque se comen de una en una",
     query="bunch of green grapes close up",
     search_text="a bunch of fresh grapes",
     sources=("ada_nutrition", "diabetes_uk_food"),
@@ -224,10 +263,9 @@ DATILES = Item(
     key="datiles",
     display="los datiles",
     claim=(
-        "Los datiles concentran mucho azucar en muy poco volumen, asi que una "
-        "racion pequena ya cuenta bastante"
+        "Los datiles concentran mucho azucar en poco volumen"
     ),
-    why="al secarse se va el agua y queda el azucar concentrado",
+    why="asi que una racion pequena ya cuenta",
     query="dried dates in a bowl",
     search_text="a bowl of dried dates",
     sources=("harvard_carbs", "who_diet"),
@@ -237,10 +275,9 @@ FRUTA_DESHIDRATADA = Item(
     key="deshidratada",
     display="la fruta deshidratada",
     claim=(
-        "La fruta deshidratada concentra los azucares porque pierde el agua, "
-        "y suele comerse en mas cantidad"
+        "La fruta deshidratada pierde el agua y concentra el azucar"
     ),
-    why="un punado equivale a bastante mas fruta de la que parece",
+    why="y suele comerse en mas cantidad",
     query="dried apricots and raisins in a bowl",
     search_text="a bowl of dried fruit",
     sources=("harvard_carbs", "who_diet", "fundacion_diabetes"),
@@ -250,10 +287,9 @@ ZUMO = Item(
     key="zumo",
     display="el zumo de naranja",
     claim=(
-        "Al exprimir la naranja se pierde casi toda la fibra y el azucar pasa "
-        "a estar libre en el vaso"
+        "Al exprimir la naranja se pierde casi toda la fibra"
     ),
-    why="por eso suele absorberse mas rapido que la fruta entera",
+    why="y el azucar suele absorberse mas rapido",
     query="glass of fresh orange juice on a table",
     search_text="a glass of orange juice",
     sources=("who_diet", "harvard_fiber", "ada_nutrition"),
@@ -263,10 +299,9 @@ NARANJA_ENTERA = Item(
     key="naranja",
     display="la naranja entera",
     claim=(
-        "La naranja entera mantiene la fibra y ademas llena mas, asi que suele "
-        "costar mas pasarse"
+        "La naranja entera mantiene la fibra y llena mas"
     ),
-    why="hacen falta dos o tres naranjas para un vaso de zumo",
+    why="y hacen falta dos o tres para un vaso",
     query="whole oranges and orange segments on a table",
     search_text="whole oranges on a table",
     sources=("who_diet", "harvard_fiber"),
@@ -284,6 +319,8 @@ def _fruit_list_items() -> tuple[Item, ...]:
 TOPICS: tuple[Topic, ...] = (
     Topic(
         slug="frutas-impacto-moderado",
+        worry="que la fruta te dispare la glucosa",
+        moment="despues de comer fruta",
         title="5 frutas que suelen tener un impacto mas moderado en la glucosa",
         format="list",
         top_title="FRUTAS Y GLUCOSA 🍓",
@@ -296,22 +333,31 @@ TOPICS: tuple[Topic, ...] = (
             "La fruta no tiene por que desaparecer de tu dieta: el tipo, la "
             "cantidad y con que la acompanas importan mucho"
         ),
+        answer=(
+                   "Fresas, frambuesas, kiwi, manzana con piel y aguacate, en "
+                   "raciones normales"
+               ),
+        takeaway=(
+                     "Si te llevas una sola cosa: mide la racion y acompana la "
+                     "fruta con algo de proteina"
+                 ),
         items=_fruit_list_items(),
         hashtags=("#diabetes", "#glucosa", "#alimentacionsaludable", "#fruta",
                   "#diabetestipo2", "#saludable"),
         hooks=(
-            "Si tienes diabetes, no todas las frutas afectan igual a tu glucosa.",
-            "Antes de dejar la fruta por miedo al azucar, mira esto.",
-            "El problema no suele ser la fruta: muchas veces es la cantidad.",
-            "Estas cinco frutas suelen tener un impacto mas moderado en la glucosa.",
+            "Si tienes diabetes y te preocupa que la fruta te dispare la glucosa, escucha esto.",
+            "Te preocupa que la fruta te suba la glucosa y ya no sabes cual elegir? Empieza por estas cinco.",
+            "Si has dejado la fruta por miedo al azucar, esto te interesa mas de lo que crees.",
             "Si te cuesta elegir fruta sin complicarte, apunta estas cinco.",
-            "La fruta no tiene por que desaparecer de tu dieta, y estas cinco lo demuestran.",
+            "Antes de dejar la fruta por miedo al azucar, mira esto.",
         ),
         opening_query="fresh fruit assortment on a kitchen table",
         opening_search_text="an assortment of fresh fruit on a table",
     ),
     Topic(
         slug="frutas-suben-mas-rapido",
+        worry="elegir una fruta que te suba mucho la glucosa",
+        moment="despues de la merienda",
         title="5 frutas que pueden subir la glucosa mas rapidamente",
         format="list",
         top_title="CUIDADO CON ESTAS FRUTAS ⚠️",
@@ -324,21 +370,30 @@ TOPICS: tuple[Topic, ...] = (
             "Ninguna de estas frutas esta descartada: cambia mucho la racion, "
             "la madurez y con que la comes"
         ),
+        answer=(
+                   "Platano muy maduro, uvas, datiles, fruta seca y zumo: vigila "
+                   "la racion"
+               ),
+        takeaway=(
+                     "No las quites: pesa una racion una vez y usala de referencia"
+                 ),
         items=(PLATANO_MADURO, UVAS, DATILES, FRUTA_DESHIDRATADA, ZUMO),
         hashtags=("#diabetes", "#glucosa", "#fruta", "#nutricion",
                   "#diabetestipo2"),
         hooks=(
+            "Si eliges fruta a ojo y luego tu glucosa sube mas de lo que esperas, mira estas cinco.",
             "Estas frutas parecen saludables, pero algunas pueden subir tu glucosa mas rapido.",
-            "No hace falta eliminarlas: con estas cinco, lo que cambia todo es la racion.",
+            "Te preocupa pasarte con la fruta sin darte cuenta? Estas cinco piden mas cuidado.",
             "Si sueles picar fruta sin mirar la cantidad, presta atencion a estas cinco.",
-            "Cinco frutas que conviene medir un poco mas que el resto.",
-            "La madurez y la racion cambian mucho como te sienta la fruta.",
+            "Si comes fruta a diario y no sabes cual vigilar mas, empieza por estas cinco.",
         ),
         opening_query="ripe fruit bowl on a kitchen counter",
         opening_search_text="a bowl of ripe fruit on a counter",
     ),
     Topic(
         slug="errores-comer-fruta",
+        worry="que la fruta te suba mas de lo que esperas",
+        moment="despues de comer fruta",
         title="5 errores al comer fruta si tienes diabetes",
         format="error_solution",
         top_title="ERRORES CON LA FRUTA",
@@ -351,17 +406,24 @@ TOPICS: tuple[Topic, ...] = (
             "Casi siempre el problema no es la fruta, sino la cantidad, la "
             "forma y el momento en que la tomamos"
         ),
+        answer=(
+                   (
+                       "Comerla sola, cambiarla por zumo, no medir, pelarla y "
+                       "pasarte con la seca"
+                   )
+               ),
+        takeaway=(
+                     "Empieza por uno: sirvete la fruta en un plato, no del bol"
+                 ),
         items=(
             Item(
                 key="fruta_sola",
                 display="comerla sola con mucha hambre",
                 claim=(
-                    "Comer fruta sola y con mucha hambre puede hacer que la "
-                    "subida sea mas marcada"
+                    "Comer fruta sola con mucha hambre suele subir mas"
                 ),
                 why=(
-                    "prueba a acompanarla con algo de proteina o grasa, como "
-                    "un yogur natural o unas nueces"
+                    "acompanala con yogur o nueces"
                 ),
                 query="yogurt with nuts and berries in a bowl",
                 search_text="a bowl of yogurt with nuts and berries",
@@ -371,10 +433,9 @@ TOPICS: tuple[Topic, ...] = (
                 key="zumo_por_fruta",
                 display="cambiar la fruta por zumo",
                 claim=(
-                    "Sustituir la fruta entera por zumo suele quitarle la "
-                    "fibra y dejar el azucar libre"
+                    "Cambiar la fruta entera por zumo le quita la fibra"
                 ),
-                why="la fruta entera es casi siempre la mejor version",
+                why="y la entera casi siempre gana",
                 query="glass of orange juice next to whole oranges",
                 search_text="a glass of juice beside whole oranges",
                 sources=("who_diet", "harvard_fiber"),
@@ -383,10 +444,9 @@ TOPICS: tuple[Topic, ...] = (
                 key="sin_medir",
                 display="no mirar nunca la racion",
                 claim=(
-                    "Comer directamente del bol sin medir hace que la racion "
-                    "se dispare sin darte cuenta"
+                    "Comer del bol infla la racion sin darte cuenta"
                 ),
-                why="servir en un plato pequeno ya cambia bastante la cantidad",
+                why="sirvete en un plato pequeno",
                 query="small plate of cut fruit portion",
                 search_text="a small plate with a portion of cut fruit",
                 sources=("ada_nutrition", "fundacion_diabetes"),
@@ -395,10 +455,9 @@ TOPICS: tuple[Topic, ...] = (
                 key="quitar_piel",
                 display="quitarle siempre la piel",
                 claim=(
-                    "Quitar la piel a frutas como la manzana o la pera elimina "
-                    "buena parte de su fibra"
+                    "Pelar la manzana o la pera le quita fibra"
                 ),
-                why="y la fibra es justo lo que suele suavizar la respuesta",
+                why="y la fibra suele suavizar la respuesta",
                 query="apple with skin sliced on a board",
                 search_text="a sliced apple with its skin on a board",
                 sources=("harvard_fiber",),
@@ -407,10 +466,9 @@ TOPICS: tuple[Topic, ...] = (
                 key="deshidratada_punado",
                 display="los punados de fruta seca",
                 claim=(
-                    "Un punado de fruta deshidratada puede equivaler a mucha "
-                    "mas fruta fresca de la que crees"
+                    "Un punado de fruta seca equivale a mucha mas fresca"
                 ),
-                why="al perder el agua, el azucar queda concentrado",
+                why="porque al perder agua el azucar se concentra",
                 query="handful of raisins and dried fruit",
                 search_text="a handful of dried fruit",
                 sources=("harvard_carbs", "who_diet"),
@@ -418,15 +476,17 @@ TOPICS: tuple[Topic, ...] = (
         ),
         hashtags=("#diabetes", "#glucosa", "#errores", "#fruta", "#nutricion"),
         hooks=(
-            "El problema no siempre es la fruta. Muchas veces es como te la comes.",
-            "Si tu glucosa sube mas de lo que esperas despues de la fruta, mira estos cinco fallos.",
-            "Cinco errores con la fruta que se cometen casi sin darse cuenta.",
-            "Comes fruta a diario y quiza estas repitiendo alguno de estos cinco fallos.",
-            "Aqui es donde mucha gente se equivoca al comer fruta.",
+            "Si tu glucosa sube mas de lo que esperas despues de la fruta, mira esto.",
+            "Comes fruta y despues ves un pico que no te cuadra? Suele estar en uno de estos cinco fallos.",
+            "Si te preocupa que la fruta te suba mas de lo normal, el problema puede estar en como te la comes.",
+            "Si comes fruta a diario, es facil que estes repitiendo alguno de estos cinco fallos.",
+            "Si la fruta te sube mas de lo que esperas, mira estos cinco fallos.",
         ),
     ),
     Topic(
         slug="desayunos-picos",
+        worry="que el desayuno te dispare la glucosa",
+        moment="despues del desayuno",
         title="5 desayunos que pueden provocar picos de glucosa",
         format="list",
         top_title="DESAYUNOS Y GLUCOSA",
@@ -439,15 +499,24 @@ TOPICS: tuple[Topic, ...] = (
             "Un desayuno con proteina, grasa buena y fibra suele sostener mucho "
             "mejor la manana"
         ),
+        answer=(
+                   "Cereales azucarados, bolleria, zumo, pan blanco con "
+                   "mermelada y yogures de sabores"
+               ),
+        takeaway=(
+                     (
+                         "Cambia una sola cosa manana: anade proteina a lo que ya "
+                         "desayunas, y vigila la cantidad"
+                     )
+                 ),
         items=(
             Item(
                 key="cereales_azucarados",
                 display="los cereales azucarados",
                 claim=(
-                    "Muchos cereales de desayuno llevan azucar anadido y poca "
-                    "fibra, y suelen absorberse rapido"
+                    "Muchos cereales llevan azucar anadido y poca fibra"
                 ),
-                why="mira la etiqueta: azucares por cien gramos y fibra",
+                why="mira azucares y fibra por cien gramos",
                 query="bowl of breakfast cereal with milk",
                 search_text="a bowl of breakfast cereal with milk",
                 sources=("who_diet", "harvard_carbs"),
@@ -456,10 +525,9 @@ TOPICS: tuple[Topic, ...] = (
                 key="bolleria",
                 display="la bolleria",
                 claim=(
-                    "La bolleria combina harina refinada, azucar y grasa, y "
-                    "suele dar una subida bastante rapida"
+                    "La bolleria junta harina refinada, azucar y grasa"
                 ),
-                why="ademas sacia poco, asi que se vuelve a tener hambre pronto",
+                why="y suele saciar poco, vuelves a tener hambre pronto",
                 query="croissants and pastries on a plate",
                 search_text="pastries and croissants on a plate",
                 sources=("who_diet", "harvard_carbs"),
@@ -468,10 +536,9 @@ TOPICS: tuple[Topic, ...] = (
                 key="zumo_desayuno",
                 display="el zumo de la manana",
                 claim=(
-                    "El zumo aporta el azucar de varias piezas de fruta sin su "
-                    "fibra, y suele absorberse rapido"
+                    "El zumo lleva el azucar de varias piezas sin su fibra"
                 ),
-                why="la fruta entera hace mejor ese trabajo",
+                why="y suele absorberse mas rapido",
                 query="glass of orange juice at breakfast table",
                 search_text="a glass of orange juice on a breakfast table",
                 sources=("who_diet", "harvard_fiber"),
@@ -480,12 +547,10 @@ TOPICS: tuple[Topic, ...] = (
                 key="pan_blanco_mermelada",
                 display="la tostada de pan blanco con mermelada",
                 claim=(
-                    "Pan blanco con mermelada son casi solo carbohidratos de "
-                    "absorcion rapida"
+                    "Pan blanco con mermelada es casi solo carbohidrato rapido"
                 ),
                 why=(
-                    "con pan integral y algo de proteina encima, la cosa suele "
-                    "cambiar"
+                    "mejor integral y algo de proteina encima"
                 ),
                 query="white bread toast with jam on a plate",
                 search_text="toast with jam on a plate",
@@ -495,10 +560,9 @@ TOPICS: tuple[Topic, ...] = (
                 key="yogur_sabores",
                 display="los yogures de sabores",
                 claim=(
-                    "Los yogures de sabores suelen llevar azucar anadido, a "
-                    "veces bastante"
+                    "Los yogures de sabores suelen llevar azucar anadido"
                 ),
-                why="el yogur natural con fruta fresca hace lo mismo sin ese extra",
+                why="el natural con fruta hace lo mismo",
                 query="flavoured yogurt cups on a table",
                 search_text="cups of flavoured yogurt",
                 sources=("who_diet", "ada_nutrition"),
@@ -506,17 +570,19 @@ TOPICS: tuple[Topic, ...] = (
         ),
         hashtags=("#diabetes", "#desayuno", "#glucosa", "#nutricion"),
         hooks=(
-            "Si tu glucosa sube mucho despues del desayuno, puede que estes tomando uno de estos cinco.",
+            "Si tu glucosa sube mucho despues del desayuno, mira estos cinco.",
+            "Te preocupa que el desayuno te dispare la glucosa? Estos cinco son los mas habituales.",
+            "Si desayunas siempre lo mismo y tu glucosa sube mas de lo que esperas, comprueba esta lista.",
             "Este desayuno parece saludable, pero puede no ser la mejor opcion para tu glucosa.",
-            "Cinco desayunos muy habituales que suelen dar una subida bastante marcada.",
-            "Si desayunas siempre lo mismo, comprueba que no sea ninguno de estos cinco.",
-            "Parecen desayunos ligeros y suelen comportarse justo al reves.",
+            "Si a media manana vuelves a tener hambre, mira que estas desayunando.",
         ),
         opening_query="breakfast table with coffee and toast",
         opening_search_text="a breakfast table with coffee and toast",
     ),
     Topic(
         slug="desayunos-equilibrados",
+        worry="no saber que desayunar sin que te suba la glucosa",
+        moment="a media manana",
         title="5 desayunos mas equilibrados para personas con diabetes",
         format="list",
         top_title="DESAYUNOS MAS EQUILIBRADOS",
@@ -529,15 +595,22 @@ TOPICS: tuple[Topic, ...] = (
             "La formula que suele funcionar es sencilla: proteina, grasa buena "
             "y fibra en el mismo plato"
         ),
+        answer=(
+                   "Junta proteina, grasa buena y fibra: estos cinco lo hacen en "
+                   "dos minutos"
+               ),
+        takeaway="Elige uno y dejalo preparado esta noche; la cantidad tambien cuenta",
         items=(
             Item(
                 key="yogur_nueces",
                 display="yogur natural con nueces y fresas",
                 claim=(
-                    "El yogur natural con nueces y fresas junta proteina, grasa "
-                    "y fibra en un solo bol"
+                    (
+                        "Yogur natural con nueces y fresas junta proteina, grasa y "
+                        "fibra"
+                    )
                 ),
-                why="esa combinacion suele suavizar la respuesta glucemica",
+                why="y suele sostener mejor la manana",
                 query="greek yogurt with walnuts and strawberries bowl",
                 search_text="a bowl of yogurt with nuts and strawberries",
                 sources=("ada_nutrition", "harvard_fiber"),
@@ -546,10 +619,14 @@ TOPICS: tuple[Topic, ...] = (
                 key="tostada_aguacate",
                 display="tostada integral con aguacate y huevo",
                 claim=(
-                    "El pan integral con aguacate y huevo aporta fibra, grasa y "
-                    "proteina a la vez"
+                    (
+                        (
+                            "Pan integral con aguacate y huevo suma fibra, grasa y "
+                            "proteina"
+                        )
+                    )
                 ),
-                why="y suele saciar bastante mas que la tostada sola",
+                why="y sacia mas que la tostada sola",
                 query="avocado toast with egg on a plate",
                 search_text="avocado toast topped with an egg",
                 sources=("ada_nutrition", "harvard_fiber"),
@@ -558,10 +635,9 @@ TOPICS: tuple[Topic, ...] = (
                 key="avena",
                 display="avena con canela y frutos rojos",
                 claim=(
-                    "La avena en copos aporta fibra soluble y suele absorberse "
-                    "mas despacio que los cereales refinados"
+                    "La avena en copos aporta fibra soluble"
                 ),
-                why="mejor en copos que instantanea y sin azucar anadido",
+                why="y suele absorberse mas despacio que los refinados",
                 query="oatmeal bowl with berries and cinnamon",
                 search_text="a bowl of oatmeal with berries",
                 sources=("harvard_fiber", "harvard_carbs"),
@@ -570,10 +646,9 @@ TOPICS: tuple[Topic, ...] = (
                 key="huevos_verduras",
                 display="huevos revueltos con verduras",
                 claim=(
-                    "Unos huevos con verduras aportan muy pocos carbohidratos y "
-                    "bastante saciedad"
+                    "Unos huevos con verduras aportan muy pocos carbohidratos"
                 ),
-                why="suele ser de los desayunos con menos impacto sobre la glucosa",
+                why="y suelen quitarte el hambre un buen rato",
                 query="scrambled eggs with vegetables on a plate",
                 search_text="scrambled eggs with vegetables",
                 sources=("ada_nutrition", "harvard_carbs"),
@@ -582,10 +657,9 @@ TOPICS: tuple[Topic, ...] = (
                 key="requeson_kiwi",
                 display="requeson con kiwi",
                 claim=(
-                    "El requeson aporta proteina y, con un kiwi, sumas fibra sin "
-                    "mucha carga de carbohidratos"
+                    "El requeson con kiwi suma proteina y fibra"
                 ),
-                why="una opcion rapida cuando hay poco tiempo",
+                why="y lo tienes listo en dos minutos",
                 query="cottage cheese with kiwi in a bowl",
                 search_text="a bowl of cottage cheese with fruit",
                 sources=("ada_nutrition",),
@@ -593,17 +667,19 @@ TOPICS: tuple[Topic, ...] = (
         ),
         hashtags=("#diabetes", "#desayuno", "#glucosa", "#recetassaludables"),
         hooks=(
+            "Si no sabes que desayunar sin que te suba la glucosa, apunta estos cinco.",
+            "Te preocupa el desayuno y siempre acabas tomando lo mismo? Prueba con uno de estos cinco.",
             "Si a media manana ya tienes hambre otra vez, prueba con uno de estos cinco desayunos.",
-            "Cinco desayunos sencillos que suelen sostener mucho mejor la manana.",
-            "Cambiar el desayuno es de los ajustes que mas se notan durante el dia.",
-            "Estos cinco desayunos se preparan en minutos y suelen sentar mejor.",
-            "No hace falta complicarse: proteina, grasa buena y fibra en el mismo plato.",
+            "Si tienes diabetes y quieres desayunar sin complicarte, estos cinco se preparan en minutos.",
+            "Si el desayuno se te queda corto y acabas picando, mira estas cinco opciones.",
         ),
         opening_query="healthy breakfast bowl on a table",
         opening_search_text="a healthy breakfast on a table",
     ),
     Topic(
         slug="snacks-carbohidratos",
+        worry="picar entre horas y que se te descontrole la glucosa",
+        moment="a media tarde",
         title="5 snacks sencillos para controlar mejor los carbohidratos",
         format="list",
         top_title="SNACKS SIN PICOS",
@@ -616,15 +692,19 @@ TOPICS: tuple[Topic, ...] = (
             "Un snack con proteina o grasa suele sostener mucho mejor que uno "
             "solo de carbohidratos"
         ),
+        answer=(
+                   "Nueces, yogur natural, hummus con zanahoria, huevo duro y "
+                   "manzana con crema de cacahuete"
+               ),
+        takeaway="Ten dos de estos a mano y el picoteo deja de decidirse solo; cuida la cantidad",
         items=(
             Item(
                 key="nueces",
                 display="un punado de nueces",
                 claim=(
-                    "Las nueces aportan grasa y fibra con muy pocos "
-                    "carbohidratos disponibles"
+                    "Las nueces aportan grasa y fibra con pocos carbohidratos"
                 ),
-                why="un punado pequeno basta, porque son muy densas",
+                why="y con un punado pequeno te sobra",
                 query="handful of walnuts in a bowl",
                 search_text="a small bowl of walnuts",
                 sources=("ada_nutrition", "harvard_fiber"),
@@ -633,10 +713,9 @@ TOPICS: tuple[Topic, ...] = (
                 key="yogur_natural",
                 display="yogur natural sin azucar",
                 claim=(
-                    "El yogur natural sin azucar anadido aporta proteina y "
-                    "suele saciar bien"
+                    "El yogur natural sin azucar anadido aporta proteina"
                 ),
-                why="si te sabe soso, mejor anadir fruta que azucar",
+                why="y suele saciar bastante bien",
                 query="plain natural yogurt in a bowl",
                 search_text="a bowl of plain white yogurt",
                 sources=("ada_nutrition", "who_diet"),
@@ -645,10 +724,9 @@ TOPICS: tuple[Topic, ...] = (
                 key="hummus_zanahoria",
                 display="hummus con zanahoria",
                 claim=(
-                    "El hummus con verdura cruda suma fibra y proteina vegetal "
-                    "en una racion pequena"
+                    "El hummus con zanahoria suma fibra y proteina vegetal"
                 ),
-                why="y se prepara en un minuto",
+                why="y lo preparas en un minuto",
                 query="hummus with carrot sticks on a plate",
                 search_text="hummus with carrot sticks",
                 sources=("harvard_fiber", "ada_nutrition"),
@@ -657,10 +735,9 @@ TOPICS: tuple[Topic, ...] = (
                 key="huevo_duro",
                 display="un huevo duro",
                 claim=(
-                    "Un huevo duro apenas aporta carbohidratos y suele quitar "
-                    "el hambre bastante bien"
+                    "Un huevo duro apenas aporta carbohidratos"
                 ),
-                why="facil de llevar y de tener preparado",
+                why="y suele quitarte el hambre bastante bien",
                 query="boiled eggs cut in half on a plate",
                 search_text="boiled eggs on a plate",
                 sources=("ada_nutrition",),
@@ -669,10 +746,11 @@ TOPICS: tuple[Topic, ...] = (
                 key="manzana_crema",
                 display="manzana con crema de cacahuete",
                 claim=(
-                    "Anadir una cucharada de crema de cacahuete a la manzana "
-                    "suma grasa y proteina a la fruta"
+                    (
+                        "La manzana con crema de cacahuete suma grasa y proteina"
+                    )
                 ),
-                why="que sea crema de cacahuete sin azucar anadido",
+                why="que sea sin azucar anadido",
                 query="apple slices with peanut butter on a plate",
                 search_text="apple slices with peanut butter",
                 sources=("ada_nutrition", "harvard_carbs"),
@@ -681,16 +759,18 @@ TOPICS: tuple[Topic, ...] = (
         hashtags=("#diabetes", "#snacks", "#glucosa", "#meriendasaludable"),
         hooks=(
             "Si entre horas siempre acabas picando lo primero que pillas, apunta estos cinco.",
-            "Cinco snacks que se preparan en un minuto y suelen sostener de verdad.",
-            "El picoteo no es el problema: lo que picas si marca la diferencia.",
-            "Estos cinco snacks aportan proteina o grasa, y eso se nota en la saciedad.",
-            "Tener dos de estos preparados evita muchas decisiones malas a media tarde.",
+            "Te preocupa picar entre horas y que se te descontrole la glucosa? Ten preparados estos cinco.",
+            "Si a media tarde te entra hambre y acabas tirando de galletas, mira estas cinco opciones.",
+            "Si picas entre horas y luego ves numeros que no te cuadran, cambia lo que picas.",
+            "Si tienes diabetes y el picoteo es tu punto debil, estos cinco te lo ponen facil.",
         ),
         opening_query="healthy snack plate on a table",
         opening_search_text="a plate of healthy snacks",
     ),
     Topic(
         slug="combinar-fruta",
+        worry="ver un pico grande despues de comer fruta sola",
+        moment="despues de la fruta",
         title="Como combinar la fruta para moderar la respuesta glucemica",
         format="combination",
         top_title="COMBINA ASI TU FRUTA 🍏",
@@ -703,15 +783,22 @@ TOPICS: tuple[Topic, ...] = (
             "La fruta sola no es un error, pero acompanarla suele hacer que la "
             "curva sea mas suave"
         ),
+        answer=(
+                   "Acompanala con proteina o con grasa, tomala entera y mejor "
+                   "de postre"
+               ),
+        takeaway=(
+                     "La proxima vez que tomes fruta, anade un yogur natural o un "
+                     "punado de nueces"
+                 ),
         items=(
             Item(
                 key="fruta_proteina",
                 display="fruta con proteina",
                 claim=(
-                    "Anadir proteina, como yogur natural o requeson, suele "
-                    "hacer la digestion mas lenta"
+                    "Anade proteina, como yogur natural o requeson"
                 ),
-                why="y una digestion mas lenta suele significar una subida mas suave",
+                why="porque suele hacer la digestion mas lenta",
                 query="yogurt bowl with fresh fruit",
                 search_text="a bowl of yogurt with fresh fruit",
                 sources=("ada_nutrition", "harvard_carbs"),
@@ -720,10 +807,9 @@ TOPICS: tuple[Topic, ...] = (
                 key="fruta_grasa",
                 display="fruta con grasa buena",
                 claim=(
-                    "Un punado de frutos secos junto a la fruta anade grasa y "
-                    "suele moderar la respuesta"
+                    "Un punado de frutos secos junto a la fruta anade grasa"
                 ),
-                why="con un punado pequeno es suficiente",
+                why="y suele moderar la respuesta",
                 query="almonds and fruit on a wooden board",
                 search_text="almonds beside fresh fruit",
                 sources=("ada_nutrition", "harvard_fiber"),
@@ -732,10 +818,9 @@ TOPICS: tuple[Topic, ...] = (
                 key="fruta_entera",
                 display="la fruta entera antes que en zumo",
                 claim=(
-                    "Mantener la fruta entera conserva la fibra, que es parte "
-                    "de lo que suaviza la absorcion"
+                    "Toma la fruta entera y conserva su fibra"
                 ),
-                why="masticar tambien ayuda a saciarse antes",
+                why="que es parte de lo que suaviza la absorcion",
                 query="whole apples and pears on a table",
                 search_text="whole fruit on a table",
                 sources=("harvard_fiber", "who_diet"),
@@ -744,10 +829,9 @@ TOPICS: tuple[Topic, ...] = (
                 key="fruta_postre",
                 display="la fruta despues de comer",
                 claim=(
-                    "Tomarla despues de una comida completa suele dar una "
-                    "subida menor que tomarla sola en ayunas"
+                    "Tomarla de postre suele subir menos que tomarla sola en ayunas"
                 ),
-                why="porque el resto del plato ya esta ralentizando la digestion",
+                why="porque el resto del plato ya ralentiza la digestion",
                 query="plate of fruit after a meal on a table",
                 search_text="a plate of fruit on a dining table",
                 sources=("ada_nutrition", "diabetes_uk_food"),
@@ -755,15 +839,17 @@ TOPICS: tuple[Topic, ...] = (
         ),
         hashtags=("#diabetes", "#glucosa", "#fruta", "#nutricion"),
         hooks=(
+            "Si comes fruta sola y despues ves un pico mas grande de lo que esperas, prueba a combinarla asi.",
+            "Te preocupa que la fruta sola te suba la glucosa? Con estas cuatro combinaciones cambia bastante.",
             "Si comes fruta sola cuando tienes mucha hambre, presta atencion a esto.",
-            "No tomes solo la manzana: prueba a combinarla asi.",
-            "Con la fruta, lo que la acompana cambia bastante el resultado.",
             "Cuatro combinaciones sencillas para tomar fruta sin renunciar a ella.",
-            "La fruta sola y la fruta acompanada no suelen comportarse igual.",
+            "Si quieres seguir comiendo fruta sin que te suba tanto, lo que la acompana importa.",
         ),
     ),
     Topic(
         slug="naranja-vs-zumo",
+        worry="que el zumo del desayuno te suba la glucosa",
+        moment="despues del desayuno",
         title="Naranja entera o zumo de naranja: que cambia para tu glucosa",
         format="comparison",
         top_title="NARANJA VS ZUMO 🍊",
@@ -775,13 +861,18 @@ TOPICS: tuple[Topic, ...] = (
             "La naranja entera suele ser la mejor opcion del dia a dia; el zumo, "
             "algo puntual y en vaso pequeno"
         ),
+        answer="La naranja entera conserva la fibra y el zumo la pierde casi toda",
+        takeaway=(
+                     "Manana desayuna la naranja entera y deja el zumo para algo "
+                     "puntual"
+                 ),
         items=(NARANJA_ENTERA, ZUMO),
         hashtags=("#diabetes", "#glucosa", "#zumo", "#fruta", "#nutricion"),
         hooks=(
-            "Naranja entera o zumo de naranja: parecen lo mismo y no lo son.",
-            "Un vaso de zumo lleva el azucar de varias naranjas y casi nada de su fibra.",
+            "Si desayunas zumo cada manana y te preocupa que te suba la glucosa, mira esta diferencia.",
+            "Te preocupa el zumo del desayuno? La naranja entera y el zumo no se comportan igual.",
+            "Si crees que el zumo natural es lo mismo que la naranja, esto te interesa.",
             "Si desayunas zumo cada manana, esta diferencia te interesa.",
-            "La misma fruta, dos formas de tomarla y dos respuestas distintas.",
             "Antes de exprimir la naranja de manana, mira esto.",
         ),
         opening_query="oranges and a glass of juice side by side",
@@ -789,6 +880,8 @@ TOPICS: tuple[Topic, ...] = (
     ),
     Topic(
         slug="fruta-deshidratada",
+        worry="pasarte de racion con la fruta seca",
+        moment="entre horas",
         title="Que ocurre cuando comemos fruta deshidratada",
         format="error_solution",
         top_title="FRUTA SECA: OJO A ESTO",
@@ -800,6 +893,11 @@ TOPICS: tuple[Topic, ...] = (
             "La fruta deshidratada no esta descartada: cambia mucho si mides la "
             "racion y la acompanas"
         ),
+        answer=(
+                   "Al perder agua concentra el azucar, asi que mide el punado y "
+                   "acompanala"
+               ),
+        takeaway="Sirvete un punado corto en un platito y guarda la bolsa",
         items=(
             FRUTA_DESHIDRATADA,
             DATILES,
@@ -807,10 +905,9 @@ TOPICS: tuple[Topic, ...] = (
                 key="racion_seca",
                 display="la racion de referencia",
                 claim=(
-                    "Una racion suele ser bastante pequena, del orden de un "
-                    "punado corto"
+                    "Una racion es bastante pequena, un punado corto"
                 ),
-                why="servirla en un platito en vez de comer de la bolsa ayuda mucho",
+                why="sirvela en un platito y no comas de la bolsa",
                 query="small bowl of dried fruit portion",
                 search_text="a small bowl with a portion of dried fruit",
                 sources=("ada_nutrition", "fundacion_diabetes"),
@@ -819,10 +916,9 @@ TOPICS: tuple[Topic, ...] = (
                 key="seca_con_nueces",
                 display="acompanarla",
                 claim=(
-                    "Combinarla con frutos secos o yogur suele suavizar la "
-                    "respuesta frente a tomarla sola"
+                    "Combinala con frutos secos o yogur natural"
                 ),
-                why="la grasa y la proteina ralentizan la digestion",
+                why="porque la grasa y la proteina ralentizan la digestion",
                 query="dried fruit and nuts mixed in a bowl",
                 search_text="a bowl of mixed nuts and dried fruit",
                 sources=("ada_nutrition", "harvard_carbs"),
@@ -830,15 +926,17 @@ TOPICS: tuple[Topic, ...] = (
         ),
         hashtags=("#diabetes", "#glucosa", "#frutosecos", "#nutricion"),
         hooks=(
+            "Si picas fruta deshidratada entre horas y te preocupa pasarte de racion, mira esto.",
+            "Te preocupa pasarte con las pasas o los datiles sin darte cuenta? Esta es la referencia.",
+            "Si comes fruta seca pensando que es igual que la fresca, aqui la racion cuenta el doble.",
+            "Si llevas fruta deshidratada para picar, revisa cuanta estas tomando.",
             "Un punado de pasas y un punado de uvas no son lo mismo, ni de lejos.",
-            "Si picas fruta deshidratada entre horas, esto te va a interesar.",
-            "Al secar la fruta se va el agua y queda el azucar concentrado.",
-            "La fruta seca no esta descartada, pero la racion aqui cuenta el doble.",
-            "Parece fruta y se comporta de otra manera.",
         ),
     ),
     Topic(
         slug="cereales-desayuno",
+        worry="que tus cereales de siempre te suban la glucosa",
+        moment="despues del desayuno",
         title="Errores comunes con los cereales del desayuno",
         format="error_solution",
         top_title="CEREALES: 4 ERRORES",
@@ -851,15 +949,22 @@ TOPICS: tuple[Topic, ...] = (
             "Con mirar dos numeros en la etiqueta, azucares y fibra, ya se "
             "decide mucho mejor"
         ),
+        answer="Mira los azucares, la fibra, la racion real y con que lo acompanas",
+        takeaway=(
+                     "Antes de comprar, mira dos numeros: azucares y fibra por "
+                     "cien gramos"
+                 ),
         items=(
             Item(
                 key="etiqueta_azucares",
                 display="no mirar los azucares",
                 claim=(
-                    "Muchos cereales llevan bastante azucar anadido aunque el "
-                    "envase parezca saludable"
+                    (
+                        "Muchos cereales llevan azucar anadido aunque el envase "
+                        "parezca saludable"
+                    )
                 ),
-                why="mira los azucares por cien gramos, no solo la imagen",
+                why="mira los azucares por cien gramos",
                 query="breakfast cereal nutrition label close up",
                 search_text="a cereal box nutrition label",
                 sources=("who_diet",),
@@ -868,10 +973,12 @@ TOPICS: tuple[Topic, ...] = (
                 key="poca_fibra",
                 display="ignorar la fibra",
                 claim=(
-                    "Un cereal con poca fibra suele absorberse mas rapido que "
-                    "uno integral"
+                    (
+                        "Un cereal con poca fibra suele absorberse mas rapido que uno "
+                        "integral"
+                    )
                 ),
-                why="a partir de unos seis gramos de fibra por cien ya es otra cosa",
+                why="busca al menos seis gramos por cien",
                 query="whole grain cereal in a bowl",
                 search_text="a bowl of whole grain cereal",
                 sources=("harvard_fiber",),
@@ -880,10 +987,9 @@ TOPICS: tuple[Topic, ...] = (
                 key="racion_cereal",
                 display="servir a ojo",
                 claim=(
-                    "La racion real suele ser mucho menor que el bol que "
-                    "solemos llenar"
+                    "La racion real suele ser mucho menor que el bol que llenas"
                 ),
-                why="pesarlo una vez cambia la referencia para siempre",
+                why="pesala una vez y te queda la referencia",
                 query="measuring a small bowl of cereal",
                 search_text="a small bowl of cereal being served",
                 sources=("ada_nutrition", "fundacion_diabetes"),
@@ -892,10 +998,9 @@ TOPICS: tuple[Topic, ...] = (
                 key="cereal_solo",
                 display="tomarlo solo",
                 claim=(
-                    "Tomarlo solo, sin proteina ni grasa, suele dar una subida "
-                    "mas marcada"
+                    "Tomarlo solo, sin proteina ni grasa, suele subir mas"
                 ),
-                why="con yogur natural o un punado de nueces la cosa cambia",
+                why="anade yogur natural o un punado de nueces",
                 query="cereal bowl with yogurt and nuts",
                 search_text="a bowl of cereal with yogurt and nuts",
                 sources=("ada_nutrition", "harvard_carbs"),
@@ -903,15 +1008,16 @@ TOPICS: tuple[Topic, ...] = (
         ),
         hashtags=("#diabetes", "#desayuno", "#cereales", "#etiquetas"),
         hooks=(
-            "El envase dice saludable y la etiqueta suele contar otra cosa.",
+            "Si desayunas cereales y te preocupa que te suban la glucosa, revisa estos cuatro detalles.",
+            "Te preocupa que tus cereales de siempre no sean tan integrales como parecen? Mira la etiqueta asi.",
             "Si desayunas cereales casi a diario, revisa estos cuatro detalles.",
+            "Si compras cereales por lo que dice el envase, esto te va a interesar.",
             "Cuatro errores con los cereales del desayuno que se repiten mucho.",
-            "Con mirar dos numeros de la etiqueta ya eliges bastante mejor.",
-            "El cereal integral y el que solo lo parece no se comportan igual.",
         ),
     ),
     Topic(
         slug="yogur-natural-vs-azucarado",
+        worry="llevarte azucar anadido sin darte cuenta",
         title="Yogur natural o yogur azucarado: que cambia de verdad",
         format="comparison",
         top_title="YOGUR: NATURAL VS AZUCARADO",
@@ -921,15 +1027,22 @@ TOPICS: tuple[Topic, ...] = (
             "El yogur natural con fruta fresca da el mismo gusto sin el azucar "
             "anadido del de sabores"
         ),
+        answer=(
+                   "El natural solo lleva el azucar de la leche y el de sabores "
+                   "suma anadido"
+               ),
+        takeaway=(
+                     "Compra natural y anadele tu la fruta: mismo gusto sin azucar "
+                     "anadido"
+                 ),
         items=(
             Item(
                 key="yogur_nat",
                 display="el yogur natural",
                 claim=(
-                    "El yogur natural aporta proteina y solo el azucar propio "
-                    "de la leche"
+                    "El yogur natural aporta proteina y solo el azucar de la leche"
                 ),
-                why="sin azucares anadidos en la lista de ingredientes",
+                why="sin azucares anadidos en los ingredientes",
                 query="plain yogurt in a glass bowl",
                 search_text="a bowl of plain yogurt",
                 sources=("ada_nutrition", "who_diet"),
@@ -938,10 +1051,9 @@ TOPICS: tuple[Topic, ...] = (
                 key="yogur_azucarado",
                 display="el yogur de sabores",
                 claim=(
-                    "Los de sabores suelen sumar varios gramos de azucar "
-                    "anadido por unidad"
+                    "Los de sabores suelen sumar varios gramos de azucar anadido"
                 ),
-                why="aparece en la etiqueta como azucar, jarabe o sirope",
+                why="aparece como azucar, jarabe o sirope",
                 query="flavoured fruit yogurt pots",
                 search_text="pots of flavoured yogurt",
                 sources=("who_diet",),
@@ -949,15 +1061,16 @@ TOPICS: tuple[Topic, ...] = (
         ),
         hashtags=("#diabetes", "#yogur", "#azucar", "#etiquetas"),
         hooks=(
-            "Yogur natural o yogur de sabores: la diferencia esta en la etiqueta.",
+            "Si compras yogures de sabores y te preocupa llevarte azucar anadido sin darte cuenta, mira esto.",
+            "Te preocupa el azucar anadido del yogur? La diferencia esta en dos lineas de la etiqueta.",
+            "Si crees que todos los yogures son parecidos, compara estas dos etiquetas.",
             "Si compras yogures de sabores pensando que son iguales, mira esto.",
-            "El mismo tarro, dos versiones y una diferencia clara de azucar anadido.",
-            "Anadir fruta al yogur natural sale mejor que comprarlo ya endulzado.",
-            "Dice yogur en la tapa, y la lista de ingredientes cuenta el resto.",
+            "Si quieres yogur con sabor sin azucar anadido, hay una forma facil.",
         ),
     ),
     Topic(
         slug="azucar-oculto",
+        worry="estar tomando azucar anadido sin saberlo",
         title="Alimentos que parecen saludables y llevan bastante azucar anadido",
         format="list",
         top_title="AZUCAR DONDE NO LO ESPERAS",
@@ -970,15 +1083,22 @@ TOPICS: tuple[Topic, ...] = (
             "Leer la linea de azucares en la etiqueta es el habito que mas "
             "cambia la compra"
         ),
+        answer=(
+                   "Granola, barritas, salsas preparadas, zumos envasados y "
+                   "lacteos de sabores"
+               ),
+        takeaway=(
+                     "Dale la vuelta al envase y lee la linea de azucares antes de "
+                     "echarlo al carro"
+                 ),
         items=(
             Item(
                 key="granola",
                 display="la granola",
                 claim=(
-                    "La granola suele llevar miel o sirope para quedar "
-                    "crujiente, y eso es azucar anadido"
+                    "La granola suele llevar miel o sirope para quedar crujiente"
                 ),
-                why="la avena en copos sola no lleva nada de eso",
+                why="y eso es azucar anadido",
                 query="granola in a bowl with milk",
                 search_text="a bowl of granola",
                 sources=("who_diet",),
@@ -987,10 +1107,9 @@ TOPICS: tuple[Topic, ...] = (
                 key="barritas",
                 display="las barritas de cereales",
                 claim=(
-                    "Muchas barritas llevan tanto azucar anadido como una "
-                    "galleta"
+                    "Muchas barritas llevan tanto azucar anadido como una galleta"
                 ),
-                why="la lista de ingredientes lo dice en las tres primeras lineas",
+                why="lo ves en las tres primeras lineas",
                 query="cereal bars on a table",
                 search_text="cereal bars on a table",
                 sources=("who_diet",),
@@ -999,10 +1118,12 @@ TOPICS: tuple[Topic, ...] = (
                 key="salsas",
                 display="las salsas preparadas",
                 claim=(
-                    "Salsas como el ketchup o las de tomate preparadas suelen "
-                    "llevar azucar anadido"
+                    (
+                        "El ketchup y las salsas de tomate preparadas suelen llevar "
+                        "azucar"
+                    )
                 ),
-                why="poca cantidad, pero se usan todos los dias",
+                why="poca cantidad, pero la usas a diario",
                 query="ketchup and sauce bottles on a table",
                 search_text="bottles of sauce on a table",
                 sources=("who_diet",),
@@ -1011,10 +1132,9 @@ TOPICS: tuple[Topic, ...] = (
                 key="zumos_envasados",
                 display="los zumos envasados",
                 claim=(
-                    "Aunque digan sin azucares anadidos, el azucar de la fruta "
-                    "sigue estando libre en el vaso"
+                    "Aunque digan sin azucares anadidos, el de la fruta sigue libre"
                 ),
-                why="sin la fibra que lo acompanaba en la pieza entera",
+                why="sin la fibra que llevaba la pieza entera",
                 query="packaged fruit juice cartons",
                 search_text="cartons of fruit juice",
                 sources=("who_diet", "harvard_fiber"),
@@ -1023,10 +1143,12 @@ TOPICS: tuple[Topic, ...] = (
                 key="lacteos_sabor",
                 display="los lacteos de sabores",
                 claim=(
-                    "Batidos y postres lacteos de sabores suelen sumar azucar "
-                    "anadido por racion"
+                    (
+                        "Batidos y postres lacteos de sabores suelen sumar azucar "
+                        "anadido"
+                    )
                 ),
-                why="la version natural cuesta lo mismo y no lo lleva",
+                why="y la version natural cuesta lo mismo",
                 query="flavoured milk drinks on a shelf",
                 search_text="flavoured milk drinks",
                 sources=("who_diet",),
@@ -1034,17 +1156,18 @@ TOPICS: tuple[Topic, ...] = (
         ),
         hashtags=("#diabetes", "#azucar", "#etiquetas", "#compra", "#glucosa"),
         hooks=(
+            "Si te preocupa estar tomando azucar anadido sin saberlo, revisa estos cinco productos.",
             "Estos cinco productos parecen saludables y suelen llevar bastante azucar anadido.",
+            "Te preocupa el azucar que no ves en la etiqueta? Empieza por estos cinco del carro.",
             "Si compras alguno de estos cada semana, merece la pena leer la etiqueta.",
-            "El azucar anadido aparece donde menos te lo esperas.",
-            "Cinco habituales del carro de la compra que sorprenden al leerlos.",
-            "No hace falta eliminarlos, pero si saber lo que llevan.",
+            "Si crees que no tomas azucar anadido, mira estos cinco habituales.",
         ),
         opening_query="supermarket shelf with packaged food",
         opening_search_text="packaged food on a supermarket shelf",
     ),
     Topic(
         slug="tamano-racion",
+        worry="no tener claro cuanta cantidad es demasiada",
         title="Como influye el tamano de la racion en la glucosa",
         format="list",
         top_title="LA RACION LO CAMBIA TODO",
@@ -1057,13 +1180,20 @@ TOPICS: tuple[Topic, ...] = (
             "El mismo alimento puede sentar de formas muy distintas solo por la "
             "cantidad que te sirves"
         ),
+        answer=(
+                   "La cantidad cambia la respuesta: plato pequeno, pesar una "
+                   "vez y no comer del paquete"
+               ),
+        takeaway=(
+                     "Pesa una vez tu racion habitual y tendras la referencia para "
+                     "siempre"
+                 ),
         items=(
             Item(
                 key="mismo_alimento",
                 display="el mismo alimento, distinta cantidad",
                 claim=(
-                    "Un mismo alimento puede dar respuestas muy distintas segun "
-                    "la cantidad que se tome"
+                    "El mismo alimento puede responder distinto segun la cantidad"
                 ),
                 why="por eso hablar de alimentos buenos o malos se queda corto",
                 query="two plates with different portion sizes",
@@ -1074,8 +1204,7 @@ TOPICS: tuple[Topic, ...] = (
                 key="plato_pequeno",
                 display="el plato pequeno",
                 claim=(
-                    "Servir en un plato mas pequeno suele reducir la racion sin "
-                    "esfuerzo"
+                    "Servir en un plato mas pequeno suele reducir la racion"
                 ),
                 why="y sin sensacion de estar renunciando a nada",
                 query="small plate with a served meal",
@@ -1086,10 +1215,9 @@ TOPICS: tuple[Topic, ...] = (
                 key="pesar_una_vez",
                 display="pesarlo una sola vez",
                 claim=(
-                    "Pesar una vez la racion habitual suele cambiar la "
-                    "referencia para siempre"
+                    "Pesa una vez tu racion habitual"
                 ),
-                why="despues ya se calcula a ojo con bastante acierto",
+                why="y despues la calculas a ojo con bastante acierto",
                 query="kitchen scale weighing food",
                 search_text="food being weighed on a kitchen scale",
                 sources=("fundacion_diabetes", "ada_nutrition"),
@@ -1098,10 +1226,9 @@ TOPICS: tuple[Topic, ...] = (
                 key="del_paquete_no",
                 display="no comer del paquete",
                 claim=(
-                    "Comer directamente del paquete suele acabar en una racion "
-                    "mucho mayor de la prevista"
+                    "Comer del paquete suele acabar en mucha mas cantidad"
                 ),
-                why="servir antes en un bol pone un limite visible",
+                why="sirvete antes en un bol",
                 query="bowl of snacks served from a package",
                 search_text="a bowl of snacks on a table",
                 sources=("diabetes_uk_food",),
@@ -1109,15 +1236,16 @@ TOPICS: tuple[Topic, ...] = (
         ),
         hashtags=("#diabetes", "#raciones", "#glucosa", "#habitos"),
         hooks=(
+            "Si te preocupa no tener claro cuanta cantidad es demasiada, empieza por estas cuatro ideas.",
+            "Te preocupa pasarte de racion sin darte cuenta? Estas cuatro referencias lo hacen facil.",
+            "Si comes bien y aun asi tu glucosa sube mas de lo que esperas, mira la cantidad.",
+            "Si nunca has mirado cuanto te sirves, estas cuatro ideas te van a servir.",
             "Muchas veces no es el alimento: es cuanto te sirves.",
-            "El mismo plato puede sentar de dos formas muy distintas solo por la cantidad.",
-            "Cuatro ideas para que la racion deje de ser una loteria.",
-            "Si nunca has pesado tu racion habitual, esto te va a sorprender un poco.",
-            "Servir en un plato mas pequeno ya cambia bastante la cantidad.",
         ),
     ),
     Topic(
         slug="carbohidratos-y-fibra",
+        worry="no entender las etiquetas y elegir a ciegas",
         title="Carbohidratos y fibra explicados de forma sencilla",
         format="list",
         top_title="CARBOHIDRATOS Y FIBRA",
@@ -1127,15 +1255,22 @@ TOPICS: tuple[Topic, ...] = (
             "Con entender carbohidratos y fibra ya se decide mucho mejor en el "
             "supermercado"
         ),
+        answer=(
+                   "Los carbohidratos influyen en tu glucosa y la fibra suele "
+                   "frenar esa subida"
+               ),
+        takeaway="En la etiqueta mira tres lineas: carbohidratos, azucares y fibra",
         items=(
             Item(
                 key="que_son_carbos",
                 display="que son los carbohidratos",
                 claim=(
-                    "Los carbohidratos son, en general, el nutriente que mas "
-                    "influye en la glucosa despues de comer"
+                    (
+                        "Los carbohidratos son lo que mas influye en tu glucosa "
+                        "despues de comer"
+                    )
                 ),
-                why="estan en cereales, fruta, legumbres, leche y azucares",
+                why="estan en cereales, fruta, legumbres y leche",
                 query="bread pasta rice and legumes on a table",
                 search_text="bread, pasta and rice on a table",
                 sources=("harvard_carbs", "ada_nutrition"),
@@ -1144,10 +1279,12 @@ TOPICS: tuple[Topic, ...] = (
                 key="fibra_no_sube",
                 display="la fibra",
                 claim=(
-                    "La fibra es un carbohidrato que apenas se absorbe, y suele "
-                    "ralentizar la digestion del resto"
+                    (
+                        "La fibra apenas se absorbe y suele ralentizar la digestion "
+                        "del resto"
+                    )
                 ),
-                why="por eso los alimentos integrales suelen comportarse distinto",
+                why="por eso lo integral se comporta distinto",
                 query="whole grain bread and vegetables",
                 search_text="whole grain bread and vegetables",
                 sources=("harvard_fiber",),
@@ -1156,10 +1293,12 @@ TOPICS: tuple[Topic, ...] = (
                 key="etiqueta",
                 display="como leer la etiqueta",
                 claim=(
-                    "En la etiqueta interesa mirar carbohidratos totales, de "
-                    "los cuales azucares, y fibra"
+                    (
+                        "En la etiqueta mira carbohidratos, de los cuales azucares, y "
+                        "fibra"
+                    )
                 ),
-                why="esas tres lineas dan casi toda la informacion util",
+                why="esas tres lineas dan casi toda la informacion",
                 query="nutrition facts label close up",
                 search_text="a nutrition facts label",
                 sources=("who_diet", "ada_nutrition"),
@@ -1168,10 +1307,9 @@ TOPICS: tuple[Topic, ...] = (
                 key="integral",
                 display="integral de verdad",
                 claim=(
-                    "Que ponga integral en el envase no siempre significa que "
-                    "la harina lo sea"
+                    "Que ponga integral no siempre significa que la harina lo sea"
                 ),
-                why="en los ingredientes debe aparecer harina integral la primera",
+                why="debe aparecer la primera en los ingredientes",
                 query="whole grain bread loaf on a board",
                 search_text="a loaf of whole grain bread",
                 sources=("who_diet", "harvard_fiber"),
@@ -1179,15 +1317,16 @@ TOPICS: tuple[Topic, ...] = (
         ),
         hashtags=("#diabetes", "#carbohidratos", "#fibra", "#etiquetas"),
         hooks=(
-            "Con entender dos conceptos, carbohidratos y fibra, lees cualquier etiqueta.",
+            "Si te preocupa no entender las etiquetas y elegir a ciegas, con dos conceptos te sobra.",
+            "Te preocupa mirar una etiqueta y no saber que numero importa? Empieza por estos dos.",
             "Si las etiquetas te suenan a chino, empieza por estas cuatro ideas.",
+            "Si eliges pan o pasta sin saber que mirar, esto te lo simplifica.",
             "Carbohidratos y fibra explicados sin tecnicismos y en cuatro pasos.",
-            "Saber que mirar en una etiqueta cambia la compra entera.",
-            "No todos los carbohidratos se comportan igual, y la fibra es la clave.",
         ),
     ),
     Topic(
         slug="respuesta-individual",
+        worry="que lo que le funciona a otros a ti no te funcione",
         title="Por que dos personas pueden responder distinto al mismo alimento",
         format="myth",
         top_title="CADA PERSONA ES DISTINTA",
@@ -1200,15 +1339,19 @@ TOPICS: tuple[Topic, ...] = (
             "Las listas orientan, pero tu propia experiencia y tu equipo "
             "sanitario mandan sobre cualquier lista"
         ),
+        answer="Influyen tu actividad, el momento del dia y con que lo combinas",
+        takeaway="Comprueba como te sienta a ti y comentalo con tu equipo sanitario",
         items=(
             Item(
                 key="variabilidad",
                 display="la variabilidad entre personas",
                 claim=(
-                    "La respuesta a un mismo alimento puede variar bastante de "
-                    "una persona a otra"
+                    (
+                        "La respuesta a un mismo alimento puede variar bastante entre "
+                        "personas"
+                    )
                 ),
-                why="influyen el tratamiento, la actividad y muchos otros factores",
+                why="influyen el tratamiento, la actividad y muchos factores",
                 query="two people eating a meal at a table",
                 search_text="two people sharing a meal at a table",
                 sources=("ada_nutrition", "who_diabetes"),
@@ -1217,10 +1360,12 @@ TOPICS: tuple[Topic, ...] = (
                 key="contexto",
                 display="el contexto de la comida",
                 claim=(
-                    "El mismo alimento puede comportarse distinto segun con que "
-                    "se combine y a que hora se tome"
+                    (
+                        "El mismo alimento puede comportarse distinto segun con que "
+                        "lo combines"
+                    )
                 ),
-                why="no es lo mismo solo, en ayunas, que dentro de una comida",
+                why="no es lo mismo solo que dentro de una comida",
                 query="balanced meal plate with vegetables and protein",
                 search_text="a balanced plate of food",
                 sources=("ada_nutrition", "harvard_carbs"),
@@ -1229,10 +1374,12 @@ TOPICS: tuple[Topic, ...] = (
                 key="medir",
                 display="comprobarlo en tu caso",
                 claim=(
-                    "Comprobar como te sienta a ti un alimento concreto suele "
-                    "ser mas util que cualquier lista general"
+                    (
+                        "Comprobar como te sienta a ti suele ser mas util que "
+                        "cualquier lista"
+                    )
                 ),
-                why="siempre dentro de lo que te haya indicado tu equipo sanitario",
+                why="siempre dentro de lo que te indique tu equipo sanitario",
                 query="person using a glucose meter at home",
                 search_text="a glucose meter on a table",
                 sources=("who_diabetes", "redgdps"),
@@ -1240,17 +1387,18 @@ TOPICS: tuple[Topic, ...] = (
         ),
         hashtags=("#diabetes", "#glucosa", "#educaciondiabetologica"),
         hooks=(
-            "El mismo alimento puede sentarte a ti de una forma y a otra persona de otra.",
-            "Si una lista general no te cuadra con lo que ves, hay una explicacion.",
-            "Dos personas, el mismo desayuno y dos respuestas distintas.",
-            "Las listas orientan, pero tu caso concreto manda sobre cualquier lista.",
-            "Por que lo que le funciona a otra persona quiza no te funcione a ti.",
+            "Te preocupa que el mismo alimento te suba la glucosa mas que a otra persona? Esto lo explica.",
+            "Si a otra persona le sienta bien el mismo desayuno y a ti te sube la glucosa mas de lo que esperas, esto lo explica.",
+            "Si sigues una lista de alimentos y tu glucosa sube mas de lo que esperas, hay una explicacion.",
+            "Si tienes diabetes y el mismo alimento te sube la glucosa mas que a otra persona, esto lo explica.",
+            "Si comes lo mismo que otra persona y tu glucosa responde distinto, no es cosa tuya.",
         ),
         opening_query="two people having breakfast together",
         opening_search_text="two people at a breakfast table",
     ),
     Topic(
         slug="mito-dejar-fruta",
+        worry="tener que renunciar a la fruta por miedo al azucar",
         title="Hay que dejar de comer fruta si tienes diabetes",
         format="myth",
         top_title="MITO: DEJAR LA FRUTA",
@@ -1260,13 +1408,20 @@ TOPICS: tuple[Topic, ...] = (
             "La fruta cabe en la alimentacion de la mayoria de personas con "
             "diabetes: manda la cantidad, la forma y el conjunto del dia"
         ),
+        answer=(
+                   "No: las guias suelen incluirla, y lo que manda es la "
+                   "cantidad y la forma"
+               ),
+        takeaway=(
+                     "Sigue tomando fruta entera en raciones medidas y consultalo "
+                     "con tu equipo sanitario"
+                 ),
         items=(
             Item(
                 key="mito_respuesta",
                 display="la respuesta corta",
                 claim=(
-                    "Las guias de alimentacion en diabetes suelen incluir la "
-                    "fruta dentro de una dieta equilibrada"
+                    "Las guias de alimentacion en diabetes suelen incluir la fruta"
                 ),
                 why="no aparece como un alimento a eliminar",
                 query="fresh fruit bowl on a kitchen table",
@@ -1277,8 +1432,7 @@ TOPICS: tuple[Topic, ...] = (
                 key="mito_matiz",
                 display="el matiz importante",
                 claim=(
-                    "Lo que suele cambiar la respuesta es la cantidad, la forma "
-                    "y con que se acompana"
+                    "Lo que suele cambiar la respuesta es la cantidad y la forma"
                 ),
                 why="entera mejor que en zumo, y en raciones medidas",
                 query="portion of cut fruit on a small plate",
@@ -1289,10 +1443,12 @@ TOPICS: tuple[Topic, ...] = (
                 key="mito_individual",
                 display="y tu caso concreto",
                 claim=(
-                    "Cada persona puede responder distinto, y el tratamiento "
-                    "tambien influye"
+                    (
+                        "Cada persona puede responder distinto, y el tratamiento "
+                        "influye"
+                    )
                 ),
-                why="tu equipo sanitario es quien ajusta eso contigo",
+                why="tu equipo sanitario lo ajusta contigo",
                 query="doctor talking with a patient at a desk",
                 search_text="a healthcare professional talking with a person",
                 sources=("who_diabetes", "redgdps"),
@@ -1300,15 +1456,16 @@ TOPICS: tuple[Topic, ...] = (
         ),
         hashtags=("#diabetes", "#mitos", "#fruta", "#glucosa"),
         hooks=(
+            "Si te han dicho que con diabetes hay que renunciar a la fruta, esto te interesa.",
+            "Te preocupa tener que dejar la fruta por miedo al azucar? Mira lo que dicen las guias.",
             "Antes de dejar la fruta por miedo al azucar, mira lo que dicen las guias.",
-            "Se repite mucho que hay que renunciar a la fruta, y no es exactamente asi.",
-            "Si te han dicho que con diabetes no se puede comer fruta, esto te interesa.",
-            "La fruta suele caber en la alimentacion de la mayoria de personas con diabetes.",
-            "Lo que suele decirse sobre la fruta no cuenta toda la historia.",
+            "Si has quitado la fruta por si acaso, esto te va a interesar.",
+            "Si crees que la fruta esta descartada con diabetes, esto te va a sorprender.",
         ),
     ),
     Topic(
         slug="ranking-frutas",
+        worry="no saber que fruta elegir para no disparar tu glucosa",
         title="5 frutas ordenadas de menor a mayor impacto aproximado",
         format="ranking",
         top_title="DE MENOR A MAYOR IMPACTO",
@@ -1321,14 +1478,24 @@ TOPICS: tuple[Topic, ...] = (
             "Es un orden aproximado, no una regla: la racion y la madurez "
             "pueden cambiarlo por completo"
         ),
+        answer=(
+                   "Aguacate, fresas, frambuesas, manzana con piel y platano "
+                   "maduro, en ese orden"
+               ),
+        takeaway=(
+                     (
+                         "Usa el orden como referencia, pero mide la racion: eso pesa "
+                         "mas"
+                     )
+                 ),
         items=(AGUACATE, FRESAS, FRAMBUESAS, MANZANA, PLATANO_MADURO),
         hashtags=("#diabetes", "#fruta", "#glucosa", "#nutricion"),
         hooks=(
-            "Cinco frutas ordenadas de menor a mayor impacto aproximado.",
-            "Un orden orientativo, no una regla: la racion puede cambiarlo entero.",
-            "Si quieres una referencia rapida para elegir fruta, este orden ayuda.",
-            "De la mas suave a la mas fuerte, con la racion habitual como referencia.",
-            "No todas las frutas estan al mismo nivel, y este es el orden aproximado.",
+            "Si te preocupa no saber que fruta elegir, este orden te da una referencia rapida.",
+            "Te preocupa elegir mal la fruta? Esta es la lista de menor a mayor impacto aproximado.",
+            "Si te preocupa elegir mal la fruta, este orden te da una referencia rapida.",
+            "Si dudas delante de la fruteria y no sabes cual coger, empieza por este orden.",
+            "Si comparas frutas y no tienes claro cual pesa mas en tu glucosa, mira este orden.",
         ),
     ),
 )

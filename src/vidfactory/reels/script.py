@@ -1,4 +1,4 @@
-"""The reel itself: hook, promise, value, retention, conclusion, CTA.
+"""The reel itself: hook, answer, value, retention, takeaway, CTA.
 
 Six beats in a fixed order, because the order is the format. What varies is
 how much of each fits, and that is arithmetic rather than taste: a forty
@@ -36,20 +36,22 @@ ALLOWED_SECONDS: tuple[int, ...] = (20, 30, 45, 60)
 DEFAULT_SECONDS = 45
 
 #: The CTA, with the natural variations the brief lists. Never a purchase,
-#: never a demand.
+#: never a demand, and only ever at the end.
 CTA_VARIANTS: tuple[str, ...] = (
-    "Siguenos para mas consejos sobre diabetes.",
-    "Siguenos para aprender mas sobre diabetes y alimentacion.",
-    "Si te ha servido, siguenos para mas consejos sobre diabetes.",
-    "Siguenos para mas ideas sencillas para cuidar tu glucosa.",
+    "Siguenos para mas consejos claros y sencillos sobre diabetes.",
+    "Si esto te ha aclarado algo, siguenos para mas.",
+    "Siguenos si quieres entender mejor tu alimentacion.",
+    "Te lo explicamos claro cada dia: siguenos.",
 )
 
 #: Small lines that buy attention across a list without promising anything.
 #: Used sparingly - two at most - because a retention line that arrives every
 #: item stops being a signal and starts being filler, which is the one thing
 #: the brief rules out by name.
-#: Two lines' worth of words, reserved before the items are chosen.
-_RETENTION_ALLOWANCE = 11
+#: Words reserved for the retention lines before the items are chosen. They
+#: are spoken words like any other and the first version forgot to budget for
+#: them, which is why a 45 second reel came out at 48.6.
+_RETENTION_WORDS = 6
 
 RETENTION_LINES: tuple[str, ...] = (
     "Pero atencion con la siguiente.",
@@ -62,7 +64,9 @@ RETENTION_LINES: tuple[str, ...] = (
 #: reel changes with the format, not just its wording.
 FORMAT_LEADS: dict[str, str] = {
     "list": "",
-    "error_solution": "Vamos con el primero.",
+    # No lead. The answer beat has just named all five, so "vamos con el
+    # primero" is four words spent announcing a list the viewer already has.
+    "error_solution": "",
     "comparison": "Vamos a compararlas.",
     "ranking": "De menor a mayor impacto aproximado.",
     "myth": "Vamos por partes.",
@@ -83,7 +87,7 @@ DEFAULT_WORDS_PER_SECOND = 2.9
 class Beat:
     """One narrated line and the picture that goes with it."""
 
-    kind: str                 # hook | promise | lead | item | retention | conclusion | cta
+    kind: str                 # hook | answer | lead | item | retention | takeaway | cta
     text: str
     query: str = ""
     search_text: str = ""
@@ -232,8 +236,19 @@ def _shared_run(left: str, right: str) -> int:
     return best
 
 
-#: At or above this the hook and the conclusion are the same clause twice.
+#: At or above this the hook and the takeaway are the same clause twice.
 _HOOK_ECHO_WORDS = 5
+
+#: A hook scoring within this of the best is treated as its equal, and the
+#: shortest of them wins.
+#:
+#: Because the hook has a *time* budget as well as a quality one. The brief
+#: puts it in the first two seconds; at this voice's rate that is six words,
+#: and the strongest-scoring candidate is regularly eighteen - five seconds
+#: of a forty second reel, paid for out of the items. Within a margin this
+#: small the candidates are not meaningfully different in quality, and the
+#: shorter one is better for a reason the score does not measure.
+_HOOK_LENGTH_MARGIN = 0.06
 
 
 def _distinct_hook(topic: Topic, extra: Sequence[str] = ()) -> HookChoice:
@@ -246,30 +261,63 @@ def _distinct_hook(topic: Topic, extra: Sequence[str] = ()) -> HookChoice:
     """
 
     choice = choose_hook(topic, extra=extra)
-    if _shared_run(choice.hook, topic.conclusion) < _HOOK_ECHO_WORDS:
+    usable = [
+        c for c in choice.candidates
+        if not c.rejected
+        and _shared_run(c.text, topic.takeaway_line) < _HOOK_ECHO_WORDS
+    ]
+    if not usable:
         return choice
-    for candidate in choice.candidates:
-        if candidate.rejected:
-            continue
-        if _shared_run(candidate.text, topic.conclusion) < _HOOK_ECHO_WORDS:
-            return HookChoice(
-                hook=candidate.text,
-                strength=candidate.total,
-                alignment=candidate.scores.get("alignment", 0.0),
-                candidates=choice.candidates,
-            )
-    return choice
+    best = max(c.total for c in usable)
+    close = [c for c in usable if c.total >= best - _HOOK_LENGTH_MARGIN]
+    winner = min(close, key=lambda c: (len(c.text.split()), -c.total))
+    return HookChoice(
+        hook=winner.text,
+        strength=winner.total,
+        alignment=winner.scores.get("alignment", 0.0),
+        candidates=choice.candidates,
+    )
 
 
-def _item_text(item: Item, with_why: bool) -> str:
+def _retention_count(items: int) -> int:
+    """How many retention lines a reel with this many items earns.
+
+    One, until the list is long enough that a viewer needs a second push. A
+    line that arrives every other item stops being a signal and becomes the
+    filler the brief rules out by name - and in a forty second reel each one
+    costs an item's worth of words, which is a bad trade: the items are the
+    reason anyone is still watching.
+    """
+
+    if items >= 6:
+        return 2
+    return 1 if items >= 4 else 0
+
+
+def _retention_slots(items: int) -> set[int]:
+    """Where they go: two thirds in, and for a long list also a third in."""
+
+    if items >= 6:
+        return {max(1, items // 3), items - 1}
+    return {items - 1} if items >= 4 else set()
+
+
+def _item_text(item: Item) -> str:
+    """One item: the claim and the reason it is true, always both.
+
+    The reason used to be optional - the first thing dropped when the duration
+    got tight - and dropping it is what produced a list of five assertions with
+    nothing behind any of them. An item the viewer cannot act on because they
+    were not told *why* is not shorter value, it is a different and worse reel,
+    so the budget now buys fewer items rather than emptier ones.
+    """
+
     claim = item.claim.rstrip(" .")
-    if with_why and item.why:
-        why = item.why.strip()
-        joiner = "" if why.startswith(("y ", "asi ", "pero ", "aunque ")) else ", "
-        if joiner:
-            return f"{claim}{joiner}{why.rstrip(' .')}."
-        return f"{claim} {why.rstrip(' .')}."
-    return claim + "."
+    why = str(item.why or "").strip()
+    if not why:
+        return claim + "."
+    joiner = "" if why.startswith(("y ", "asi ", "pero ", "aunque ", "porque ")) else ", "
+    return f"{claim}{joiner}{why.rstrip(' .')}." if joiner else f"{claim} {why.rstrip(' .')}."
 
 
 #: Added to the conclusion when nothing else in the reel says it. Almost
@@ -286,9 +334,77 @@ def _ensure_caveat(beats: list[Beat]) -> None:
     if mentions_caveat(" ".join(b.text for b in beats)):
         return
     for beat in beats:
-        if beat.kind == "conclusion":
+        if beat.kind == "takeaway":
             beat.text = beat.text.rstrip() + " " + CAVEAT_LINE
             return
+
+
+def _assemble(
+    topic: Topic,
+    hook: HookChoice,
+    cta: str,
+    lead: str,
+    items: Sequence[Item],
+) -> list[Beat]:
+    """The finished beat list for exactly these items.
+
+    Assembled rather than estimated, because the estimate was wrong in a way
+    that cost items: the caveat line is added *after* the script is written,
+    so a trim that budgeted for everything except it produced a 45 second
+    request at 50.0 seconds. Counting the words of the real thing is both
+    simpler and exact.
+    """
+
+    query, search = topic.opening_query, topic.opening_search_text
+    beats = [
+        Beat("hook", hook.hook, query, search),
+        # The answer, not a trailer for one. "En este reel vas a ver cinco
+        # frutas" spends the third second describing the reel to someone who
+        # is already watching it; "fresas, frambuesas, kiwi, manzana con piel
+        # y aguacate" is the same length and is already the value.
+        Beat("answer", topic.answer_line, query, search),
+    ]
+    if lead and items:
+        beats.append(Beat("lead", lead, query, search))
+
+    slots = _retention_slots(len(items))
+    used: set[str] = set()
+
+    def retention_line(index: int, last: bool) -> str:
+        preferred = RETENTION_LINES[1] if last else RETENTION_LINES[
+            _stable_index(f"{topic.slug}:{index}", len(RETENTION_LINES))
+        ]
+        if preferred not in used:
+            used.add(preferred)
+            return preferred
+        for candidate in RETENTION_LINES:
+            if candidate not in used:
+                used.add(candidate)
+                return candidate
+        return preferred                                  # pragma: no cover
+
+    for index, item in enumerate(items):
+        if index in slots:
+            beats.append(
+                Beat("retention", retention_line(index, index == len(items) - 1),
+                     item.query, item.search_text, index=index)
+            )
+        beats.append(
+            Beat(
+                kind="item",
+                text=_item_text(item),
+                query=item.query,
+                search_text=item.search_text,
+                index=index,
+                sources=item.sources,
+                item_key=item.key,
+            )
+        )
+
+    beats.append(Beat("takeaway", topic.takeaway_line, query, search))
+    beats.append(Beat("cta", cta, query, search))
+    _ensure_caveat(beats)
+    return beats
 
 
 def build(
@@ -301,9 +417,9 @@ def build(
     """Fit this topic into the requested duration without losing the point.
 
     The fixed beats are non-negotiable: a reel without a hook has no opening,
-    and one without a CTA is the whole reason the account exists. So the
-    items absorb the budget - first by losing their explanations, then, only
-    if that is still not enough, by being fewer.
+    and one without a CTA is the whole reason the account exists. So the items
+    absorb the budget - and they absorb it as whole items, because every item
+    keeps the reason it is true.
     """
 
     words_per_second = max(1.5, float(words_per_second))
@@ -314,110 +430,51 @@ def build(
     cta = cta_for(topic)
     lead = FORMAT_LEADS.get(topic.format, "")
 
-    fixed = [
-        Beat("hook", hook.hook, topic.opening_query, topic.opening_search_text),
-        Beat("promise", topic.promise.rstrip(" .") + ".",
-             topic.opening_query, topic.opening_search_text),
-    ]
-    tail = [
-        Beat("conclusion", topic.conclusion.rstrip(" .") + ".",
-             topic.opening_query, topic.opening_search_text),
-        Beat("cta", cta, topic.opening_query, topic.opening_search_text),
-    ]
-    fixed_words = sum(b.word_count for b in (*fixed, *tail))
-    if lead:
-        fixed_words += len(lead.split())
-    # The retention lines are decided later, from the item count, but they are
-    # spoken words like any other and the first version of this forgot to
-    # budget for them - which is why a 45 second reel came out at 48.6.
-    if len(topic.items) >= 4:
-        fixed_words += _RETENTION_ALLOWANCE
-
     items = list(topic.items)
     if max_items > 0:
         items = items[:max_items]
     dropped: list[str] = []
     floor = min(MIN_ITEMS, len(items))
+    required = topic.required_item_count
 
-    def words_of(chosen: Sequence[Item], explained: set[str]) -> int:
-        return sum(
-            len(_item_text(i, i.key in explained).split()) for i in chosen
-        )
+    def words(chosen: Sequence[Item]) -> int:
+        return sum(b.word_count for b in _assemble(topic, hook, cta, lead, chosen))
 
-    # Claims first. Drop whole items only when the bare claims still do not
-    # fit, and never below the floor: a twenty second reel with two items is
-    # a reel, and one with none is a caption read aloud.
-    while (
-        len(items) > floor
-        and fixed_words + words_of(items, set()) > budget_words * 1.02
-    ):
+    while len(items) > floor and words(items) > budget_words * 1.02:
         dropped.append(items[-1].key)
         items = items[:-1]
 
-    # Then spend whatever is left on explanations, item by item, because the
-    # brief asks for the "por que" wherever the format allows it. Partial is
-    # fine: four explained items and one bare beats five bare ones.
-    explained: set[str] = set()
-    for item in items:
-        candidate = explained | {item.key}
-        if fixed_words + words_of(items, candidate) <= budget_words * 1.02:
-            explained = candidate
-
-    beats: list[Beat] = list(fixed)
-    if lead and items:
-        beats.append(
-            Beat("lead", lead, topic.opening_query, topic.opening_search_text)
+    # A number in the title is a requirement, exactly as it is on the
+    # long-form side. "5 frutas" that delivers four is not a shorter reel, it
+    # is a reel whose first line is false - and the title is on screen for the
+    # whole forty seconds saying so. Renaming it silently would be worse, so
+    # this raises and names the duration that would fit.
+    if required and len(items) < required:
+        raise ValueError(
+            f"{topic.slug!r} promises {required} items in its title and only "
+            f"{len(items)} fit in {target_seconds:.0f}s at "
+            f"{words_per_second:.2f} words/second. Render it longer "
+            f"({_smallest_fit(topic, words, words_per_second, required)}) or "
+            f"shorten the items."
         )
 
-    # Two retention lines at most, and only where they earn their place: one
-    # about a third of the way in, one before the last item.
-    retention_at: set[int] = set()
-    if len(items) >= 4:
-        retention_at = {max(1, len(items) // 3), len(items) - 1}
-
-    # Two distinct lines. The first version picked each slot independently and
-    # duly said "la cantidad sigue siendo importante" twice in the same reel,
-    # which is exactly the filler this is supposed to avoid.
-    used_lines: set[str] = set()
-
-    def retention_line(index: int, last: bool) -> str:
-        preferred = RETENTION_LINES[1] if last else RETENTION_LINES[
-            _stable_index(f"{topic.slug}:{index}", len(RETENTION_LINES))
-        ]
-        if preferred not in used_lines:
-            used_lines.add(preferred)
-            return preferred
-        for candidate in RETENTION_LINES:
-            if candidate not in used_lines:
-                used_lines.add(candidate)
-                return candidate
-        return preferred                                  # pragma: no cover
-
-    for index, item in enumerate(items):
-        if index in retention_at:
-            line = retention_line(index, index == len(items) - 1)
-            beats.append(
-                Beat("retention", line, item.query, item.search_text, index=index)
-            )
-        beats.append(
-            Beat(
-                kind="item",
-                text=_item_text(item, item.key in explained),
-                query=item.query,
-                search_text=item.search_text,
-                index=index,
-                sources=item.sources,
-                item_key=item.key,
-            )
-        )
-
-    beats.extend(tail)
-    _ensure_caveat(beats)
     return ReelScript(
         topic=topic,
         hook=hook,
-        beats=beats,
+        beats=_assemble(topic, hook, cta, lead, items),
         target_seconds=target_seconds,
         words_per_second=words_per_second,
         dropped_items=dropped,
     )
+
+
+def _smallest_fit(
+    topic: Topic, words: Any, words_per_second: float, required: int
+) -> str:
+    """The shortest allowed duration that would hold the promised items."""
+
+    needed = words(list(topic.items)[:required]) / words_per_second
+    for allowed in ALLOWED_SECONDS:
+        if allowed * 1.02 >= needed:
+            return f"--seconds {allowed}"
+    return f"about {needed:.0f}s, which is longer than the allowed durations"

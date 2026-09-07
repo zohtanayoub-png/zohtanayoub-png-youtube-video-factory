@@ -34,7 +34,7 @@ from dataclasses import dataclass, field
 from typing import Any, Sequence
 
 from .knowledge import Topic
-from .safety import find_risks, is_hedged, makes_effect_claim
+from .safety import find_risks, find_unhedged
 
 #: Openings the brief rules out by name, plus the obvious neighbours.
 BANNED_OPENERS: tuple[str, ...] = (
@@ -51,6 +51,45 @@ BANNED_OPENERS: tuple[str, ...] = (
     #: - banned as an opening, which is how it is always used.
     r"^\W*sabias que",
     r"^\W*¿sabias que",
+)
+
+#: The viewer's own worry, in their own words. This is the dimension the
+#: brief cares about most: the first sentence has to make someone think "this
+#: is exactly what worries me", and that only happens when the sentence names
+#: the worry rather than the subject. "Frutas y glucosa" is a subject; "si te
+#: preocupa que la fruta te dispare la glucosa" is a person.
+PROBLEM: tuple[str, ...] = (
+    "te preocupa", "te da miedo", "por miedo", "te dispara", "se te dispara",
+    "te sube", "sube mucho", "sube mas de lo que", "no sabes", "nunca sabes",
+    "no tienes claro", "te cuesta", "sin saber", "si notas", "si ves",
+    "si te pasa", "acabas", "te descontrola", "se te descontrola",
+    "despues de comer", "despues del desayuno", "entre horas",
+    "sin darte cuenta", "un pico", "picos", "renunciar",
+    "no disparar", "sin que te suba", "sin que se te", "que elegir",
+    "que desayunar", "que picar", "cuanta cantidad",
+    # The subjunctive is how half of these are actually said - "puede que te
+    # suba", "para que no te suba" - and matching only the indicative missed
+    # one of the brief's own examples entirely.
+    "suba", "suban", "dispare", "de lo que esperas", "mas rapido de lo que",
+    "parece saludable", "parecen saludables", "mas de lo normal",
+)
+
+#: How it feels, not what it is. Relief is as strong a signal as worry, and
+#: safer: "no hace falta que dejes la fruta" recognises the same fear without
+#: manufacturing it.
+EMOTION: tuple[str, ...] = (
+    "miedo", "preocupa", "tranquil", "no hace falta", "no tienes que",
+    "puedes seguir", "sin culpa", "sin renunciar", "no tiene por que",
+    "frustra", "cansa", "harta", "agobia",
+)
+
+#: Words that make a hook about *this* reel rather than about food in
+#: general: a number, a named food, a named moment.
+SPECIFIC: tuple[str, ...] = (
+    "fresas", "frambuesas", "kiwi", "manzana", "pera", "aguacate", "platano",
+    "uvas", "datiles", "naranja", "zumo", "yogur", "cereales", "avena",
+    "granola", "pasas", "desayuno", "merienda", "cena", "etiqueta",
+    "racion", "raciones", "punado", "cinco", "cuatro", "tres", "diez",
 )
 
 #: Words that open a gap: an exception, a contrast, a correction.
@@ -72,6 +111,8 @@ BENEFIT: tuple[str, ...] = (
     "toma nota", "estas son", "aqui tienes", "te interesa", "te va a interesar",
     "ayudarte", "te ayuda", "presta atencion", "sin renunciar",
     "sin complicarte", "sin tecnicismos", "sencill", "en un minuto",
+    "guarda est", "escucha esto", "hay algo importante", "debes saber",
+    "quedate", "anota", "esto te interesa", "puede que el problema",
 )
 
 #: Clickbait that promises more than the content can deliver.
@@ -84,22 +125,35 @@ CLICKBAIT: tuple[str, ...] = (
 #: How the six dimensions are weighted. Honesty is not here because it is a
 #: gate rather than a score: a hook that fails it is discarded.
 WEIGHTS: dict[str, float] = {
-    "curiosity": 0.28,
-    "clarity": 0.18,
-    "benefit": 0.20,
-    "relevance": 0.22,
-    "naturalness": 0.12,
+    # Problem recognition leads, because it is the one the brief says decides
+    # whether anyone stays: the viewer has to think "this is exactly what
+    # worries me" before they care what the answer is.
+    "problem": 0.26,
+    "usefulness": 0.18,
+    "curiosity": 0.14,
+    "specificity": 0.14,
+    "emotion": 0.10,
+    "relevance": 0.10,
+    "clarity": 0.05,
+    "naturalness": 0.03,
 }
+
+#: How many candidates to put in front of the scorer. The brief asks for
+#: eight to twelve; the per-topic hooks supply most of them and the
+#: problem-first templates guarantee the floor.
+MIN_CANDIDATES = 8
+MAX_CANDIDATES = 12
 
 #: Below this a hook is not good enough to open a reel with.
 #:
-#: Read off the brief's own eight example hooks rather than chosen. Scored
-#: against the fruit topic they land between 0.54 and 0.80, so the floor sits
-#: just under the weakest of them: anything the brief would call a good
-#: opening passes, and the banned openers do not reach it because they are
-#: rejected outright rather than scored. All seventeen topics currently clear
-#: it, between 0.56 and 0.80.
-HOOK_PASS = 0.52
+#: Recalibrated when problem recognition became the leading dimension. The
+#: brief's six problem-first examples, each scored against the topic it
+#: belongs to, land between **0.491 and 0.692**; a deliberately generic
+#: opening ("estas son cinco ideas sencillas para el dia a dia") scores
+#: **0.320**. The floor sits just under the weakest real example and well
+#: above the generic one. The banned openers never reach it at all, because
+#: they are rejected outright rather than scored.
+HOOK_PASS = 0.48
 
 
 def _fold(text: str) -> str:
@@ -202,7 +256,11 @@ def score_hook(text: str, topic: Topic) -> HookCandidate:
         candidate.rejected = True
         candidate.reason = f"medical risk: {risks[0].code}"
         return candidate
-    if makes_effect_claim(candidate.text) and not is_hedged(candidate.text):
+    # Through find_unhedged rather than re-implementing it: the hedge rule
+    # exempts a conditional about what the viewer notices, and duplicating the
+    # check here is how one of the brief's own hooks came to be rejected by a
+    # rule that had already been taught not to reject it.
+    if find_unhedged(candidate.text):
         candidate.rejected = True
         candidate.reason = "states an effect the evidence does not support"
         return candidate
@@ -217,12 +275,20 @@ def score_hook(text: str, topic: Topic) -> HookCandidate:
     shared = {w for w in _words(candidate.text) if len(w) > 3} & _content_words(topic)
 
     scores = {
-        "curiosity": min(1.0, 0.45 * _hits(candidate.text, CURIOSITY)),
+        "problem": min(1.0, 0.55 * _hits(candidate.text, PROBLEM)),
+        "usefulness": min(1.0, 0.60 * _hits(candidate.text, BENEFIT)),
+        "curiosity": min(1.0, 0.50 * _hits(candidate.text, CURIOSITY)),
+        "specificity": min(1.0, 0.40 * _hits(candidate.text, SPECIFIC)),
+        "emotion": min(1.0, 0.60 * _hits(candidate.text, EMOTION)),
+        "relevance": min(1.0, 0.30 * len(shared)),
         "clarity": _clarity(candidate.text),
-        "benefit": min(1.0, 0.55 * _hits(candidate.text, BENEFIT)),
-        "relevance": min(1.0, 0.25 * len(shared)),
         "naturalness": _naturalness(candidate.text),
     }
+    # A hook that names no problem at all is generic however well it reads.
+    # Penalised rather than rejected, because a few honest openings - the
+    # myth format's, for instance - work by naming a belief instead.
+    if scores["problem"] == 0.0 and scores["emotion"] == 0.0:
+        scores["curiosity"] *= 0.6
     candidate.scores = scores
     candidate.total = round(
         sum(scores[k] * w for k, w in WEIGHTS.items()), 3
@@ -234,34 +300,20 @@ def score_hook(text: str, topic: Topic) -> HookCandidate:
 # Candidate generation
 # ---------------------------------------------------------------------------
 
-#: A small number of openings that stay grammatical whatever they are handed,
-#: kept as extra candidates so the choice is never between one option and
-#: nothing. The topics carry their own written hooks, which is where the good
-#: ones come from: a template that has to fit seventeen subjects produces
-#: interchangeable openings, and the opening is the one part of a reel that
-#: must not be interchangeable.
-TEMPLATES: dict[str, tuple[str, ...]] = {
-    "comparison": (
-        "{Left_cap} o {right}: parecen lo mismo y no lo son.",
-        "Antes de elegir entre {left} y {right}, mira esto.",
-    ),
-    "myth": (
-        "Se repite mucho, y no es exactamente asi.",
-        "Lo que suele decirse sobre esto no cuenta toda la historia.",
-    ),
-    "error_solution": (
-        "Aqui es donde mucha gente se equivoca, y tiene arreglo facil.",
-    ),
-    "list": (
-        "Estas son {count} ideas sencillas para el dia a dia.",
-    ),
-    "ranking": (
-        "Un orden orientativo, no una regla: la racion puede cambiarlo entero.",
-    ),
-    "combination": (
-        "Lo que acompana a un alimento cambia bastante el resultado.",
-    ),
-}
+#: Problem-first openings, filled from the topic's own ``worry``. These are
+#: the floor rather than the source - the per-topic hooks are written for
+#: their subject and usually win - but they guarantee the eight to twelve
+#: candidates the brief asks for, and every one of them opens on the viewer's
+#: concern rather than on the subject.
+TEMPLATES: tuple[str, ...] = (
+    "Si tienes diabetes y te preocupa {worry}, escucha esto.",
+    "Si te preocupa {worry}, esto te interesa.",
+    "Te preocupa {worry}? Presta atencion a esto.",
+    "Si {moment} notas que tu glucosa sube mas de lo que esperas, quedate.",
+)
+
+#: Used only when the topic names a moment.
+_MOMENT_TEMPLATE = "Si {moment} notas que tu glucosa sube mas de lo que esperas, quedate."
 
 
 def _capitalise(text: str) -> str:
@@ -272,29 +324,24 @@ def _capitalise(text: str) -> str:
 def generate(topic: Topic) -> list[str]:
     """Between five and ten candidate openings for this topic.
 
-    The topic's own written openings come first and the generic templates
-    follow, because a hook written for this subject beats a hook that had to
-    fit seventeen of them - which is exactly what the scoring below keeps
-    finding.
+    The topic's own written openings come first and the worry templates
+    follow. Between eight and twelve, which is what the brief asks for and
+    what makes "choose the best" mean anything: three candidates is a
+    preference, ten is a selection.
     """
 
-    left = topic.items[0].display if topic.items else "esta opcion"
-    right = topic.items[1].display if len(topic.items) > 1 else "la otra"
-    values = {
-        "count": str(len(topic.items)),
-        "left": left,
-        "right": right,
-        "Left_cap": _capitalise(left),
-    }
+    worry = str(topic.worry or "").strip()
+    moment = str(topic.moment or "").strip()
 
     # The topic's own hooks first: they are written for this subject and they
-    # are the ones that win. The templates are the floor, not the source.
+    # are the ones that usually win. The templates are the floor, not the
+    # source, and every one of them opens on the worry.
     out: list[str] = [h for h in topic.hooks]
-    for template in TEMPLATES.get(topic.format, TEMPLATES["list"]):
-        try:
-            out.append(template.format(**values))
-        except KeyError:                                  # pragma: no cover
-            continue
+    if worry:
+        for template in TEMPLATES:
+            if "{moment}" in template and not moment:
+                continue
+            out.append(template.format(worry=worry, moment=moment))
     # Deduplicate, keep order.
     seen: set[str] = set()
     unique: list[str] = []
@@ -303,7 +350,7 @@ def generate(topic: Topic) -> list[str]:
         if key and key not in seen:
             seen.add(key)
             unique.append(text)
-    return unique[:10]
+    return unique[:MAX_CANDIDATES]
 
 
 @dataclass

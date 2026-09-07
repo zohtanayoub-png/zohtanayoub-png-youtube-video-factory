@@ -435,11 +435,19 @@ class PiperEngine(TTSEngine):
         )
 
     # ------------------------------------------------------------------
-    def synthesize(self, text: str, destination: Path) -> Path:
+    def synthesize(self, text: str, destination: Path, speed: float = 0.0) -> Path:
+        """``speed`` overrides the engine's own for this chunk only.
+
+        Additive and optional: every existing caller passes two arguments and
+        gets exactly the behaviour it had. The reels use it to read a list a
+        little faster than the line the viewer is meant to remember, which is
+        most of the difference between a person talking and a newsreader.
+        """
+
         destination.parent.mkdir(parents=True, exist_ok=True)
         raw = destination.with_name(destination.stem + ".piper.wav")
         # Piper's length_scale is inverse to speed: 1.25 is 25% slower.
-        length_scale = 1.0 / max(0.4, min(self.speed, 2.0))
+        length_scale = 1.0 / max(0.4, min(float(speed or self.speed), 2.0))
         command = [
             *self.command_prefix,
             "-m", str(self.model_path),
