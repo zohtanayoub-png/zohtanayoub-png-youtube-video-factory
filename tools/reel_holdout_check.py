@@ -167,6 +167,16 @@ HOLDOUT_PILES: tuple[Pile, ...] = (
 )
 
 
+#: Which piles each command searches. Named once so the freeze check and the
+#: runner cannot disagree about what a command is about to spend.
+PILES_FOR: dict[str, tuple[Pile, ...]] = {
+    "berries": BERRY_PILES,
+    "avocado": AVOCADO_PILES,
+    "apple": APPLE_PILES,
+    "holdout": HOLDOUT_PILES,
+}
+
+
 # ---------------------------------------------------------------------------
 # Fetching
 # ---------------------------------------------------------------------------
@@ -661,9 +671,13 @@ def main(argv: list[str] | None = None) -> int:
     excluded, burned = frozen()
     log.info("excluding %d development clips and %d spent queries",
              len(excluded), len(burned))
-    for pile in (*BERRY_PILES, *AVOCADO_PILES, *APPLE_PILES, *HOLDOUT_PILES):
-        if pile.query.strip().lower() in burned:           # pragma: no cover
-            print(f"pile {pile.name!r} reuses a development query")
+    # Only the piles this command will actually search. A calibration pile
+    # is *supposed* to appear in the burned list once it has been spent -
+    # that is what spending it means - and checking every pile on every run
+    # refuses the held-out run for the calibration's own history.
+    for pile in PILES_FOR[args.command]:
+        if pile.query.strip().lower() in burned:
+            print(f"pile {pile.name!r} reuses a query the calibration spent")
             return 2
 
     downloader = ClipDownloader(

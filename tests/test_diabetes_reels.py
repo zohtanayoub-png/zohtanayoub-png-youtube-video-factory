@@ -1577,6 +1577,19 @@ def test_the_held_out_piles_never_reuse_a_development_query_or_clip():
     from vidfactory.reels.foods import BY_NAME
     for pile in module.HOLDOUT_PILES:
         assert pile.food in BY_NAME, pile.name
+
+    # The guard checks the piles the command is about to search, and only
+    # those: a calibration pile belongs in the burned list once it has been
+    # spent, and checking all of them refused the held-out run for the
+    # calibration's own history.
+    assert set(module.PILES_FOR) == {"berries", "avocado", "apple", "holdout"}
+    assert module.PILES_FOR["holdout"] is module.HOLDOUT_PILES
+    for command, piles in module.PILES_FOR.items():
+        already = {p.query.strip().lower() for p in piles} & burned
+        if command == "holdout":
+            assert not already, sorted(already)
+        else:
+            assert already, f"{command} piles are not recorded as spent"
     # And the loader hands the id filter to every pile builder.
     clips, queries = module.frozen()
     assert len(clips) == 54 and queries == burned
