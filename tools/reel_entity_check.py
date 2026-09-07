@@ -29,7 +29,7 @@ from typing import Any
 from vidfactory.config import load_config
 from vidfactory.downloader import ClipDownloader
 from vidfactory.logging_utils import get_logger, setup_logging
-from vidfactory.reels.foods import BY_NAME, FOODS, score_food
+from vidfactory.reels.foods import BY_NAME, identify_food, score_food
 from vidfactory.stock import build_providers
 from vidfactory.visual_analysis import VisualAnalyzer
 from vidfactory.visual_model import load_model
@@ -50,7 +50,7 @@ SWEEP = (0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80)
 
 
 def score_pile(analyzer: Any, downloader: Any, providers: Any, entity: Any,
-               query: str, limit: int) -> list[float]:
+               query: str, limit: int, scorer: Any) -> list[float]:
     """Grounding scores for `limit` clips found by `query`."""
 
     candidates: list[Any] = []
@@ -70,7 +70,7 @@ def score_pile(analyzer: Any, downloader: Any, providers: Any, entity: Any,
         frames = analyzer.sample(
             result.clip, video=result.clip.local_path or result.path
         )
-        grounding = analyzer.ground_entity(frames, entity, score_food)
+        grounding = analyzer.ground_entity(frames, entity, scorer)
         if grounding.checked:
             scores.append(grounding.score)
     return scores
@@ -82,6 +82,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--clips", type=int, default=6,
                         help="clips per pile (each is a download and a decode)")
     parser.add_argument("--out", default="output/reel-entity-check.json")
+    parser.add_argument("--scorer", default="identify",
+                        choices=["identify", "dominance"])
+    parser.add_argument("--model", default="rank", choices=["rank", "claim"],
+                        help="rank = MobileCLIP-S0, claim = the validated ViT-L/14")
     args = parser.parse_args(argv)
     setup_logging(verbose=False)
 
@@ -90,7 +94,9 @@ def main(argv: list[str] | None = None) -> int:
     if not providers:
         print("no stock provider is available")
         return 2
-    settings = dict(config.get("visual.model", {}) or {})
+    key = "visual.model" if args.model == "rank" else "visual.claim_model"
+    settings = dict(config.get(key, {}) or {})
+    settings.setdefault("enabled", True)
     model = load_model(settings) if settings.get("enabled", True) else None
     if model is None:
         print("no visual model; nothing to calibrate")
@@ -110,11 +116,14 @@ def main(argv: list[str] | None = None) -> int:
     rows: list[dict[str, Any]] = []
     for name, wrong_query in CONFUSIONS:
         entity = BY_NAME[name]
+        scorer = identify_food if args.scorer == "identify" else score_food
         right = score_pile(
-            analyzer, downloader, providers, entity, entity.queries[0], args.clips
+            analyzer, downloader, providers, entity, entity.queries[0],
+            args.clips, scorer,
         )
         wrong = score_pile(
-            analyzer, downloader, providers, entity, wrong_query, args.clips
+            analyzer, downloader, providers, entity, wrong_query,
+            args.clips, scorer,
         )
         rows.append({
             "food": name,
@@ -136,19 +145,23 @@ def main(argv: list[str] | None = None) -> int:
     wrong = [s for r in rows for s in r["wrong_scores"]]
     sweep = []
     for cut in SWEEP:
-        # score is "the food owns the frame"; it passes when score > 1 - cut,
-        # which is exactly what score_food's dominance test does.
-        keep = sum(1 for s in own if s >= 1.0 - cut)
-        catch = sum(1 for s in wrong if s < 1.0 - cut)
+        # identify: the score IS the share of frames naming the right food, so
+        # it passes at score >= cut. dominance: the score is "the food owns the
+        # frame" and passes at score >= 1 - cut.
+        bar = cut if args.scorer == "identify" else 1.0 - cut
+        keep = sum(1 for s in own if s >= bar)
+        catch = sum(1 for s in wrong if s < bar)
         sweep.append({
-            "dominance_fail": cut,
+            "cut": cut,
+            "passes_at_score": round(bar, 2),
             "kept_of_own": f"{keep}/{len(own)}",
             "kept_pct": round(100.0 * keep / len(own), 1) if own else 0.0,
             "rejected_of_wrong": f"{catch}/{len(wrong)}",
             "rejected_pct": round(100.0 * catch / len(wrong), 1) if wrong else 0.0,
         })
 
-    report = {"per_food": rows, "sweep": sweep,
+    report = {"scorer": args.scorer, "model": args.model,
+              "per_food": rows, "sweep": sweep,
               "own_clips": len(own), "wrong_clips": len(wrong)}
     target = Path(args.out)
     target.parent.mkdir(parents=True, exist_ok=True)

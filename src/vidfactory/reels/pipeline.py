@@ -49,7 +49,7 @@ from .knowledge import BY_SLUG, Topic, find_topic
 from .metadata import caption as build_caption
 from .metadata import publish_metadata
 from .qc import ReelReport, build_report
-from .foods import repair_queries, required_food_for, score_food
+from .foods import identify_food, repair_queries, required_food_for
 from .script import (
     ALLOWED_SECONDS,
     DEFAULT_SECONDS,
@@ -490,7 +490,7 @@ class ReelPipeline:
                         "analyzed": analysis.analyzed,
                     })
                     if entity is not None:
-                        grounding = analyzer.ground_entity(frames, entity, score_food)
+                        grounding = analyzer.ground_entity(frames, entity, identify_food)
                         if grounding.failed:
                             # Not this beat's food. Put the clip back rather
                             # than shipping it: the whole point is that the

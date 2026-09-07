@@ -33,7 +33,12 @@ import re
 import unicodedata
 from typing import Any, Sequence
 
-from ..entities import VisualEntity, grounding_prompts, score_from_similarities
+from ..entities import (
+    EntityGrounding,
+    VisualEntity,
+    grounding_prompts,
+    score_from_similarities,
+)
 from ..logging_utils import get_logger
 
 log = get_logger("REELFOOD")
@@ -340,7 +345,11 @@ def required_food_for(beat: Any) -> VisualEntity | None:
 
 
 def score_food(entity: VisualEntity, per_frame: Sequence[Sequence[float]], ramp: Any):
-    """The same dominance question the interiors ask, at the food thresholds."""
+    """The same dominance question the interiors ask, at the food thresholds.
+
+    Kept for comparison and **not** used: the first calibration measured it at
+    chance. See :func:`identify_food`, and the note in CLAUDE.md.
+    """
 
     return score_from_similarities(
         entity,
@@ -349,6 +358,69 @@ def score_food(entity: VisualEntity, per_frame: Sequence[Sequence[float]], ramp:
         margin_low=FOOD_MARGIN_LOW,
         margin_high=FOOD_MARGIN_HIGH,
         dominance_fail=FOOD_DOMINANCE_FAIL,
+    )
+
+
+#: What share of frames must name the right food for the shot to be about it.
+#:
+#: Placeholder until the identification probe has been swept. The dominance
+#: probe above was measured first and came back at chance - kept% + rejected%
+#: summed to ~100 at every cut, and manzana was *inverted*, real apple footage
+#: at a median of 0.131 against orange footage at 0.508.
+FOOD_IDENTIFY_PASS = 0.60
+
+
+def identify_food(
+    entity: VisualEntity, per_frame: Sequence[Sequence[float]], ramp: Any = None
+) -> EntityGrounding:
+    """Which food does this frame look most like?
+
+    A different question from the interiors', because food is a different
+    kind of subject. "Does this room contain a wall" is true of every room, so
+    the only answerable question there was displacement - how far something
+    else beats the wall. But a fruit close-up is *of one fruit*: apple, orange
+    and pear are mutually exclusive in a way a wall and a sofa are not, so the
+    answerable question is plain identification.
+
+    So this ranks every prompt - the food's own descriptions and the foods it
+    is confused with - and asks which came first. The score is the share of
+    frames where the right food won, and there is no margin band: a frame that
+    looks marginally more like an orange than an apple is a frame of an
+    orange.
+    """
+
+    positives = len(entity.positives)
+    wins = 0
+    counted = 0
+    losers: dict[str, int] = {}
+    for similarities in per_frame:
+        if len(similarities) <= positives:
+            continue
+        counted += 1
+        best = max(range(len(similarities)), key=lambda i: similarities[i])
+        if best < positives:
+            wins += 1
+        else:
+            name = entity.competitors[best - positives]
+            losers[name] = losers.get(name, 0) + 1
+    if not counted:
+        return EntityGrounding(entity=entity.name, labels=entity.labels)
+    share = wins / counted
+    top = max(losers.items(), key=lambda kv: kv[1])[0] if losers else ""
+    passed = share >= FOOD_IDENTIFY_PASS
+    return EntityGrounding(
+        entity=entity.name,
+        labels=entity.labels,
+        checked=True,
+        score=round(share, 3),
+        passed=passed,
+        top_distractor=top,
+        top_distractor_margin=round(1.0 - share, 3),
+        detail=(
+            f"{entity.labels[0]} named in {wins}/{counted} frames" if passed
+            else f"only {wins}/{counted} frames look like {entity.labels[0]}"
+                 + (f"; {top} won the rest" if top else "")
+        ),
     )
 
 

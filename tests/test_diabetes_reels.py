@@ -1022,3 +1022,44 @@ def test_the_medical_checks_still_see_accented_spanish():
         "unhedged"
     ]
     assert safety.find_risks("La fruta suele bajar el azúcar en sangre.") == []
+
+
+def test_the_identification_probe_names_the_food_that_won():
+    """Which fruit is this, not how displaced is it.
+
+    The dominance probe the interiors use was measured at chance on food: over
+    28 correct and 28 wrong clips, kept% and rejected% summed to ~100 at every
+    cut, and manzana came back *inverted* - real apple footage at a median of
+    0.131 against orange footage at 0.508. Apple, orange and pear are mutually
+    exclusive in a way a wall and a sofa are not, so the answerable question
+    is plain identification.
+    """
+
+    from vidfactory.reels.foods import BY_NAME, identify_food
+
+    apple = BY_NAME["manzana"]
+    positives = len(apple.positives)
+
+    orange = [[0.18] * positives + [0.34] + [0.20] * (len(apple.competitors) - 1)] * 3
+    verdict = identify_food(apple, orange)
+    assert verdict.checked and not verdict.passed
+    assert verdict.score == 0.0
+    assert verdict.top_distractor == "an orange"
+
+    good = [[0.31] * positives + [0.19] * len(apple.competitors)] * 3
+    assert identify_food(apple, good).passed
+    assert identify_food(apple, good).score == 1.0
+
+
+def test_a_mostly_right_clip_still_passes():
+    """One frame where the camera has panned off the fruit is not a failure."""
+
+    from vidfactory.reels.foods import FOOD_IDENTIFY_PASS, BY_NAME, identify_food
+
+    kiwi = BY_NAME["kiwi"]
+    positives = len(kiwi.positives)
+    right = [0.30] * positives + [0.19] * len(kiwi.competitors)
+    wrong = [0.18] * positives + [0.33] + [0.20] * (len(kiwi.competitors) - 1)
+    verdict = identify_food(kiwi, [right, right, wrong])
+    assert verdict.score == pytest.approx(2 / 3, abs=0.01)
+    assert verdict.passed is (2 / 3 >= FOOD_IDENTIFY_PASS)

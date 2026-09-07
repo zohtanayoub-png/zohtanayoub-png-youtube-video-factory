@@ -811,14 +811,27 @@ jobs:
       - name: Measure the food probes
         env:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
-        run: python tools/reel_entity_check.py --clips 6
+        run: |
+          set -euo pipefail
+          # Four measurements: both probes on both models. The dominance probe
+          # on MobileCLIP-S0 came back at chance, and "the backend was the
+          # limit" is what the long-form instruction check found - so it is
+          # measured rather than assumed here too.
+          for model in rank claim; do
+            for scorer in identify dominance; do
+              echo "=== $model / $scorer"
+              python tools/reel_entity_check.py --clips 6 \
+                --model "$model" --scorer "$scorer" \
+                --out "output/foodcheck-$model-$scorer.json" || true
+            done
+          done
       - name: Report
         if: always()
         run: |
           {
             echo "## Food grounding calibration"
             echo '```json'
-            cat output/reel-entity-check.json || true
+            for f in output/foodcheck-*.json; do echo "--- $f"; cat "$f"; done || true
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
