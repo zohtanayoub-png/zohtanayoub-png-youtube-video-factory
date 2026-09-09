@@ -1480,12 +1480,20 @@ jobs:
           # size delivers only whatever happened to print last - the first
           # strips run emitted 33 and 18 arrived. probe_query carries the band
           # as "LOW HIGH"; blank means the low end, which is where the floor is.
-          BAND="${PROBE_QUERY:-0.0 0.25}"
-          read -r LOW HIGH <<< "$BAND"
-          python tools/reel_holdout_check.py strips --clips 1 \
-            --sharpness-min "$LOW" --sharpness-max "$HIGH" \
-            --strip-height 220 --strip-quality 9 \
-            --out output/holdout/strips.json | tee output/holdout/strips-summary.txt
+          # probe_query carries either a band as "LOW HIGH", or a comma-
+          # separated list of window ids / strip names to draw exactly.
+          SEL="${PROBE_QUERY:-0.0 0.25}"
+          if [[ "$SEL" == *,* ]]; then
+            python tools/reel_holdout_check.py strips --clips 1 \
+              --window-ids "$SEL" --strip-height 220 --strip-quality 9 \
+              --out output/holdout/strips.json | tee output/holdout/strips-summary.txt
+          else
+            read -r LOW HIGH <<< "$SEL"
+            python tools/reel_holdout_check.py strips --clips 1 \
+              --sharpness-min "$LOW" --sharpness-max "$HIGH" \
+              --strip-height 220 --strip-quality 9 \
+              --out output/holdout/strips.json | tee output/holdout/strips-summary.txt
+          fi
       - name: Report
         if: always()
         run: |

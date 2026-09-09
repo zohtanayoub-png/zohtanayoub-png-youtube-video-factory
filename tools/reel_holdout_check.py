@@ -1221,12 +1221,26 @@ def run_strips(args, analyzer, providers, downloader, excluded) -> dict[str, Any
     # sharpest, because they print last - so the low end where the floor
     # actually sits arrived as nothing at all. Asking for one band at a time
     # is how the evidence fits through.
-    low = float(getattr(args, "sharpness_min", 0.0) or 0.0)
-    high = getattr(args, "sharpness_max", None)
-    high = float(high) if high is not None else 1.0
-    banded = [r for r in rows
-              if low <= float(r.get("window_sharpness", 0.0)) <= high]
-    chosen = stratified(banded, max(1, STRIP_BUDGET - len(known))) + known
+    # Named windows take precedence over the band. Expanding a labelled set
+    # means drawing the specific windows a decision is short of, not a fresh
+    # spread across an axis that has already been read.
+    wanted = [w.strip() for w in
+              str(getattr(args, "window_ids", "") or "").split(",") if w.strip()]
+    if wanted:
+        by_id = {str(r.get("window_id")): r for r in rows + known}
+        by_strip = {str(r.get("strip")): r for r in rows + known}
+        chosen = [by_id.get(w) or by_strip.get(w) for w in wanted]
+        missing = [w for w, r in zip(wanted, chosen) if r is None]
+        if missing:
+            log.warning("no measured window for %s", ", ".join(missing))
+        chosen = [r for r in chosen if r is not None]
+    else:
+        low = float(getattr(args, "sharpness_min", 0.0) or 0.0)
+        high = getattr(args, "sharpness_max", None)
+        high = float(high) if high is not None else 1.0
+        banded = [r for r in rows
+                  if low <= float(r.get("window_sharpness", 0.0)) <= high]
+        chosen = stratified(banded, max(1, STRIP_BUDGET - len(known))) + known
     work = Path("output/holdout/strips")
     work.mkdir(parents=True, exist_ok=True)
 
@@ -2034,6 +2048,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--sharpness-max", type=float, default=1.0)
     parser.add_argument("--strip-height", type=int, default=240)
     parser.add_argument("--strip-quality", type=int, default=4)
+    #: Draw exactly these windows, by window_id or by strip name. Overrides
+    #: the band: expanding a labelled set is about specific windows.
+    parser.add_argument("--window-ids", default="")
     args = parser.parse_args(argv)
     setup_logging(verbose=False)
 
