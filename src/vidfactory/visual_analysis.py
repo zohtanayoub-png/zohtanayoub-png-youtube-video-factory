@@ -171,6 +171,103 @@ def sample_positions(duration: float, count: int = 3) -> list[float]:
     return [round(lead + step * i, 3) for i in range(count)]
 
 
+def segment_positions(start: float, duration: float, count: int = 3) -> list[float]:
+    """Where to look *inside* one temporal window, and nowhere else.
+
+    The reel's grounding used to inspect a whole source clip while the editor
+    showed only the first three seconds of it, so a clip whose apple appears
+    at second nine passed a beat that displayed a blurred hand at second one.
+    A window is judged on its own frames or the guarantee means nothing.
+
+    Sampled at roughly 22%, 50% and 78% of the window rather than at its
+    edges: a cut, a fade or the tail of a camera move lands on a boundary far
+    more often than in the middle, and a frame from the neighbouring shot is
+    exactly the evidence this function exists to exclude.
+    """
+
+    count = max(1, int(count))
+    start = max(0.0, float(start))
+    duration = max(0.0, float(duration))
+    if duration <= 0.05:
+        return [round(start, 3)] * count
+    if count == 1:
+        return [round(start + duration * 0.5, 3)]
+    lead, tail = 0.22, 0.78
+    step = (tail - lead) / (count - 1)
+    return [round(start + duration * (lead + step * i), 3) for i in range(count)]
+
+
+def segment_frames(
+    video: str | Path,
+    start: float,
+    duration: float,
+    count: int = 3,
+    size: tuple[int, int] = STAT_SIZE,
+    timeout: float = 30.0,
+) -> list[Frame]:
+    """Decode frames from one temporal window of a video.
+
+    Deliberately does *not* take provider preview stills: those are spread
+    across the whole clip and are the reason a segment could be rescued by
+    footage the viewer never sees.
+    """
+
+    frames: list[Frame] = []
+    for position in segment_positions(start, duration, count):
+        frame = decode_frame(video, position, size, timeout)
+        if frame and frame.ok:
+            frames.append(frame)
+    return frames
+
+
+def window_quality(frames: Sequence[Frame]) -> dict[str, float]:
+    """How watchable one candidate window is, beyond what it contains.
+
+    Three measured things, and they are proxies rather than the words a
+    reviewer would use. **Sharpness** is mean edge density, which is what
+    motion blur and a hunting focus both destroy. **Steadiness** is how much
+    consecutive sampled frames differ, which is high across a cut and across
+    a fast whip pan. **Centre weight** is edge density in the middle of the
+    frame, because a 16:9 source becomes a 9:16 reel and only the middle
+    third survives - a subject at the edge is a subject that gets cropped
+    out.
+
+    Not claimed: composition, or "the hand is blocking the food". Those are
+    judgements, and the four probes already answer the one that matters -
+    whether the food is identifiable in this window.
+    """
+
+    usable = [f for f in frames if f.ok]
+    if not usable:
+        return {"sharpness": 0.0, "steadiness": 0.0, "centre_weight": 0.0, "quality": 0.0}
+
+    stats = [measure(f) for f in usable]
+    sharpness = _mean([s.edge_density for s in stats])
+    centre = _mean([measure(crop_center(f, 0.45)).edge_density for f in usable])
+
+    changes: list[float] = []
+    for before, after in zip(usable, usable[1:]):
+        if before.width != after.width or len(before.pixels) != len(after.pixels):
+            continue
+        step = max(1, len(before.pixels) // 3000)
+        sampled = range(0, len(before.pixels), step)
+        changes.append(
+            sum(abs(before.pixels[i] - after.pixels[i]) for i in sampled)
+            / max(1, len(range(0, len(before.pixels), step)))
+        )
+    movement = _mean(changes) if changes else 0.0
+
+    sharp = _ramp(sharpness, 4.0, 26.0)
+    steady = 1.0 - _ramp(movement, 12.0, 70.0)
+    weighted = _ramp(centre, 4.0, 26.0)
+    return {
+        "sharpness": round(sharp, 3),
+        "steadiness": round(steady, 3),
+        "centre_weight": round(weighted, 3),
+        "quality": round(0.5 * sharp + 0.3 * steady + 0.2 * weighted, 3),
+    }
+
+
 def decode_frame(
     source: str | Path,
     timestamp: float | None = None,

@@ -1791,3 +1791,85 @@ def test_the_provider_counts_survive_the_trip_to_the_report():
     alone = _provider_counts([shot("pexels:1"), shot("pexels:2")])
     assert alone["providers_on_screen"] == ["pexels"]
     assert alone["pixabay_video_shot_count"] == 0
+
+
+def test_a_window_is_sampled_inside_itself_and_never_outside():
+    """The whole failure, as an assertion.
+
+    Run 34324481463 shipped a manzana beat scoring 1.00 on all four probes
+    over a crop showing a blurred hand, because the frames that answered came
+    from elsewhere in the source clip. A window judged on somebody else's
+    frames is not judged.
+    """
+
+    from vidfactory.visual_analysis import segment_positions
+
+    start, length = 12.4, 2.9
+    positions = segment_positions(start, length)
+    assert len(positions) == 3
+    for t in positions:
+        assert start < t < start + length, t
+    # And ordered, with nothing sitting on an edge where a cut lives.
+    assert positions == sorted(positions)
+    assert positions[0] > start + length * 0.15
+    assert positions[-1] < start + length * 0.85
+
+    # A degenerate segment still answers rather than raising.
+    assert segment_positions(5.0, 0.0) == [5.0, 5.0, 5.0]
+    assert segment_positions(0.0, 3.0, 1) == [1.5]
+
+
+def test_the_crop_moves_before_the_clip_is_thrown_away():
+    """A source is not unusable because its first three seconds are."""
+
+    from vidfactory.reels.pipeline import MAX_WINDOWS, window_starts
+
+    # The opening leads, because that is where the editor has always started
+    # and a source that is fine as it stands must cost one grounding pass.
+    assert window_starts(10.0, 3.0)[0] == 0.0
+    assert len(window_starts(10.0, 3.0)) > 1
+
+    # A long source does not turn into an unbounded scan.
+    assert len(window_starts(600.0, 3.0)) <= MAX_WINDOWS + 1
+
+    # A source with no room to move offers exactly the one window it has.
+    assert window_starts(3.05, 3.0) == [0.0]
+    assert window_starts(2.0, 3.0) == [0.0]
+
+    # Every start leaves a whole window inside the source.
+    for seconds in (4.0, 7.5, 31.0):
+        for start in window_starts(seconds, 3.0):
+            assert start + 3.0 <= seconds + 0.05, (seconds, start)
+
+
+def test_the_report_separates_the_clip_from_the_crop():
+    """"The source contains an apple" and "the viewer saw an apple" are two
+    different claims, and only the second one ships."""
+
+    import inspect
+    from vidfactory.reels import pipeline, qc
+
+    report = inspect.getsource(qc)
+    for name in ("used_segment_results", "segment_grounding_failure_count",
+                 "segment_window_repair_count",
+                 "the_seconds_on_screen_show_the_food"):
+        assert name in report, name
+
+    # The allow-list has to name them or they never arrive - the mistake the
+    # provider counters already made once.
+    summary = inspect.getsource(pipeline.ReelPipeline._visual_summary)
+    for name in ("used_segment_results", "segment_grounding_failure_count",
+                 "segment_window_repair_count"):
+        assert name in summary, name
+
+
+def test_the_editor_no_longer_starts_every_reel_shot_at_zero():
+    """``start=0.0`` was hardcoded, so the viewer always got the opening
+    seconds of a clip that had been judged on frames from anywhere in it."""
+
+    import inspect
+    from vidfactory.reels import pipeline
+
+    source = inspect.getsource(pipeline.ReelPipeline._plan_visuals)
+    assert "start=0.0" not in source
+    assert "start=round(in_point, 3)" in source

@@ -27,6 +27,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from typing import Sequence
 
 #: Full-resolution bands, sampled once. These are the two things a downscale
 #: lies about: the title's weight and the captions' outline.
@@ -91,7 +92,8 @@ def beat_at(beats: list, at: float) -> tuple[int, dict]:
     return -1, {}
 
 
-def describe(position: int, beat: dict, grounding: dict) -> str:
+def describe(position: int, beat: dict, grounding: dict,
+             segments: Sequence[dict] | None = None) -> str:
     """Everything a reviewer needs to judge one frame, on one line."""
 
     if not beat:
@@ -109,6 +111,10 @@ def describe(position: int, beat: dict, grounding: dict) -> str:
             # used should not have to parse keys to find out.
             f"via={'+'.join(row.get('providers', []) or []) or '-'}"
             f"/{'+'.join(sorted(set(row.get('media_types', []) or []))) or '-'} "
+            # The seconds of the source that reached the screen, which is the
+            # claim that matters: a clip containing the food and a crop
+            # showing it are two different things.
+            f"{_segments(segments or (), row.get('beat', ''))} "
             f"score={float(row.get('score', 0.0)):.2f} {verdict}"
         )
         # The four probes, separately. One combined number cannot tell a
@@ -131,6 +137,24 @@ def describe(position: int, beat: dict, grounding: dict) -> str:
             looked = row.get("looked_like") or "something else"
             parts.append(f"FAILED ON {failed} - looked like {looked}")
     return " | ".join(parts)
+
+
+def _segments(segments: Sequence[dict], beat: str) -> str:
+    """The used crops of one beat, as "12.4-15.3s@1.00(moved)"."""
+
+    rows = [r for r in segments if r.get("beat") == beat]
+    if not rows:
+        return "segment=-"
+    parts = []
+    for row in rows:
+        moved = ",moved" if row.get("window_moved") else ""
+        verdict = "" if row.get("segment_grounding_passed") else ",FAILED"
+        parts.append(
+            f"{float(row.get('source_start') or 0.0):.1f}-"
+            f"{float(row.get('source_end') or 0.0):.1f}s@"
+            f"{float(row.get('segment_grounding_score') or 0.0):.2f}{moved}{verdict}"
+        )
+    return "segment=" + "+".join(parts)
 
 
 def main(argument: str) -> int:
@@ -162,6 +186,10 @@ def main(argument: str) -> int:
         str(row.get("beat", "")): row
         for row in report.get("item_grounding_results", []) or []
     }
+    # The crops that actually reached the screen, per shot rather than per
+    # beat: a beat with two shots has two of them, and either can be the one
+    # a reviewer is looking at.
+    used_segments = list(report.get("used_segment_results", []) or [])
 
     # One frame per beat, sampled in the middle of the beat and labelled with
     # the beat that timestamp actually lands in. Every item beat is sampled,
@@ -190,7 +218,7 @@ def main(argument: str) -> int:
         # Scaled to 540 wide: half the reel's own width, which keeps the log
         # payload reasonable and the layout readable.
         grab(video, at, frame, "scale=540:-2")
-        emit(name, frame, at, describe(position, beat, grounding))
+        emit(name, frame, at, describe(position, beat, grounding, used_segments))
 
     mid = max(0.5, total * 0.45)
     for name, filters in BANDS:

@@ -49,6 +49,8 @@ claim: a still photograph that does is a better answer than a video that
 does not, and the last resort below that is never silent.
 
 ``image_fallback_shot_count``         beats carried by an animated still
+``segment_grounding_failure_count``   used crops that do not show their food
+``segment_window_repair_count``       crops moved inside their own source
 ``ungrounded_fallback_count``         beats that shipped an unverified clip
 
 In production the two safety counts must be zero. That is not a threshold to
@@ -352,6 +354,11 @@ def build_report(
         )
     }
     providers["providers_on_screen"] = list(visual.pop("providers_on_screen", []) or [])
+    # The seconds the viewer is actually shown. Popped by name for the same
+    # reason as the provider counts: these are read directly off the report.
+    segments = list(visual.pop("used_segment_results", []) or [])
+    segment_failures = int(visual.pop("segment_grounding_failure_count", 0) or 0)
+    window_repairs = int(visual.pop("segment_window_repair_count", 0) or 0)
     providers["provider_count_on_screen"] = len(providers["providers_on_screen"])
 
     metrics: dict[str, Any] = {
@@ -381,6 +388,12 @@ def build_report(
         "item_grounding_results": grounding_rows,
         "repaired_item_shot_count": repaired_shots,
         "image_fallback_shot_count": image_shots,
+        # A source clip containing the right food and a *crop* of it showing
+        # the right food are two different guarantees, and only the second
+        # one is what ships. Reported separately for that reason.
+        "used_segment_results": segments,
+        "segment_grounding_failure_count": segment_failures,
+        "segment_window_repair_count": window_repairs,
         **providers,
         "ungrounded_fallback_count": len(ungrounded),
         "repair_rounds_used": repair_rounds,
@@ -490,6 +503,29 @@ def build_report(
             # the long-form grounding gate uses, and for the same reason -
             # a probe's false positives should not silently refuse a render
             # nobody has looked at yet.
+            severity="error" if production else "warning",
+        ),
+        ReelCheck(
+            "the_seconds_on_screen_show_the_food",
+            not segment_failures,
+            (
+                "; ".join(
+                    f"{r.get('item') or r.get('beat')} shows {r.get('source')} "
+                    f"at {float(r.get('source_start') or 0.0):.1f}-"
+                    f"{float(r.get('source_end') or 0.0):.1f}s and fails on "
+                    f"{', '.join(r.get('failed_on') or ['grounding'])}"
+                    for r in segments
+                    if not r.get("segment_grounding_passed")
+                ) if segment_failures else
+                f"all {len(segments)} used segment(s) show the food they name"
+                + (f", after moving {window_repairs} crop(s)"
+                   if window_repairs else "")
+            ),
+            # The check above says the source clip contained the right food.
+            # This says the two to four seconds actually on screen did, which
+            # is the only one of the two a viewer experiences: run
+            # 34324481463 passed the first at 1.00 on all four probes and
+            # showed a blurred hand for the whole apple line.
             severity="error" if production else "warning",
         ),
         ReelCheck(

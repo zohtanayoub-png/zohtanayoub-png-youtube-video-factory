@@ -43,7 +43,7 @@ from ..logging_utils import get_logger
 from ..ranking import ClipRanker, RankingContext
 from ..stock.registry import build_providers
 from ..subtitles import generate_subtitles
-from ..visual_analysis import sample_frames
+from ..visual_analysis import sample_frames, segment_frames, window_quality
 from .narration import narrate
 from .voice import build_reel_engine, licence_report, prosody
 from .captions import REEL_HEIGHT, REEL_WIDTH, safe_area_report, write_reel_ass
@@ -77,6 +77,13 @@ MAX_SHOT = 4.0
 #: A short hold after the last word. Long enough not to cut the CTA off,
 #: short enough that the loop comes round quickly.
 TAIL_SECONDS = 0.4
+
+#: Frames inspected inside the window that will actually be on screen.
+SEGMENT_FRAMES = 3
+#: How many windows of a source to try before giving the clip up. A cap
+#: rather than a scan: a sixty second source offers twenty windows and
+#: grounding each costs a ViT-L/14 pass over three frames.
+MAX_WINDOWS = 6
 
 
 def shot_spans(
@@ -150,6 +157,92 @@ class ReelResult:
             "shots": len(self.shots),
             "passed": bool(self.report and self.report.passed),
         }
+
+
+def window_starts(
+    source_seconds: float, length: float, limit: int = MAX_WINDOWS
+) -> list[float]:
+    """Every in-point worth trying inside one source, the current one first.
+
+    ``0.0`` leads because that is where the editor has always started, so a
+    source that is fine as it stands costs exactly one grounding pass and
+    nothing moves. The rest are spread across the clip rather than stepped
+    from the front: the useful footage in a ten second stock clip is as
+    likely to be at second seven as at second three.
+    """
+
+    length = max(0.1, float(length))
+    usable = max(0.0, float(source_seconds) - length)
+    if usable <= 0.05:
+        return [0.0]
+    count = min(int(limit), max(2, int(usable // length) + 1))
+    step = usable / (count - 1)
+    starts = [round(step * i, 3) for i in range(count)]
+    return [0.0] + [t for t in starts if t > 0.05]
+
+
+def choose_window(
+    analyzer: Any,
+    video: Any,
+    source_seconds: float,
+    length: float,
+    requirement: Any,
+) -> tuple[float, Any, dict[str, float], int]:
+    """The best ``length`` seconds of this source for this beat.
+
+    The guarantee the reel used to make was "the source clip contains the
+    right food". What a viewer gets is a two to four second crop of it, and
+    run 34324481463 shipped a beat whose crop was a blurred hand while three
+    frames sampled elsewhere in the same clip showed the apple perfectly.
+    Every probe scored 1.00 and every one of them was answering about footage
+    nobody saw.
+
+    So a window is judged on frames from inside itself, and if it fails the
+    *clip* is not thrown away first - the crop is moved. Only when no window
+    passes has the source really failed, and the caller then treats it as it
+    always treated a rejected candidate.
+
+    Returns ``(start, grounding, quality, windows_tried)``. A ``grounding``
+    that did not pass means no window did, and ``start`` is then the opening
+    of the clip, which is where the editor would have put it anyway.
+    """
+
+    tried = 0
+    best: tuple[float, Any, dict[str, float]] | None = None
+    for start in window_starts(source_seconds, length):
+        frames = segment_frames(
+            video, start, length, SEGMENT_FRAMES, analyzer.decode_size
+        )
+        if not frames:
+            continue
+        tried += 1
+        grounding = ground_requirement(analyzer, frames, requirement)
+        if not grounding.passed:
+            log.debug(
+                "window %.2f-%.2fs fails on %s", start, start + length,
+                ", ".join(grounding.failed_on) or "unchecked",
+            )
+            if best is None:
+                best = (start, grounding, window_quality(frames))
+            continue
+        quality = window_quality(frames)
+        # Grounding decides, and the picture quality only breaks ties between
+        # windows that all show the food: a sharp window of the wrong fruit
+        # is not a better window.
+        rank = (round(grounding.score, 3), quality["quality"])
+        if best is None or not best[1].passed or rank > (
+            round(best[1].score, 3), best[2]["quality"]
+        ):
+            best = (start, grounding, quality)
+        # The opening of the clip is what shipped before. If it passes and
+        # scores full marks there is nothing a later window can win, so the
+        # common case still costs one pass.
+        if start == 0.0 and grounding.score >= 1.0 and quality["quality"] >= 0.75:
+            break
+
+    if best is None:
+        return 0.0, ground_requirement(analyzer, [], requirement), {}, tried
+    return best[0], best[1], best[2], tried
 
 
 def _provider_counts(shots: Sequence[Any]) -> dict[str, Any]:
@@ -519,6 +612,9 @@ class ReelPipeline:
         repaired_shots = 0
         rounds_used = 0
         image_shots = 0
+        window_repairs = 0
+        segment_failures = 0
+        segment_rows: list[dict[str, Any]] = []
 
         # The picture has to cover the whole narration plus the hold at the
         # end. Falling short is what made the editor freeze the final frame
@@ -793,12 +889,13 @@ class ReelPipeline:
                     "repair_rounds": attempts,
                 })
 
-            laid: list[tuple[str, Path, bool]] = [
-                (r.clip.key, Path(r.path), False) for r, _g in chosen
-            ] + [(c.key, path, True) for c, _g, path in picture]
+            laid: list[tuple[str, Path, bool, float]] = [
+                (r.clip.key, Path(r.path), False,
+                 float(getattr(r.clip, "duration", 0.0) or 0.0)) for r, _g in chosen
+            ] + [(c.key, path, True, 0.0) for c, _g, path in picture]
             per = span / len(laid)
             offset = start
-            for position, (clip_key, source, is_still) in enumerate(laid):
+            for position, (clip_key, source, is_still, source_seconds) in enumerate(laid):
                 length = min(MAX_SHOT, max(MIN_SHOT * 0.6, per))
                 if position == len(laid) - 1:
                     # The beat's last shot runs to the exact second the next
@@ -807,12 +904,64 @@ class ReelPipeline:
                     # which is the same defect as the frozen tail wearing a
                     # different hat.
                     length = max(0.1, end - offset)
+
+                # Which seconds of the source the viewer will actually get.
+                # The editor used to start every reel shot at 0.0 while the
+                # grounding inspected preview stills spread across the whole
+                # clip, so the guarantee covered footage nobody saw. The crop
+                # is chosen now, on its own frames, and moved rather than
+                # discarded when the opening of the clip will not do.
+                in_point = 0.0
+                if requirement is not None and not is_still and analyzer is not None:
+                    if not source_seconds:
+                        try:
+                            source_seconds = float(probe_media(source).duration)
+                        except Exception:                      # pragma: no cover
+                            source_seconds = 0.0
+                    in_point, verdict, quality, tried = choose_window(
+                        analyzer, source, source_seconds, length, requirement
+                    )
+                    if in_point > 0.05:
+                        window_repairs += 1
+                        log.info(
+                            "%s: %s moved to %.2f-%.2fs of %.1fs (%d windows tried)",
+                            scene_id, clip_key, in_point, in_point + length,
+                            source_seconds, tried,
+                        )
+                    if not verdict.passed:
+                        segment_failures += 1
+                        log.warning(
+                            "%s: no window of %s shows %s (%s)", scene_id, clip_key,
+                            entity.name, ", ".join(verdict.failed_on) or "unchecked",
+                        )
+                    segment_rows.append({
+                        "beat": scene_id,
+                        "item": beat.item_key,
+                        "source": clip_key,
+                        "provider": clip_key.split(":", 1)[0],
+                        "asset_id": clip_key.split(":", 1)[-1],
+                        "source_start": round(in_point, 3),
+                        "source_end": round(in_point + length, 3),
+                        "source_seconds": round(source_seconds, 2),
+                        "windows_tried": tried,
+                        "window_moved": in_point > 0.05,
+                        "segment_grounding_score": round(verdict.score, 3),
+                        "segment_grounding_passed": bool(verdict.passed),
+                        "entity_presence_score": round(verdict.entity_presence_score, 3),
+                        "state_match_score": round(verdict.state_match_score, 3),
+                        "context_match_score": round(verdict.context_match_score, 3),
+                        "dominant_subject_score": round(verdict.dominant_subject_score, 3),
+                        "failed_on": list(verdict.failed_on),
+                        "looked_like": verdict.top_distractor,
+                        **{f"window_{k}": v for k, v in (quality or {}).items()},
+                    })
+
                 shots.append(
                     Shot(
                         scene_id=scene_id,
                         clip_key=clip_key,
                         source=source,
-                        start=0.0,
+                        start=round(in_point, 3),
                         duration=round(length, 3),
                         motion="zoom_in" if position % 2 == 0 else "pan_left",
                         still=is_still,
@@ -845,6 +994,12 @@ class ReelPipeline:
             "image_fallback_shot_count": image_shots,
             "repair_rounds_used": rounds_used,
             "frozen_tail_duration": frozen_tail,
+            # What the viewer is actually shown, per shot, judged on its own
+            # frames. ``item_grounding_results`` says the source clip was
+            # right; this says the seconds on screen were.
+            "used_segment_results": segment_rows,
+            "segment_grounding_failure_count": segment_failures,
+            "segment_window_repair_count": window_repairs,
         }
 
     def _analyzer(self) -> Any | None:
@@ -923,6 +1078,14 @@ class ReelPipeline:
             **_provider_counts(shots),
             "repair_rounds_used": int(clips.get("repair_rounds_used", 0) or 0),
             "frozen_tail_duration": float(clips.get("frozen_tail_duration", 0.0) or 0.0),
+            # Named here or dropped on the floor - this function is an
+            # allow-list, which is how the provider counters came to report
+            # zero shots for a sixteen-shot reel.
+            "used_segment_results": list(clips.get("used_segment_results", []) or []),
+            "segment_grounding_failure_count": int(
+                clips.get("segment_grounding_failure_count", 0) or 0),
+            "segment_window_repair_count": int(
+                clips.get("segment_window_repair_count", 0) or 0),
         }
 
     # ------------------------------------------------------------------
@@ -959,7 +1122,7 @@ class ReelPipeline:
 
     @staticmethod
     def _duration(video: Path) -> float:
-        from ..ffmpeg_utils import probe_media
+        from ..ffmpeg_utils import probe_media, probe_media
 
         try:
             return float(probe_media(video).duration or 0.0)
