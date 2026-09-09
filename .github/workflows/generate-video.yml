@@ -136,7 +136,7 @@ on:
                   reel-holdout-calibration, reel-holdout-entity,
                   reel-holdout-presentation, reel-holdout-final,
                   reel-apple-state, reel-apple-holdout, reel-apple-final,
-                  reel-sharpness, reel-strips]
+                  reel-sharpness, reel-strips, reel-focus]
       upload_to_youtube:
         description: "Upload to YouTube when it is finished"
         required: false
@@ -1504,6 +1504,74 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: reel-strips
+          path: output/holdout/*
+          retention-days: 14
+          if-no-files-found: warn
+
+  # -------------------------------------------------------------------
+  #  Candidate local-focus metrics on the ninety-two windows already
+  #  measured and labelled. Searches nothing, spends no query.
+  # -------------------------------------------------------------------
+  reel-focus:
+    name: Local focus measures on the same windows
+    if: inputs.task == 'reel-focus'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    # Least privilege: a probe reads the code and writes nothing back.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ffmpeg
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+          pip install onnxruntime
+      - name: Restore the cached model files
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: vidfactory-reel-cache-v1
+      - name: Measure
+        env:
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+          PROBE_QUERY: ${{ inputs.probe_query }}
+        run: |
+          set -euo pipefail
+          mkdir -p output/holdout
+          # No search and no new footage: the sources are fetched by provider
+          # id and the frames are the same sampled positions already measured.
+          python tools/reel_holdout_check.py focus --clips 1 \
+            --out output/holdout/focus.json | tee output/holdout/focus-summary.txt
+      - name: Report
+        if: always()
+        run: |
+          # Deliberately not the whole file. The sharpness run pushed 17MB at
+          # a 1MB step summary and GitHub discarded the lot; the strips are
+          # base64 and belong in the log, not in a markdown summary.
+          {
+            echo "## Local focus measures"
+            echo '```'
+            grep -c FRAME-BEGIN output/holdout/focus-summary.txt || true
+            echo "strips emitted; the pictures are in the job log"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload the scores
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reel-focus
           path: output/holdout/*
           retention-days: 14
           if-no-files-found: warn

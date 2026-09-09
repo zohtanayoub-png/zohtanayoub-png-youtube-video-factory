@@ -87,6 +87,9 @@ from vidfactory.visual_analysis import (
     VisualAnalyzer,
     crop_center,
     sample_frames,
+    decode_frame,
+    focus_statistics,
+    measure,
     segment_frames,
     segment_positions,
     window_quality,
@@ -594,6 +597,8 @@ PILES_FOR: dict[str, tuple[Pile, ...]] = {
     # Pictures for windows already measured. It searches no provider, so it
     # spends no query and has no pile of its own to freeze.
     "strips": (),
+    # Focus measures on those same windows. Also searchless.
+    "focus": (),
     "holdout": HOLDOUT_PILES,
 }
 
@@ -1262,6 +1267,103 @@ def run_strips(args, analyzer, providers, downloader, excluded) -> dict[str, Any
             "re-measures them."
         ),
         "emitted": emitted,
+    }
+
+
+LABELS_FILE = Path("data/calibration/window_readability_labels.json")
+
+#: Where focus is measured. Production decodes to the claim model's 224x224,
+#: which squashes a 16:9 frame and lowpasses away most of the evidence blur
+#: leaves behind - a downsample is itself a sharpening operation. So the
+#: candidates are measured at both sizes, and whether the resolution is
+#: itself part of the answer is one of the things being asked.
+FOCUS_SIZES: tuple[tuple[str, tuple[int, int]], ...] = (
+    ("224 (what production sees)", (224, 224)),
+    ("480x270 (native aspect)", (480, 270)),
+)
+
+
+def run_focus(args, analyzer, providers, downloader, excluded) -> dict[str, Any]:
+    """Local focus measures on the windows already measured and already labelled.
+
+    No search, no new footage: the sources are fetched by provider id and the
+    frames are the same ``sampled_at`` positions ``window_quality`` used, so
+    every number here describes a window that already has a hand-made label
+    beside it.
+
+    Nothing is thresholded. This prints distributions; whether any candidate
+    separates is read off them afterwards, and the file says so.
+    """
+
+    if not WINDOWS_FILE.exists():
+        print(f"no measured windows at {WINDOWS_FILE}")
+        return {"command": "focus", "windows": 0}
+    data = json.loads(WINDOWS_FILE.read_text(encoding="utf-8"))
+    rows = list(data.get("per_window") or [])
+    known = list((data.get("known_unreadable") or {}).get("per_window") or [])
+    labels = {}
+    if LABELS_FILE.exists():
+        for row in json.loads(LABELS_FILE.read_text(encoding="utf-8"))["labels"]:
+            labels[row["window_id"]] = row["label"]
+
+    sources: dict[str, str] = {}
+    measured: list[dict[str, Any]] = []
+    for row in rows + known:
+        key = str(row.get("source", ""))
+        if key not in sources:
+            clip = pexels_clip_by_id(key.split(":", 1)[-1])
+            got = downloader.fetch_many([clip], needed=1) if clip is not None else []
+            sources[key] = str(got[0].clip.local_path or got[0].path) if got else ""
+        video = sources[key]
+        if not video:
+            log.warning("could not fetch %s", key)
+            continue
+
+        out: dict[str, Any] = {
+            "window_id": row.get("window_id"),
+            "strip": row.get("strip"),
+            "food": row.get("food"),
+            "source": key,
+            "label": labels.get(str(row.get("window_id")), ""),
+            "held_out": row in known,
+            "window_sharpness": row.get("window_sharpness"),
+            "window_centre_weight": row.get("window_centre_weight"),
+            "segment_grounding_score": row.get("segment_grounding_score"),
+            "segment_grounding_passed": row.get("segment_grounding_passed"),
+        }
+        positions = list(row.get("sampled_at") or [])
+        for title, size in FOCUS_SIZES:
+            frames = [f for f in (
+                decode_frame(video, at, size, 30.0) for at in positions
+            ) if f is not None and f.ok]
+            if not frames:
+                continue
+            stats = [focus_statistics(f) for f in frames]
+            # The weakest frame of the window, not the average of them: a
+            # window is only as watchable as its worst moment, which is the
+            # same rule the grounding conjunction uses.
+            for name in stats[0]:
+                out[f"{name}@{title.split()[0]}"] = round(
+                    min(s[name] for s in stats), 5)
+            out[f"edge_density@{title.split()[0]}"] = round(
+                min(measure(f).edge_density for f in frames), 3)
+        measured.append(out)
+        log.info("%s (%s): lap224=%s lap480=%s",
+                 out["window_id"], out["label"] or "unlabelled",
+                 out.get("laplacian_variance@224"),
+                 out.get("laplacian_variance@480x270"))
+
+    return {
+        "command": "focus",
+        "windows": len(measured),
+        "labelled": sum(1 for r in measured if r["label"]),
+        "sizes": [t for t, _s in FOCUS_SIZES],
+        "note": (
+            "No threshold is chosen here and none is applied anywhere. Each "
+            "window carries the weakest of its three frames, because a window "
+            "is only as watchable as its worst moment."
+        ),
+        "per_window": measured,
     }
 
 
@@ -1975,7 +2077,8 @@ def main(argv: list[str] | None = None) -> int:
                   "apple-holdout": run_apple_holdout,
                   "apple-final": run_apple_final,
                   "sharpness": run_sharpness,
-                  "strips": run_strips}[args.command]
+                  "strips": run_strips,
+                  "focus": run_focus}[args.command]
         report = runner(args, analyzer, providers, downloader, excluded)
 
     report["held_out_from"] = {"clips": len(excluded), "queries": sorted(burned)}

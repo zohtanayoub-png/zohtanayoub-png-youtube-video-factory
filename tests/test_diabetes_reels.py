@@ -1622,12 +1622,12 @@ def test_every_command_the_cli_offers_has_piles_recorded():
     assert set(module.PILES_FOR) == {
         "berries", "entity", "presentation", "avocado", "apple",
         "apple-state", "apple-holdout", "apple-final", "sharpness", "strips",
-        "holdout",
+        "focus", "holdout",
     }
     #: Commands that search no provider, so they spend no query and have no
     #: pile to freeze. "strips" only re-draws pictures for windows already
     #: measured and recorded.
-    searchless = {"strips"}
+    searchless = {"strips", "focus"}
     for command, piles in module.PILES_FOR.items():
         assert piles or command in searchless, command
         # And a command with no runner is an argparse choice that crashes on
@@ -1967,3 +1967,97 @@ def test_the_readability_floor_is_not_shipped_because_it_was_not_earned():
     # And the known clip never counted towards a threshold anyway.
     assert all(row.get("held_out") for row in labels["labels"]
                if row["window_id"].startswith("pexels:37239365"))
+
+
+def _grey_frame(width: int, height: int, value):
+    """A Frame whose luma at (x, y) is ``value(x, y)``."""
+
+    from vidfactory.visual_analysis import Frame
+
+    pixels = bytearray()
+    for y in range(height):
+        for x in range(width):
+            v = max(0, min(255, int(value(x, y))))
+            pixels += bytes((v, v, v))
+    return Frame(width, height, bytes(pixels))
+
+
+def _blurred(frame, radius: int):
+    """A box blur, so "the same picture out of focus" is a real comparison."""
+
+    from vidfactory.visual_analysis import Frame
+
+    width, height = frame.width, frame.height
+    luma = [frame.pixels[i * 3] for i in range(width * height)]
+    out = bytearray()
+    for y in range(height):
+        for x in range(width):
+            total = count = 0
+            for dy in range(-radius, radius + 1):
+                for dx in range(-radius, radius + 1):
+                    yy, xx = y + dy, x + dx
+                    if 0 <= yy < height and 0 <= xx < width:
+                        total += luma[yy * width + xx]
+                        count += 1
+            v = max(0, min(255, int(total / count)))
+            out += bytes((v, v, v))
+    return Frame(width, height, bytes(out))
+
+
+def test_edge_density_cannot_tell_focus_from_a_plain_background():
+    """The defect, reproduced without any footage at all.
+
+    A small bright disc on black and the *same disc blurred* have the same
+    mean gradient, because averaging over a mostly-empty frame is dominated
+    by the emptiness. That is exactly what put a pin-sharp lime at 0.000 and
+    an unreadable blurred apple at 0.007 in the readability calibration.
+    """
+
+    from vidfactory.visual_analysis import measure
+
+    sharp = _grey_frame(80, 50, lambda x, y: 230 if (x - 40) ** 2 + (y - 25) ** 2 < 90 else 8)
+    soft = _blurred(sharp, 3)
+
+    assert abs(measure(sharp).edge_density - measure(soft).edge_density) < 1.0
+
+
+def test_laplacian_variance_orders_every_blurred_case_below_every_sharp_one():
+    """The one candidate that survived the constructed cases.
+
+    Four pictures, two of them the blurred twins of the others, plus a
+    low-contrast sharp texture standing in for the attractive soft macro this
+    gate must never reject. ``laplacian_variance`` puts all the blur below all
+    the focus; the alternatives do not, and the reasons are worth keeping:
+
+    * ``strong_edge_fraction`` scores the low-contrast sharp frame 0.0, because
+      its edges never clear the fixed gradient threshold of 40 - it would
+      reject exactly the cinematography this is meant to preserve.
+    * ``p999_gradient`` ranks the low-contrast sharp frame *below* the blurred
+      disc, because blur smears one strong edge across many pixels.
+    * ``normalised_laplacian`` ranks the sharp disc below the blurred texture,
+      because dividing by the frame's own variance rewards an empty frame.
+    """
+
+    from vidfactory.visual_analysis import focus_statistics
+
+    disc = _grey_frame(80, 50, lambda x, y: 230 if (x - 40) ** 2 + (y - 25) ** 2 < 90 else 8)
+    busy = _grey_frame(80, 50, lambda x, y: (x * 37 + y * 91) % 256)
+    faint = _grey_frame(80, 50, lambda x, y: 128 + (10 if (x // 3) % 2 else -10))
+    blurred_disc, blurred_busy = _blurred(disc, 3), _blurred(busy, 3)
+
+    sharp_group = [disc, busy, faint]
+    blurred_group = [blurred_disc, blurred_busy]
+
+    def lap(frame):
+        return focus_statistics(frame)["laplacian_variance"]
+
+    assert min(lap(f) for f in sharp_group) > max(lap(f) for f in blurred_group), (
+        "laplacian_variance no longer separates the constructed cases"
+    )
+
+    # And the disqualifications, so nobody reaches for them again.
+    assert focus_statistics(faint)["strong_edge_fraction"] == 0.0
+    assert (focus_statistics(faint)["p999_gradient"]
+            <= focus_statistics(blurred_disc)["p999_gradient"])
+    assert (focus_statistics(disc)["normalised_laplacian"]
+            < focus_statistics(blurred_busy)["normalised_laplacian"])

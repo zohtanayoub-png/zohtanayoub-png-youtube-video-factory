@@ -220,6 +220,108 @@ def segment_frames(
     return frames
 
 
+def focus_statistics(frame: Frame) -> dict[str, float]:
+    """Local focus, as distinct from how busy the picture is.
+
+    ``edge_density`` averages the gradient over the whole frame, so it mostly
+    measures how much of the frame is plain background. The readability
+    calibration put a pin-sharp lime falling through water on black at
+    **0.000** and the unreadable blurred apple of ``pexels:37239365`` at
+    **0.007** - the sharp shot scoring *below* the blurred one, which is why
+    no floor could be placed on it.
+
+    Focus is a local property, so every statistic here reads the strongest
+    part of the gradient field rather than its mean, or reads the gradient
+    against the contrast that was there to be resolved:
+
+    ``strong_edge_fraction``   share of pixels whose gradient clears 40, the
+                               threshold ``measure`` already uses. A small
+                               sharp subject still has some.
+    ``p99_gradient``           the gradient at the 99th percentile, and
+                               ``p999_gradient`` at the 99.9th. The higher one
+                               matters: a subject covering under one per cent
+                               of the frame is invisible to p99, and a blurred
+                               frame can even score *higher* there because
+                               blur smears one edge across many pixels.
+    ``laplacian_variance``     the classical focus measure - variance of the
+                               second derivative, which collapses under blur.
+    ``normalised_laplacian``   the same, divided by the frame's own luma
+                               variance, so a low-contrast scene is not
+                               punished for being low-contrast.
+    ``normalised_p99``         ``p99_gradient`` over the luma spread, for the
+                               same reason.
+
+    Pure arithmetic over the frame it is given, and nothing is thresholded
+    here: this reports numbers, and whether any of them separates is a
+    measurement someone else makes.
+    """
+
+    if not frame.ok:
+        return {
+            "strong_edge_fraction": 0.0, "p90_gradient": 0.0,
+            "p99_gradient": 0.0, "p999_gradient": 0.0, "max_gradient": 0.0,
+            "laplacian_variance": 0.0, "normalised_laplacian": 0.0,
+            "normalised_p99": 0.0,
+        }
+
+    width, height = frame.width, frame.height
+    pixels = frame.pixels
+    luma = [
+        (pixels[i * 3] * 299 + pixels[i * 3 + 1] * 587 + pixels[i * 3 + 2] * 114) / 1000.0
+        for i in range(width * height)
+    ]
+
+    gradients: list[float] = []
+    laplacians: list[float] = []
+    for y in range(1, height - 1):
+        row = y * width
+        above, below = row - width, row + width
+        for x in range(1, width - 1):
+            here = luma[row + x]
+            gradients.append(
+                abs(luma[row + x + 1] - here) + abs(luma[below + x] - here)
+            )
+            laplacians.append(
+                4.0 * here - luma[row + x - 1] - luma[row + x + 1]
+                - luma[above + x] - luma[below + x]
+            )
+
+    if not gradients:
+        return focus_statistics(Frame(0, 0, b""))
+
+    ordered = sorted(gradients)
+    def percentile(fraction: float) -> float:
+        return ordered[min(len(ordered) - 1, int(len(ordered) * fraction))]
+
+    mean_luma = sum(luma) / len(luma)
+    luma_variance = sum((v - mean_luma) ** 2 for v in luma) / len(luma)
+    spread = percentile_of(sorted(luma), 0.95) - percentile_of(sorted(luma), 0.05)
+
+    mean_lap = sum(laplacians) / len(laplacians)
+    lap_variance = sum((v - mean_lap) ** 2 for v in laplacians) / len(laplacians)
+
+    p99 = percentile(0.99)
+    return {
+        "strong_edge_fraction": round(
+            sum(1 for g in gradients if g > 40) / len(gradients), 5),
+        "p90_gradient": round(percentile(0.90), 3),
+        "p99_gradient": round(p99, 3),
+        "p999_gradient": round(percentile(0.999), 3),
+        "max_gradient": round(ordered[-1], 3),
+        "laplacian_variance": round(lap_variance, 3),
+        "normalised_laplacian": round(lap_variance / (luma_variance + 1.0), 4),
+        "normalised_p99": round(p99 / (spread + 1.0), 4),
+    }
+
+
+def percentile_of(ordered: Sequence[float], fraction: float) -> float:
+    """The value at ``fraction`` through an already-sorted sequence."""
+
+    if not ordered:
+        return 0.0
+    return ordered[min(len(ordered) - 1, int(len(ordered) * fraction))]
+
+
 def window_quality(frames: Sequence[Frame]) -> dict[str, float]:
     """How watchable one candidate window is, beyond what it contains.
 
