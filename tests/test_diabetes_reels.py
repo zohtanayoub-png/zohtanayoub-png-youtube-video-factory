@@ -1748,3 +1748,46 @@ def test_the_report_says_which_provider_reached_the_screen():
                  "pixabay_image_shot_count", "animated_still_count",
                  "providers_on_screen"):
         assert name in source, name
+
+
+def test_the_provider_counts_survive_the_trip_to_the_report():
+    """The first version of these counters reported zero for a sixteen-shot reel.
+
+    They were computed in ``_plan_visuals`` and returned in its dict - but
+    ``_visual_summary`` is an explicit allow-list, so a key it does not name
+    is dropped on the floor, and ``build_report`` then popped an absent key
+    and got the default. Every number was 0 while the same report said
+    ``visual_shot_count: 16`` and listed real Pexels asset ids per beat.
+
+    So the counts are taken where the shots are, and this asserts the whole
+    trip rather than the arithmetic: a shot list in, named metrics out.
+    """
+
+    from vidfactory.editor import Shot
+    from vidfactory.reels.pipeline import ReelPipeline, _provider_counts
+
+    def shot(key: str, still: bool = False) -> Shot:
+        return Shot(scene_id="beat-00", clip_key=key, source="x", start=0.0,
+                    duration=2.0, motion="zoom_in", still=still)
+
+    shots = [shot("pexels:1"), shot("pexels:2"), shot("pixabay:3"),
+             shot("pixabay:4", still=True), shot("pexels:5", still=True)]
+
+    counts = _provider_counts(shots)
+    assert counts["pexels_shot_count"] == 2
+    assert counts["pexels_image_shot_count"] == 1
+    assert counts["pixabay_video_shot_count"] == 1
+    assert counts["pixabay_image_shot_count"] == 1
+    assert counts["animated_still_count"] == 2
+    assert counts["providers_on_screen"] == ["pexels", "pixabay"]
+
+    # And the summary the report is actually built from carries them, which is
+    # the half that was broken.
+    summary = ReelPipeline._visual_summary(shots, {})
+    for name, value in counts.items():
+        assert summary[name] == value, name
+
+    # A reel that really is one-provider says so rather than saying nothing.
+    alone = _provider_counts([shot("pexels:1"), shot("pexels:2")])
+    assert alone["providers_on_screen"] == ["pexels"]
+    assert alone["pixabay_video_shot_count"] == 0

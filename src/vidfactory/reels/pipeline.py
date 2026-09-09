@@ -152,6 +152,39 @@ class ReelResult:
         }
 
 
+def _provider_counts(shots: Sequence[Any]) -> dict[str, Any]:
+    """Whose footage reached the screen, and as video or as a photograph.
+
+    "16 shots from 16 distinct sources" is true of a one-provider reel and of
+    a three-provider one, and two renders drew on Pexels alone for want of a
+    Pixabay key with nothing in the report saying so. A clip key is
+    "<provider>:<id>", so the provider is read off the key rather than tracked
+    beside it, and ``still`` is what makes a picture a photograph.
+    """
+
+    def split(shot: Any) -> tuple[str, str]:
+        provider = str(shot.clip_key).split(":", 1)[0]
+        return provider, "image" if getattr(shot, "still", False) else "video"
+
+    pairs = [split(shot) for shot in shots]
+
+    def count(provider: str, medium: str) -> int:
+        return sum(1 for p, m in pairs if p == provider and m == medium)
+
+    return {
+        "pexels_shot_count": count("pexels", "video"),
+        "pexels_image_shot_count": count("pexels", "image"),
+        "pixabay_video_shot_count": count("pixabay", "video"),
+        "pixabay_image_shot_count": count("pixabay", "image"),
+        # Counted apart from the provider split because "how many pictures
+        # were photographs" and "whose photographs" are two questions. A
+        # still here is held and crawled across, so it reads as a shot rather
+        # than as the freeze the frozen-tail check exists to catch.
+        "animated_still_count": sum(1 for _p, m in pairs if m == "image"),
+        "providers_on_screen": sorted({p for p, _m in pairs if p}),
+    }
+
+
 class ReelPipeline:
     """DIABETES REELS, end to end."""
 
@@ -787,26 +820,6 @@ class ReelPipeline:
                 )
                 offset += length
 
-        # Which provider and which medium actually reached the screen. The
-        # last two renders drew on Pexels alone because Pixabay had no key,
-        # and nothing in the report said so: "16 shots from 16 sources" is
-        # true of a one-provider reel and of a three-provider one.
-        media_of: dict[str, str] = {}
-        provider_of: dict[str, str] = {}
-        for row in grounding_rows:
-            for key, medium in zip(row.get("sources", ()), row.get("media_types", ())):
-                media_of[key], provider_of[key] = medium, key.split(":", 1)[0]
-        for shot in shots:
-            provider_of.setdefault(shot.clip_key, shot.clip_key.split(":", 1)[0])
-            media_of.setdefault(shot.clip_key, "image" if shot.still else "video")
-
-        def counted(provider: str, medium: str) -> int:
-            return sum(
-                1 for shot in shots
-                if provider_of.get(shot.clip_key) == provider
-                and media_of.get(shot.clip_key) == medium
-            )
-
         covered = sum(s.duration for s in shots)
         frozen_tail = round(max(0.0, timeline_end - covered), 3)
         log.info(
@@ -830,18 +843,6 @@ class ReelPipeline:
             "item_grounding_results": grounding_rows,
             "repaired_item_shot_count": repaired_shots,
             "image_fallback_shot_count": image_shots,
-            "pexels_shot_count": counted("pexels", "video"),
-            "pexels_image_shot_count": counted("pexels", "image"),
-            "pixabay_video_shot_count": counted("pixabay", "video"),
-            "pixabay_image_shot_count": counted("pixabay", "image"),
-            # A still is not a freeze here: it is held and crawled across, so
-            # it reads as a shot. Counted separately from the provider split
-            # because "how many pictures were photographs" and "whose
-            # photographs" are two questions.
-            "animated_still_count": sum(1 for shot in shots if shot.still),
-            "providers_on_screen": sorted(
-                {provider_of.get(shot.clip_key, "") for shot in shots} - {""}
-            ),
             "repair_rounds_used": rounds_used,
             "frozen_tail_duration": frozen_tail,
         }
@@ -910,6 +911,16 @@ class ReelPipeline:
             "repaired_item_shot_count": int(clips.get("repaired_item_shot_count", 0) or 0),
             "image_fallback_shot_count": int(clips.get("image_fallback_shot_count", 0) or 0),
             "still_shot_count": sum(1 for s in shots if getattr(s, "still", False)),
+            # Whose footage reached the screen, and as what. Computed here
+            # rather than in the planner because this function is an explicit
+            # allow-list - a key the planner returns and this does not name is
+            # silently dropped, which is how the first version of these
+            # counters reported zero shots for a sixteen-shot reel.
+            #
+            # A clip key is "<provider>:<id>", so the split is the answer
+            # rather than a second thing to keep in step, and ``still`` is
+            # what makes a picture a photograph.
+            **_provider_counts(shots),
             "repair_rounds_used": int(clips.get("repair_rounds_used", 0) or 0),
             "frozen_tail_duration": float(clips.get("frozen_tail_duration", 0.0) or 0.0),
         }
