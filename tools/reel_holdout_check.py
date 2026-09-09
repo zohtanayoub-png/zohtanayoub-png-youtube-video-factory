@@ -1038,7 +1038,7 @@ def run_entity(args, analyzer, providers, downloader, excluded) -> dict[str, Any
 # ---------------------------------------------------------------------------
 
 def strip_of(video: str, positions: Sequence[float], target: Path,
-             height: int = 640) -> bool:
+             height: int = 640, quality: int = 4) -> bool:
     """One JPEG showing the whole window: its three sampled moments, in order.
 
     A single midpoint frame would hide the half of a window that goes soft,
@@ -1058,7 +1058,7 @@ def strip_of(video: str, positions: Sequence[float], target: Path,
     command = [
         "ffmpeg", "-y", "-loglevel", "error", "-nostdin",
         *inputs, "-filter_complex", chain, "-map", "[out]",
-        "-frames:v", "1", "-q:v", "4", str(target),
+        "-frames:v", "1", "-q:v", str(int(quality)), str(target),
     ]
     subprocess.run(command, check=False, timeout=120)
     return target.exists() and target.stat().st_size > 0
@@ -1211,7 +1211,17 @@ def run_strips(args, analyzer, providers, downloader, excluded) -> dict[str, Any
 
     # The known clip is always shown - it is the case the gate has to reject
     # and a reviewer has to see it - and it never counts towards the floor.
-    chosen = stratified(rows, max(1, STRIP_BUDGET - len(known))) + known
+    # A band of the sharpness axis rather than the whole of it. The first
+    # strips run emitted thirty-three and the log delivered eighteen - the
+    # sharpest, because they print last - so the low end where the floor
+    # actually sits arrived as nothing at all. Asking for one band at a time
+    # is how the evidence fits through.
+    low = float(getattr(args, "sharpness_min", 0.0) or 0.0)
+    high = getattr(args, "sharpness_max", None)
+    high = float(high) if high is not None else 1.0
+    banded = [r for r in rows
+              if low <= float(r.get("window_sharpness", 0.0)) <= high]
+    chosen = stratified(banded, max(1, STRIP_BUDGET - len(known))) + known
     work = Path("output/holdout/strips")
     work.mkdir(parents=True, exist_ok=True)
 
@@ -1229,7 +1239,9 @@ def run_strips(args, analyzer, providers, downloader, excluded) -> dict[str, Any
             continue
         name = str(row.get("strip") or row.get("window_id"))
         strip = work / f"{name}.jpg"
-        if strip_of(video, list(row.get("sampled_at") or []), strip, height=240):
+        if strip_of(video, list(row.get("sampled_at") or []), strip,
+                    height=int(getattr(args, "strip_height", 240) or 240),
+                    quality=int(getattr(args, "strip_quality", 4) or 4)):
             emit_strip(name, strip, (
                 f"{row.get('window_id')} food={row.get('food')} "
                 f"sharp={float(row.get('window_sharpness', 0)):.3f} "
@@ -1913,6 +1925,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--config", default="config.yaml")
     parser.add_argument("--clips", type=int, default=6)
     parser.add_argument("--out", default="")
+    # Which slice of the sharpness axis to draw, and how big. The log hands
+    # back about 828 KB however much is printed, so a run that draws
+    # everything at full size delivers only whatever printed last.
+    parser.add_argument("--sharpness-min", type=float, default=0.0)
+    parser.add_argument("--sharpness-max", type=float, default=1.0)
+    parser.add_argument("--strip-height", type=int, default=240)
+    parser.add_argument("--strip-quality", type=int, default=4)
     args = parser.parse_args(argv)
     setup_logging(verbose=False)
 

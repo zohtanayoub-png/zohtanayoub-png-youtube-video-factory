@@ -1471,13 +1471,20 @@ jobs:
         env:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+          PROBE_QUERY: ${{ inputs.probe_query }}
         run: |
           set -euo pipefail
           mkdir -p output/holdout
-          # The tool prints the summary without its per-clip arrays, which is
-          # what fits in a job log and in a step summary; the full rows go to
-          # the artifact.
+          # One band of the sharpness axis at a time. The log hands back about
+          # 828KB however much is printed, so drawing the whole axis at full
+          # size delivers only whatever happened to print last - the first
+          # strips run emitted 33 and 18 arrived. probe_query carries the band
+          # as "LOW HIGH"; blank means the low end, which is where the floor is.
+          BAND="${PROBE_QUERY:-0.0 0.25}"
+          read -r LOW HIGH <<< "$BAND"
           python tools/reel_holdout_check.py strips --clips 1 \
+            --sharpness-min "$LOW" --sharpness-max "$HIGH" \
+            --strip-height 220 --strip-quality 9 \
             --out output/holdout/strips.json | tee output/holdout/strips-summary.txt
       - name: Report
         if: always()
