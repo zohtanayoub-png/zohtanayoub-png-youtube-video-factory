@@ -1,3 +1,6 @@
 -r requirements.txt
 pytest>=8.0
 pytest-timeout>=2.3
+# Undefined names are a crash, not a style opinion: two of them reached a
+# runner in one afternoon and one of them survived a passing render.
+pyflakes>=3.0

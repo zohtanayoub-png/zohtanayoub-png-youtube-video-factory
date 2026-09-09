@@ -36,6 +36,7 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from ..downloader import ClipDownloader
+from ..ffmpeg_utils import probe_media
 from ..http import download_file
 from ..editor import Shot, VideoEditor
 from ..languages import resolve_language
@@ -1122,7 +1123,7 @@ class ReelPipeline:
 
     @staticmethod
     def _duration(video: Path) -> float:
-        from ..ffmpeg_utils import probe_media, probe_media
+        from ..ffmpeg_utils import probe_media
 
         try:
             return float(probe_media(video).duration or 0.0)

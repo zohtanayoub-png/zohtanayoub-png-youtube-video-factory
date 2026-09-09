@@ -1873,3 +1873,45 @@ def test_the_editor_no_longer_starts_every_reel_shot_at_zero():
     source = inspect.getsource(pipeline.ReelPipeline._plan_visuals)
     assert "start=0.0" not in source
     assert "start=round(in_point, 3)" in source
+
+
+def test_no_undefined_names_in_the_reel_code_or_its_probes():
+    """A name that only resolves at call time is a crash waiting for a runner.
+
+    Two of these shipped in one afternoon. ``run_sharpness`` called
+    ``ground_requirement`` without importing it and died on the first clip of
+    a probe that had already spent five minutes downloading models. Worse,
+    ``_plan_visuals`` referenced ``probe_media`` that was never imported at
+    module level - a botched edit put the import inside another method - and
+    the reel render *passed*, because the branch only runs for a clip whose
+    duration the provider did not report.
+
+    Importing the module catches neither: both names are looked up when the
+    line executes. So the whole reel surface and every probe is checked for
+    undefined names, which is exactly the question a linter answers and the
+    test suite did not ask.
+    """
+
+    import subprocess
+    import sys
+
+    pytest.importorskip("pyflakes", reason="pyflakes is the linter this uses")
+
+    root = Path(__file__).resolve().parents[1]
+    targets = [
+        *sorted((root / "src" / "vidfactory" / "reels").glob("*.py")),
+        root / "src" / "vidfactory" / "visual_analysis.py",
+        root / "tools" / "reel_holdout_check.py",
+        root / "tools" / "inspect_reel_frames.py",
+    ]
+    result = subprocess.run(
+        [sys.executable, "-m", "pyflakes", *[str(t) for t in targets]],
+        capture_output=True, text=True, check=False,
+    )
+    # Unused imports are style; an undefined name is a crash. Only the second
+    # kind fails, so this cannot become a reason to churn imports.
+    undefined = [
+        line for line in result.stdout.splitlines()
+        if "undefined name" in line or "redefinition" in line
+    ]
+    assert not undefined, "\n".join(undefined)

@@ -76,6 +76,7 @@ from vidfactory.reels.foods import (
     BY_NAME,
     WRONG_CONTEXT,
     FOOD_IDENTIFY_PASS,
+    ground_requirement,
     identify_food,
     requirement_for_food,
     requirement_prompts,
