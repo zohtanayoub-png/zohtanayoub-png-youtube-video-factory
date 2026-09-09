@@ -52,6 +52,7 @@ from .metadata import caption as build_caption
 from .metadata import publish_metadata
 from .qc import ReelReport, build_report
 from .foods import (
+    FOOD_SEMANTIC_DISTRACTORS,
     ground_requirement,
     required_visual_for,
     state_repair_queries,
@@ -525,8 +526,18 @@ class ReelPipeline:
                     frames = analyzer.sample(
                         result.clip, video=result.clip.local_path or result.path
                     )
+                    # What the ranker scores the frames against. The beat's
+                    # own search_text was written to *find* footage and names
+                    # the furniture it expects to find it on ("a whole red
+                    # apple on a wooden table"); the requirement's intent
+                    # names the food and its state and nothing else.
+                    intent = (
+                        requirement.visual_intent
+                        if requirement is not None and requirement.visual_intent
+                        else beat.search_text
+                    )
                     analysis = analyzer.analyze(
-                        frames, query=beat.search_text, narration=beat.search_text
+                        frames, query=intent, narration=intent
                     )
                     result.clip.visual = analysis.to_dict()
                     result.clip.visual_semantic_match = analysis.semantic_match
@@ -534,6 +545,9 @@ class ReelPipeline:
                         "beat": scene_id,
                         "kind": beat.kind,
                         "query": query,
+                        "visual_intent": intent,
+                        "provider": result.clip.provider,
+                        "source": result.clip.key,
                         "semantic_match": analysis.semantic_match,
                         "analyzed": analysis.analyzed,
                     })
@@ -712,6 +726,17 @@ class ReelPipeline:
                     "forbidden_attributes": list(requirement.forbidden_attributes),
                     "sources": ([c.clip.key for c, _g in chosen]
                                 + [c.key for c, _g, _p in picture]),
+                    # Which provider served this beat, and what kind of asset.
+                    # A key is "<provider>:<id>", so the split is the answer
+                    # rather than a second thing to keep in step.
+                    "providers": sorted({
+                        *(c.clip.provider for c, _g in chosen),
+                        *(c.provider for c, _g, _p in picture),
+                    }),
+                    "asset_ids": ([c.clip.provider_id for c, _g in chosen]
+                                  + [c.provider_id for c, _g, _p in picture]),
+                    "media_types": (["video"] * len(chosen)
+                                    + ["image"] * len(picture)),
                     "media": "image" if picture else "video",
                     "ungrounded_fallback": ungrounded,
                     "score": round(worst.score, 3) if worst else 0.0,
@@ -762,6 +787,26 @@ class ReelPipeline:
                 )
                 offset += length
 
+        # Which provider and which medium actually reached the screen. The
+        # last two renders drew on Pexels alone because Pixabay had no key,
+        # and nothing in the report said so: "16 shots from 16 sources" is
+        # true of a one-provider reel and of a three-provider one.
+        media_of: dict[str, str] = {}
+        provider_of: dict[str, str] = {}
+        for row in grounding_rows:
+            for key, medium in zip(row.get("sources", ()), row.get("media_types", ())):
+                media_of[key], provider_of[key] = medium, key.split(":", 1)[0]
+        for shot in shots:
+            provider_of.setdefault(shot.clip_key, shot.clip_key.split(":", 1)[0])
+            media_of.setdefault(shot.clip_key, "image" if shot.still else "video")
+
+        def counted(provider: str, medium: str) -> int:
+            return sum(
+                1 for shot in shots
+                if provider_of.get(shot.clip_key) == provider
+                and media_of.get(shot.clip_key) == medium
+            )
+
         covered = sum(s.duration for s in shots)
         frozen_tail = round(max(0.0, timeline_end - covered), 3)
         log.info(
@@ -785,6 +830,18 @@ class ReelPipeline:
             "item_grounding_results": grounding_rows,
             "repaired_item_shot_count": repaired_shots,
             "image_fallback_shot_count": image_shots,
+            "pexels_shot_count": counted("pexels", "video"),
+            "pexels_image_shot_count": counted("pexels", "image"),
+            "pixabay_video_shot_count": counted("pixabay", "video"),
+            "pixabay_image_shot_count": counted("pixabay", "image"),
+            # A still is not a freeze here: it is held and crawled across, so
+            # it reads as a shot. Counted separately from the provider split
+            # because "how many pictures were photographs" and "whose
+            # photographs" are two questions.
+            "animated_still_count": sum(1 for shot in shots if shot.still),
+            "providers_on_screen": sorted(
+                {provider_of.get(shot.clip_key, "") for shot in shots} - {""}
+            ),
             "repair_rounds_used": rounds_used,
             "frozen_tail_duration": frozen_tail,
         }
@@ -817,6 +874,12 @@ class ReelPipeline:
                 "not be checked"
             )
         return VisualAnalyzer(
+            # The alternatives the scene prompt competes against. The default
+            # set describes rooms and put a whole reel of fruit at a semantic
+            # average of 0.217 - a macro shot of berries on a board really
+            # does look like "a kitchen counter". These are what a food search
+            # returns instead.
+            semantic_distractors=FOOD_SEMANTIC_DISTRACTORS,
             model=model,
             claim_model=claim_model,
             frames_per_clip=int(self.config.get("visual.frames_per_clip", 3)),

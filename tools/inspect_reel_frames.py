@@ -103,6 +103,12 @@ def describe(position: int, beat: dict, grounding: dict) -> str:
         parts.append(
             f"requires={row.get('required_entity', '')} "
             f"source={','.join(row.get('sources', []) or []) or '-'} "
+            # Which provider served this beat and what kind of asset it is.
+            # "source=pexels:5615187" already carries the provider, but a
+            # reviewer checking whether the second provider is really being
+            # used should not have to parse keys to find out.
+            f"via={'+'.join(row.get('providers', []) or []) or '-'}"
+            f"/{'+'.join(sorted(set(row.get('media_types', []) or []))) or '-'} "
             f"score={float(row.get('score', 0.0)):.2f} {verdict}"
         )
         # The four probes, separately. One combined number cannot tell a

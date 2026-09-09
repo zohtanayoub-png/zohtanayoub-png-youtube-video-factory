@@ -1039,6 +1039,7 @@ class VisualAnalyzer:
         penalty_confidence: float = PENALTY_CONFIDENCE,
         allow_remote_video: bool = True,
         claim_model: Any | None = None,
+        semantic_distractors: Sequence[str] | None = None,
     ) -> None:
         self.model = model
         # The second stage. MobileCLIP-S0 ranks the shortlist; a claim is a
@@ -1052,6 +1053,15 @@ class VisualAnalyzer:
         self.reject_confidence = float(reject_confidence)
         self.penalty_confidence = float(penalty_confidence)
         self.allow_remote_video = bool(allow_remote_video)
+        # What the scene prompt is scored *against*. The default set describes
+        # rooms, because that is what this analyzer was written for; a reel
+        # about fruit needs the alternatives a fruit search actually returns.
+        # Parameterised rather than branched on, so the long-form verdict is
+        # byte-identical when nothing is passed - the same reason
+        # ``score_from_similarities`` takes its thresholds as arguments.
+        self.semantic_distractors = (
+            None if semantic_distractors is None else tuple(semantic_distractors)
+        )
         self._text_cache: dict[str, list[float]] = {}
         self._claim_text_cache: dict[str, list[float]] = {}
 
@@ -1170,7 +1180,9 @@ class VisualAnalyzer:
             for name, value in concept_flags.items():
                 flags[name] = combine_confidence(flags.get(name, 0.0), value)
                 evidence.setdefault(name, []).append("clip concept")
-            matched = self._clip_semantic(image_vectors, query, narration)
+            matched = self._clip_semantic(
+                image_vectors, query, narration, self.semantic_distractors
+            )
             if matched is not None:
                 semantic, semantic_source = matched, "clip-embeddings"
 
@@ -1510,7 +1522,8 @@ class VisualAnalyzer:
 
     # ------------------------------------------------------------------
     def _clip_semantic(
-        self, image_vectors: Sequence[Sequence[float]], query: str, narration: str
+        self, image_vectors: Sequence[Sequence[float]], query: str, narration: str,
+        distractors: Sequence[str] | None = None,
     ) -> float | None:
         """How well the frames show *this* sentence rather than something else.
 
@@ -1530,7 +1543,8 @@ class VisualAnalyzer:
         if not wanted:
             return None
         prompt = PROMPT_TEMPLATE.format(wanted) if len(wanted) < 60 else wanted
-        prompts = [prompt, *(PROMPT_TEMPLATE.format(d) for d in DISTRACTOR_PROMPTS)]
+        against = DISTRACTOR_PROMPTS if distractors is None else distractors
+        prompts = [prompt, *(PROMPT_TEMPLATE.format(d) for d in against)]
         try:
             text_vectors = self._encode_texts(prompts)
         except Exception as exc:                          # pragma: no cover

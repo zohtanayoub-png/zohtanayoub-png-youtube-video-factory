@@ -523,6 +523,35 @@ COMMON_DOMINANT_DISTRACTORS: tuple[str, ...] = (
 #: boxes in run 34154410206 - valid footage with the wrong furniture - and a
 #: prompt naming a container is a prompt about that container. Presentation
 #: is not something a beat about fruit gets to require.
+#: What the *ranking* score compares a beat's picture against.
+#:
+#: Not the grounding gate - that is the four-probe conjunction below and it
+#: does not change. This is ``visual_semantic_match``, the number that orders
+#: the shortlist, and it was measured at **0.217** across a whole reel with
+#: nineteen of twenty-three clips called low relevance (run 34165114277). The
+#: reason is that the analyzer's own alternatives describe *rooms* - "a
+#: kitchen counter", "a bedroom with a made bed", "a close-up of a potted
+#: plant" - and a macro shot of raspberries on a board genuinely does look
+#: like a kitchen counter. The fruit prompt was losing to furniture.
+#:
+#: These are the alternatives a *food* search returns instead, taken from the
+#: failures already on record: the dessert made of the fruit, the drink made
+#: of it, the packaged version, the person holding it, the field it grew in.
+#: They are meant to be competitive - a straw-man list would put every clip at
+#: the top of the range and measure nothing.
+FOOD_SEMANTIC_DISTRACTORS: tuple[str, ...] = (
+    "a plate of cooked food",
+    "a cake or a dessert with cream",
+    "a drink in a glass",
+    "a person in a kitchen",
+    "packaged food on a supermarket shelf",
+    "a green salad",
+    "a close-up of a person's hands",
+    "a garden or a field of crops",
+    "an empty table or worktop",
+)
+
+
 WRONG_CONTEXT: tuple[str, ...] = (
     "a branded supermarket product in printed packaging",
     "a printed logo or an advertisement",
@@ -559,6 +588,14 @@ class VisualRequirement:
     #: "manzana" is what returned the cake; "whole raw apple with the skin on"
     #: is what does not.
     queries: tuple[str, ...] = ()
+    #: The short English phrase the *ranker* scores a candidate against, which
+    #: is a different job from the four probes and needs a different sentence.
+    #: A beat's own ``search_text`` was written to find footage and names the
+    #: furniture it expects to find it on - "a whole red apple on a wooden
+    #: table" - and a prompt naming the table is a prompt about the table, the
+    #: same fault the context prompts had. This names the food and its state
+    #: and nothing else.
+    visual_intent: str = ""
 
     @property
     def entity(self) -> VisualEntity:
@@ -572,6 +609,7 @@ def _requirement(
     dominant: Sequence[str] = (),
     context: Sequence[str] = (),
     queries: Sequence[str] = (),
+    intent: str = "",
 ) -> VisualRequirement:
     return VisualRequirement(
         required_entity=food,
@@ -580,6 +618,7 @@ def _requirement(
         forbidden_dominant_entities=(*COMMON_DOMINANT_DISTRACTORS, *dominant),
         context_requirements=tuple(context),
         queries=tuple(queries),
+        visual_intent=intent,
     )
 
 
@@ -621,6 +660,7 @@ REQUIREMENTS: dict[str, VisualRequirement] = {
             "unpeeled apples on a wooden table",
             "fresh apple with skin sliced on a board",
         ),
+        intent="a fresh whole apple with its skin, as the main subject",
     ),
     # A dog owned one strawberry frame; "strawberry" also returns milkshakes,
     # ice cream and cake, which are not what "menos carbohidratos por racion"
@@ -648,6 +688,7 @@ REQUIREMENTS: dict[str, VisualRequirement] = {
             "fresh whole strawberries in a bowl close up",
             "ripe raw strawberries on a table",
         ),
+        intent="fresh whole strawberries as the main food subject",
     ),
     # The one food the probe cannot identify on its own (0.0/0.0 against
     # strawberries). Its state requirement is written the same way as the
@@ -675,6 +716,7 @@ REQUIREMENTS: dict[str, VisualRequirement] = {
             "fresh whole raspberries in a punnet close up",
             "ripe raw raspberries in a white bowl",
         ),
+        intent="fresh raspberries as the main food subject",
     ),
     # A coconut shared the kiwi frame, and "tropical fruit" is what a kiwi
     # search drifts into.
@@ -701,6 +743,7 @@ REQUIREMENTS: dict[str, VisualRequirement] = {
             "fresh kiwi fruit cut in half close up",
             "raw green kiwi slices on a plate",
         ),
+        intent="fresh kiwi fruit, whole or halved, as the main subject",
     ),
     # The brief accepts whole or cut, and rejects the branded tub where no
     # fruit is visible - which is what WRONG_CONTEXT is for.
@@ -732,6 +775,7 @@ REQUIREMENTS: dict[str, VisualRequirement] = {
             "fresh raw avocado cut in half close up",
             "whole avocados on a wooden board",
         ),
+        intent="a fresh avocado, whole or cut open, as the main subject",
     ),
     # The juice item is about the juice, and the state is inverted: here the
     # glass is right and the whole fruit is the failure. Written because
@@ -755,6 +799,7 @@ REQUIREMENTS: dict[str, VisualRequirement] = {
         queries=(
             "glass of fresh orange juice on a table close up",
         ),
+        intent="a glass of fruit juice as the main subject",
     ),
     # "que ponga integral en el envase" is advice about a label, and the
     # failure is white bread, which is a state rather than a different food.
@@ -774,6 +819,7 @@ REQUIREMENTS: dict[str, VisualRequirement] = {
         queries=(
             "dark whole grain bread loaf sliced close up",
         ),
+        intent="dark wholegrain bread with visible grains, as the main subject",
     ),
 }
 

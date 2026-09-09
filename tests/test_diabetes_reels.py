@@ -1677,3 +1677,74 @@ def test_the_wrong_context_list_can_be_varied_for_a_measurement():
         row[offsets["context"]] = 0.9
     verdict = score_requirement(requirement, rows, ("a printed logo",))
     assert verdict.checked and verdict.passed
+
+
+def test_the_ranker_scores_the_food_and_not_the_furniture():
+    """``visual_semantic_match`` compared a fruit prompt against *rooms*.
+
+    Run 34165114277 averaged 0.217 over a whole reel with nineteen of
+    twenty-three clips called low relevance, and the reason is in the
+    analyzer's own alternatives: "a kitchen counter", "a bedroom with a made
+    bed", "a close-up of a potted plant". A macro shot of raspberries on a
+    board genuinely does look like a kitchen counter, so the fruit prompt kept
+    losing to furniture. The reel now supplies the alternatives a *food*
+    search returns instead.
+
+    This is the ranking score and not the gate: the four-probe conjunction is
+    untouched, and the long-form analyzer keeps its own list byte-for-byte.
+    """
+
+    from vidfactory.reels.foods import FOOD_SEMANTIC_DISTRACTORS
+    from vidfactory.visual_analysis import DISTRACTOR_PROMPTS, VisualAnalyzer
+
+    # Nothing in the food list describes a room.
+    rooms = ("living room", "bedroom", "bathroom", "hallway", "office", "sofa")
+    for prompt in FOOD_SEMANTIC_DISTRACTORS:
+        for room in rooms:
+            assert room not in prompt.lower(), prompt
+
+    # And the default is unchanged, so the long-form verdict cannot move.
+    assert VisualAnalyzer().semantic_distractors is None
+    assert DISTRACTOR_PROMPTS[0] == "a kitchen counter"
+    chosen = VisualAnalyzer(semantic_distractors=FOOD_SEMANTIC_DISTRACTORS)
+    assert chosen.semantic_distractors == FOOD_SEMANTIC_DISTRACTORS
+
+
+def test_every_food_states_the_intent_the_ranker_scores():
+    """A prompt naming the table is a prompt about the table.
+
+    The beat's ``search_text`` was written to *find* footage and says "a whole
+    red apple on a wooden table"; scoring against it asks the ranker how
+    table-like the frame is. ``visual_intent`` names the food and its state,
+    and the same words that were banned from the context prompts are banned
+    here for the same reason.
+    """
+
+    from vidfactory.reels.foods import REQUIREMENTS
+
+    furniture = ("bowl", "plate", "table", "board", "counter", "basket",
+                 "punnet", "jar", "kitchen")
+    for name, requirement in REQUIREMENTS.items():
+        assert requirement.visual_intent, name
+        lowered = requirement.visual_intent.lower()
+        for word in furniture:
+            assert word not in lowered, f"{name} intent names the {word}"
+
+
+def test_the_report_says_which_provider_reached_the_screen():
+    """"16 shots from 16 sources" is true of a one-provider reel too.
+
+    Two renders drew on Pexels alone because Pixabay had no key, and no
+    metric in the report said so. These are popped by name rather than left
+    to the ``visual_`` prefix, because they are what someone asking "is the
+    second provider actually being used" reads.
+    """
+
+    import inspect
+    from vidfactory.reels import qc
+
+    source = inspect.getsource(qc)
+    for name in ("pexels_shot_count", "pixabay_video_shot_count",
+                 "pixabay_image_shot_count", "animated_still_count",
+                 "providers_on_screen"):
+        assert name in source, name

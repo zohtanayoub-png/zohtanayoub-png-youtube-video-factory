@@ -336,6 +336,23 @@ def build_report(
     image_shots = int(visual.pop("image_fallback_shot_count", 0) or 0)
     ungrounded = [r for r in grounding_rows if r.get("ungrounded_fallback")]
     repair_rounds = int(visual.pop("repair_rounds_used", 0) or 0)
+    # Which provider and which medium reached the screen. Popped by name
+    # rather than left to the ``visual_`` prefix below, because these are
+    # read directly off the report by anyone asking "is the second provider
+    # actually being used" - two renders drew on Pexels alone for want of a
+    # key and no metric said so.
+    providers = {
+        name: int(visual.pop(name, 0) or 0)
+        for name in (
+            "pexels_shot_count",
+            "pexels_image_shot_count",
+            "pixabay_video_shot_count",
+            "pixabay_image_shot_count",
+            "animated_still_count",
+        )
+    }
+    providers["providers_on_screen"] = list(visual.pop("providers_on_screen", []) or [])
+    providers["provider_count_on_screen"] = len(providers["providers_on_screen"])
 
     metrics: dict[str, Any] = {
         "mode": "production" if production else "test",
@@ -364,6 +381,7 @@ def build_report(
         "item_grounding_results": grounding_rows,
         "repaired_item_shot_count": repaired_shots,
         "image_fallback_shot_count": image_shots,
+        **providers,
         "ungrounded_fallback_count": len(ungrounded),
         "repair_rounds_used": repair_rounds,
         "frozen_tail_duration": round(frozen_tail, 3),
