@@ -1920,3 +1920,50 @@ def test_no_undefined_names_in_the_reel_code_or_its_probes():
         if "undefined name" in line or "redefinition" in line
     ]
     assert not undefined, "\n".join(undefined)
+
+
+def test_the_readability_floor_is_not_shipped_because_it_was_not_earned():
+    """The calibration says this metric cannot carry a threshold.
+
+    ``window_sharpness`` is mean edge density over the whole frame, so what
+    it mostly measures is how much of the frame is plain background. The
+    labelled set contains a pin-sharp lime falling through water on black at
+    **0.000** and the unreadable blurred apple of ``pexels:37239365`` at
+    **0.007**: sharpness is not monotone in readability, and any floor that
+    rejects the blur also rejects sharp subjects on plain backgrounds.
+
+    So no floor exists in the code, and this test says why rather than
+    leaving the absence to look like an oversight. It fails the day someone
+    adds one without a labelled set that separates.
+    """
+
+    import inspect
+    from vidfactory.reels import pipeline
+
+    source = inspect.getsource(pipeline.choose_window)
+    for guess in ("SHARPNESS_FLOOR", "MIN_SHARPNESS", "READABILITY_FLOOR"):
+        assert guess not in source, (
+            f"{guess} was added to choose_window; "
+            "window_readability_labels.json says this metric does not separate"
+        )
+
+    labels = json.loads(
+        (Path(__file__).resolve().parents[1] / "data" / "calibration"
+         / "window_readability_labels.json").read_text(encoding="utf-8")
+    )
+    by_strip = {row["strip"]: row for row in labels["labels"]}
+
+    # The two rows that kill the threshold, pinned so the finding survives a
+    # rewrite of the file.
+    sharp_but_low = by_strip["manzana-dropped-02-00"]
+    blurred = by_strip["known-manzana-00"]
+    assert sharp_but_low["label"] == "WATCHABLE"
+    assert blurred["label"] == "UNWATCHABLE"
+    assert sharp_but_low["sharpness"] < blurred["sharpness"], (
+        "the watchable window scored lower than the unwatchable one; that "
+        "inversion is the whole reason there is no floor"
+    )
+
+    # And the known clip never counted towards a threshold anyway.
+    assert all(row.get("held_out") for row in labels["labels"]
+               if row["window_id"].startswith("pexels:37239365"))
