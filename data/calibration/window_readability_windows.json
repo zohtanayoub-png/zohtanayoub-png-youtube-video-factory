@@ -1,0 +1,2164 @@
+{
+  "run_id": 34335671018,
+  "purpose": "Every window measured for the readability calibration, with the four numbers window_quality produces. Labels live beside this file in window_readability_labels.json; the floor is read off those and never off these numbers alone.",
+  "window_seconds": 3.0,
+  "note": "pexels:37239365 is measured here and is EXCLUDED from choosing the floor. It is the clip that motivated the gate, and a rule fitted to its own motivating example fits nothing else.",
+  "per_window": [
+    {
+      "window_id": "pexels:12221817@0.00",
+      "strip": "fresas-macro-00-00",
+      "food": "fresas",
+      "source": "pexels:12221817",
+      "provider": "pexels",
+      "source_start": 0.0,
+      "source_end": 3.0,
+      "source_seconds": 25.17,
+      "sampled_at": [
+        0.66,
+        1.5,
+        2.34
+      ],
+      "window_sharpness": 0.286,
+      "window_centre_weight": 0.393,
+      "window_steadiness": 1.0,
+      "window_quality": 0.522,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:12221817@13.30",
+      "strip": "fresas-macro-00-01",
+      "food": "fresas",
+      "source": "pexels:12221817",
+      "provider": "pexels",
+      "source_start": 13.3,
+      "source_end": 16.3,
+      "source_seconds": 25.17,
+      "sampled_at": [
+        13.96,
+        14.8,
+        15.64
+      ],
+      "window_sharpness": 0.279,
+      "window_centre_weight": 0.306,
+      "window_steadiness": 1.0,
+      "window_quality": 0.501,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:12221817@22.17",
+      "strip": "fresas-macro-00-02",
+      "food": "fresas",
+      "source": "pexels:12221817",
+      "provider": "pexels",
+      "source_start": 22.167,
+      "source_end": 25.167,
+      "source_seconds": 25.17,
+      "sampled_at": [
+        22.827,
+        23.667,
+        24.507
+      ],
+      "window_sharpness": 0.283,
+      "window_centre_weight": 0.321,
+      "window_steadiness": 1.0,
+      "window_quality": 0.506,
+      "segment_grounding_score": 0.667,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:3569293@0.00",
+      "strip": "fresas-macro-01-00",
+      "food": "fresas",
+      "source": "pexels:3569293",
+      "provider": "pexels",
+      "source_start": 0.0,
+      "source_end": 3.0,
+      "source_seconds": 17.0,
+      "sampled_at": [
+        0.66,
+        1.5,
+        2.34
+      ],
+      "window_sharpness": 0.317,
+      "window_centre_weight": 0.68,
+      "window_steadiness": 1.0,
+      "window_quality": 0.595,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "entity",
+        "state"
+      ]
+    },
+    {
+      "window_id": "pexels:3569293@7.00",
+      "strip": "fresas-macro-01-01",
+      "food": "fresas",
+      "source": "pexels:3569293",
+      "provider": "pexels",
+      "source_start": 7.001,
+      "source_end": 10.001,
+      "source_seconds": 17.0,
+      "sampled_at": [
+        7.661,
+        8.501,
+        9.341
+      ],
+      "window_sharpness": 0.306,
+      "window_centre_weight": 0.68,
+      "window_steadiness": 1.0,
+      "window_quality": 0.589,
+      "segment_grounding_score": 0.333,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "entity",
+        "state"
+      ]
+    },
+    {
+      "window_id": "pexels:3569293@14.00",
+      "strip": "fresas-macro-01-02",
+      "food": "fresas",
+      "source": "pexels:3569293",
+      "provider": "pexels",
+      "source_start": 14.002,
+      "source_end": 17.002,
+      "source_seconds": 17.0,
+      "sampled_at": [
+        14.662,
+        15.502,
+        16.342
+      ],
+      "window_sharpness": 0.329,
+      "window_centre_weight": 0.661,
+      "window_steadiness": 0.991,
+      "window_quality": 0.594,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "entity",
+        "state"
+      ]
+    },
+    {
+      "window_id": "pexels:4081319@0.00",
+      "strip": "fresas-macro-02-00",
+      "food": "fresas",
+      "source": "pexels:4081319",
+      "provider": "pexels",
+      "source_start": 0.0,
+      "source_end": 3.0,
+      "source_seconds": 15.47,
+      "sampled_at": [
+        0.66,
+        1.5,
+        2.34
+      ],
+      "window_sharpness": 0.203,
+      "window_centre_weight": 0.279,
+      "window_steadiness": 0.828,
+      "window_quality": 0.406,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:4081319@6.23",
+      "strip": "fresas-macro-02-01",
+      "food": "fresas",
+      "source": "pexels:4081319",
+      "provider": "pexels",
+      "source_start": 6.233,
+      "source_end": 9.233,
+      "source_seconds": 15.47,
+      "sampled_at": [
+        6.893,
+        7.733,
+        8.573
+      ],
+      "window_sharpness": 0.0,
+      "window_centre_weight": 0.0,
+      "window_steadiness": 0.828,
+      "window_quality": 0.248,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:4081319@12.47",
+      "strip": "fresas-macro-02-02",
+      "food": "fresas",
+      "source": "pexels:4081319",
+      "provider": "pexels",
+      "source_start": 12.467,
+      "source_end": 15.467,
+      "source_seconds": 15.47,
+      "sampled_at": [
+        13.127,
+        13.967,
+        14.807
+      ],
+      "window_sharpness": 0.0,
+      "window_centre_weight": 0.082,
+      "window_steadiness": 0.465,
+      "window_quality": 0.156,
+      "segment_grounding_score": 0.667,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:9022233@0.00",
+      "strip": "fresas-dropped-00-00",
+      "food": "fresas",
+      "source": "pexels:9022233",
+      "provider": "pexels",
+      "source_start": 0.0,
+      "source_end": 3.0,
+      "source_seconds": 45.8,
+      "sampled_at": [
+        0.66,
+        1.5,
+        2.34
+      ],
+      "window_sharpness": 0.0,
+      "window_centre_weight": 0.0,
+      "window_steadiness": 1.0,
+      "window_quality": 0.3,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "entity",
+        "state",
+        "context",
+        "dominant_subject"
+      ]
+    },
+    {
+      "window_id": "pexels:9022233@25.68",
+      "strip": "fresas-dropped-00-01",
+      "food": "fresas",
+      "source": "pexels:9022233",
+      "provider": "pexels",
+      "source_start": 25.68,
+      "source_end": 28.68,
+      "source_seconds": 45.8,
+      "sampled_at": [
+        26.34,
+        27.18,
+        28.02
+      ],
+      "window_sharpness": 0.0,
+      "window_centre_weight": 0.0,
+      "window_steadiness": 1.0,
+      "window_quality": 0.3,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "entity",
+        "state",
+        "context",
+        "dominant_subject"
+      ]
+    },
+    {
+      "window_id": "pexels:9022233@42.80",
+      "strip": "fresas-dropped-00-02",
+      "food": "fresas",
+      "source": "pexels:9022233",
+      "provider": "pexels",
+      "source_start": 42.8,
+      "source_end": 45.8,
+      "source_seconds": 45.8,
+      "sampled_at": [
+        43.46,
+        44.3,
+        45.14
+      ],
+      "window_sharpness": 0.0,
+      "window_centre_weight": 0.0,
+      "window_steadiness": 1.0,
+      "window_quality": 0.3,
+      "segment_grounding_score": 0.667,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:2583475@0.00",
+      "strip": "fresas-dropped-01-00",
+      "food": "fresas",
+      "source": "pexels:2583475",
+      "provider": "pexels",
+      "source_start": 0.0,
+      "source_end": 3.0,
+      "source_seconds": 15.27,
+      "sampled_at": [
+        0.66,
+        1.5,
+        2.34
+      ],
+      "window_sharpness": 0.166,
+      "window_centre_weight": 0.579,
+      "window_steadiness": 0.955,
+      "window_quality": 0.485,
+      "segment_grounding_score": 0.667,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:2583475@6.13",
+      "strip": "fresas-dropped-01-01",
+      "food": "fresas",
+      "source": "pexels:2583475",
+      "provider": "pexels",
+      "source_start": 6.133,
+      "source_end": 9.133,
+      "source_seconds": 15.27,
+      "sampled_at": [
+        6.793,
+        7.633,
+        8.473
+      ],
+      "window_sharpness": 0.22,
+      "window_centre_weight": 0.812,
+      "window_steadiness": 0.981,
+      "window_quality": 0.566,
+      "segment_grounding_score": 0.667,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:2583475@12.27",
+      "strip": "fresas-dropped-01-02",
+      "food": "fresas",
+      "source": "pexels:2583475",
+      "provider": "pexels",
+      "source_start": 12.265,
+      "source_end": 15.265,
+      "source_seconds": 15.27,
+      "sampled_at": [
+        12.925,
+        13.765,
+        14.605
+      ],
+      "window_sharpness": 0.219,
+      "window_centre_weight": 0.833,
+      "window_steadiness": 0.989,
+      "window_quality": 0.573,
+      "segment_grounding_score": 0.667,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:9022236@0.00",
+      "strip": "fresas-dropped-02-00",
+      "food": "fresas",
+      "source": "pexels:9022236",
+      "provider": "pexels",
+      "source_start": 0.0,
+      "source_end": 3.0,
+      "source_seconds": 57.76,
+      "sampled_at": [
+        0.66,
+        1.5,
+        2.34
+      ],
+      "window_sharpness": 0.0,
+      "window_centre_weight": 0.0,
+      "window_steadiness": 1.0,
+      "window_quality": 0.3,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "entity",
+        "state",
+        "dominant_subject"
+      ]
+    },
+    {
+      "window_id": "pexels:9022236@32.86",
+      "strip": "fresas-dropped-02-01",
+      "food": "fresas",
+      "source": "pexels:9022236",
+      "provider": "pexels",
+      "source_start": 32.856,
+      "source_end": 35.856,
+      "source_seconds": 57.76,
+      "sampled_at": [
+        33.516,
+        34.356,
+        35.196
+      ],
+      "window_sharpness": 0.562,
+      "window_centre_weight": 0.785,
+      "window_steadiness": 0.697,
+      "window_quality": 0.647,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "entity"
+      ]
+    },
+    {
+      "window_id": "pexels:9022236@54.76",
+      "strip": "fresas-dropped-02-02",
+      "food": "fresas",
+      "source": "pexels:9022236",
+      "provider": "pexels",
+      "source_start": 54.76,
+      "source_end": 57.76,
+      "source_seconds": 57.76,
+      "sampled_at": [
+        55.42,
+        56.26,
+        57.1
+      ],
+      "window_sharpness": 0.262,
+      "window_centre_weight": 0.346,
+      "window_steadiness": 0.927,
+      "window_quality": 0.478,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "entity"
+      ]
+    },
+    {
+      "window_id": "pexels:7456949@0.00",
+      "strip": "frambuesas-picked-00-00",
+      "food": "frambuesas",
+      "source": "pexels:7456949",
+      "provider": "pexels",
+      "source_start": 0.0,
+      "source_end": 3.0,
+      "source_seconds": 11.9,
+      "sampled_at": [
+        0.66,
+        1.5,
+        2.34
+      ],
+      "window_sharpness": 0.477,
+      "window_centre_weight": 0.876,
+      "window_steadiness": 0.575,
+      "window_quality": 0.587,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:7456949@4.45",
+      "strip": "frambuesas-picked-00-01",
+      "food": "frambuesas",
+      "source": "pexels:7456949",
+      "provider": "pexels",
+      "source_start": 4.452,
+      "source_end": 7.452,
+      "source_seconds": 11.9,
+      "sampled_at": [
+        5.112,
+        5.952,
+        6.792
+      ],
+      "window_sharpness": 0.573,
+      "window_centre_weight": 1.0,
+      "window_steadiness": 0.422,
+      "window_quality": 0.613,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:7456949@8.90",
+      "strip": "frambuesas-picked-00-02",
+      "food": "frambuesas",
+      "source": "pexels:7456949",
+      "provider": "pexels",
+      "source_start": 8.903,
+      "source_end": 11.903,
+      "source_seconds": 11.9,
+      "sampled_at": [
+        9.563,
+        10.403,
+        11.243
+      ],
+      "window_sharpness": 0.483,
+      "window_centre_weight": 0.864,
+      "window_steadiness": 0.54,
+      "window_quality": 0.577,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:5944616@0.00",
+      "strip": "frambuesas-picked-01-00",
+      "food": "frambuesas",
+      "source": "pexels:5944616",
+      "provider": "pexels",
+      "source_start": 0.0,
+      "source_end": 3.0,
+      "source_seconds": 9.21,
+      "sampled_at": [
+        0.66,
+        1.5,
+        2.34
+      ],
+      "window_sharpness": 0.19,
+      "window_centre_weight": 0.697,
+      "window_steadiness": 0.95,
+      "window_quality": 0.519,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:5944616@3.11",
+      "strip": "frambuesas-picked-01-01",
+      "food": "frambuesas",
+      "source": "pexels:5944616",
+      "provider": "pexels",
+      "source_start": 3.107,
+      "source_end": 6.107,
+      "source_seconds": 9.21,
+      "sampled_at": [
+        3.767,
+        4.607,
+        5.447
+      ],
+      "window_sharpness": 0.206,
+      "window_centre_weight": 0.642,
+      "window_steadiness": 1.0,
+      "window_quality": 0.532,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:5944616@6.21",
+      "strip": "frambuesas-picked-01-02",
+      "food": "frambuesas",
+      "source": "pexels:5944616",
+      "provider": "pexels",
+      "source_start": 6.215,
+      "source_end": 9.215,
+      "source_seconds": 9.21,
+      "sampled_at": [
+        6.875,
+        7.715,
+        8.555
+      ],
+      "window_sharpness": 0.217,
+      "window_centre_weight": 0.652,
+      "window_steadiness": 1.0,
+      "window_quality": 0.539,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:9021968@0.00",
+      "strip": "frambuesas-picked-02-00",
+      "food": "frambuesas",
+      "source": "pexels:9021968",
+      "provider": "pexels",
+      "source_start": 0.0,
+      "source_end": 3.0,
+      "source_seconds": 44.16,
+      "sampled_at": [
+        0.66,
+        1.5,
+        2.34
+      ],
+      "window_sharpness": 0.0,
+      "window_centre_weight": 0.0,
+      "window_steadiness": 1.0,
+      "window_quality": 0.3,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "entity",
+        "state",
+        "dominant_subject"
+      ]
+    },
+    {
+      "window_id": "pexels:9021968@24.70",
+      "strip": "frambuesas-picked-02-01",
+      "food": "frambuesas",
+      "source": "pexels:9021968",
+      "provider": "pexels",
+      "source_start": 24.696,
+      "source_end": 27.696,
+      "source_seconds": 44.16,
+      "sampled_at": [
+        25.356,
+        26.196,
+        27.036
+      ],
+      "window_sharpness": 0.433,
+      "window_centre_weight": 0.615,
+      "window_steadiness": 0.882,
+      "window_quality": 0.604,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:9021968@41.16",
+      "strip": "frambuesas-picked-02-02",
+      "food": "frambuesas",
+      "source": "pexels:9021968",
+      "provider": "pexels",
+      "source_start": 41.16,
+      "source_end": 44.16,
+      "source_seconds": 44.16,
+      "sampled_at": [
+        41.82,
+        42.66,
+        43.5
+      ],
+      "window_sharpness": 0.155,
+      "window_centre_weight": 0.227,
+      "window_steadiness": 1.0,
+      "window_quality": 0.423,
+      "segment_grounding_score": 0.333,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "state"
+      ]
+    },
+    {
+      "window_id": "pexels:7660931@0.00",
+      "strip": "frambuesas-turning-00-00",
+      "food": "frambuesas",
+      "source": "pexels:7660931",
+      "provider": "pexels",
+      "source_start": 0.0,
+      "source_end": 3.0,
+      "source_seconds": 8.04,
+      "sampled_at": [
+        0.66,
+        1.5,
+        2.34
+      ],
+      "window_sharpness": 0.152,
+      "window_centre_weight": 0.125,
+      "window_steadiness": 1.0,
+      "window_quality": 0.401,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:7660931@5.04",
+      "strip": "frambuesas-turning-00-01",
+      "food": "frambuesas",
+      "source": "pexels:7660931",
+      "provider": "pexels",
+      "source_start": 5.042,
+      "source_end": 8.042,
+      "source_seconds": 8.04,
+      "sampled_at": [
+        5.702,
+        6.542,
+        7.382
+      ],
+      "window_sharpness": 0.143,
+      "window_centre_weight": 0.128,
+      "window_steadiness": 1.0,
+      "window_quality": 0.397,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:855201@0.00",
+      "strip": "frambuesas-turning-01-00",
+      "food": "frambuesas",
+      "source": "pexels:855201",
+      "provider": "pexels",
+      "source_start": 0.0,
+      "source_end": 3.0,
+      "source_seconds": 25.09,
+      "sampled_at": [
+        0.66,
+        1.5,
+        2.34
+      ],
+      "window_sharpness": 0.285,
+      "window_centre_weight": 0.735,
+      "window_steadiness": 1.0,
+      "window_quality": 0.589,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "state"
+      ]
+    },
+    {
+      "window_id": "pexels:855201@13.25",
+      "strip": "frambuesas-turning-01-01",
+      "food": "frambuesas",
+      "source": "pexels:855201",
+      "provider": "pexels",
+      "source_start": 13.252,
+      "source_end": 16.252,
+      "source_seconds": 25.09,
+      "sampled_at": [
+        13.912,
+        14.752,
+        15.592
+      ],
+      "window_sharpness": 0.29,
+      "window_centre_weight": 0.747,
+      "window_steadiness": 1.0,
+      "window_quality": 0.594,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "state"
+      ]
+    },
+    {
+      "window_id": "pexels:855201@22.09",
+      "strip": "frambuesas-turning-01-02",
+      "food": "frambuesas",
+      "source": "pexels:855201",
+      "provider": "pexels",
+      "source_start": 22.087,
+      "source_end": 25.087,
+      "source_seconds": 25.09,
+      "sampled_at": [
+        22.747,
+        23.587,
+        24.427
+      ],
+      "window_sharpness": 0.289,
+      "window_centre_weight": 0.742,
+      "window_steadiness": 1.0,
+      "window_quality": 0.593,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "state"
+      ]
+    },
+    {
+      "window_id": "pexels:5944615@0.00",
+      "strip": "frambuesas-turning-02-00",
+      "food": "frambuesas",
+      "source": "pexels:5944615",
+      "provider": "pexels",
+      "source_start": 0.0,
+      "source_end": 3.0,
+      "source_seconds": 11.13,
+      "sampled_at": [
+        0.66,
+        1.5,
+        2.34
+      ],
+      "window_sharpness": 0.291,
+      "window_centre_weight": 0.633,
+      "window_steadiness": 0.837,
+      "window_quality": 0.523,
+      "segment_grounding_score": 0.333,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "entity"
+      ]
+    },
+    {
+      "window_id": "pexels:5944615@4.07",
+      "strip": "frambuesas-turning-02-01",
+      "food": "frambuesas",
+      "source": "pexels:5944615",
+      "provider": "pexels",
+      "source_start": 4.067,
+      "source_end": 7.067,
+      "source_seconds": 11.13,
+      "sampled_at": [
+        4.727,
+        5.567,
+        6.407
+      ],
+      "window_sharpness": 0.28,
+      "window_centre_weight": 0.464,
+      "window_steadiness": 1.0,
+      "window_quality": 0.533,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "entity"
+      ]
+    },
+    {
+      "window_id": "pexels:5944615@8.13",
+      "strip": "frambuesas-turning-02-02",
+      "food": "frambuesas",
+      "source": "pexels:5944615",
+      "provider": "pexels",
+      "source_start": 8.135,
+      "source_end": 11.135,
+      "source_seconds": 11.13,
+      "sampled_at": [
+        8.795,
+        9.635,
+        10.475
+      ],
+      "window_sharpness": 0.376,
+      "window_centre_weight": 0.535,
+      "window_steadiness": 0.941,
+      "window_quality": 0.577,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:5944771@0.00",
+      "strip": "kiwi-sliced-00-00",
+      "food": "kiwi",
+      "source": "pexels:5944771",
+      "provider": "pexels",
+      "source_start": 0.0,
+      "source_end": 3.0,
+      "source_seconds": 11.76,
+      "sampled_at": [
+        0.66,
+        1.5,
+        2.34
+      ],
+      "window_sharpness": 0.212,
+      "window_centre_weight": 0.46,
+      "window_steadiness": 0.795,
+      "window_quality": 0.436,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:5944771@4.38",
+      "strip": "kiwi-sliced-00-01",
+      "food": "kiwi",
+      "source": "pexels:5944771",
+      "provider": "pexels",
+      "source_start": 4.38,
+      "source_end": 7.38,
+      "source_seconds": 11.76,
+      "sampled_at": [
+        5.04,
+        5.88,
+        6.72
+      ],
+      "window_sharpness": 0.221,
+      "window_centre_weight": 0.514,
+      "window_steadiness": 1.0,
+      "window_quality": 0.514,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:5944771@8.76",
+      "strip": "kiwi-sliced-00-02",
+      "food": "kiwi",
+      "source": "pexels:5944771",
+      "provider": "pexels",
+      "source_start": 8.76,
+      "source_end": 11.76,
+      "source_seconds": 11.76,
+      "sampled_at": [
+        9.42,
+        10.26,
+        11.1
+      ],
+      "window_sharpness": 0.184,
+      "window_centre_weight": 0.422,
+      "window_steadiness": 1.0,
+      "window_quality": 0.477,
+      "segment_grounding_score": 0.667,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:8328465@0.00",
+      "strip": "kiwi-sliced-01-00",
+      "food": "kiwi",
+      "source": "pexels:8328465",
+      "provider": "pexels",
+      "source_start": 0.0,
+      "source_end": 3.0,
+      "source_seconds": 13.92,
+      "sampled_at": [
+        0.66,
+        1.5,
+        2.34
+      ],
+      "window_sharpness": 0.229,
+      "window_centre_weight": 0.699,
+      "window_steadiness": 1.0,
+      "window_quality": 0.554,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "entity",
+        "state"
+      ]
+    },
+    {
+      "window_id": "pexels:8328465@7.28",
+      "strip": "kiwi-sliced-01-01",
+      "food": "kiwi",
+      "source": "pexels:8328465",
+      "provider": "pexels",
+      "source_start": 7.28,
+      "source_end": 10.28,
+      "source_seconds": 13.92,
+      "sampled_at": [
+        7.94,
+        8.78,
+        9.62
+      ],
+      "window_sharpness": 0.311,
+      "window_centre_weight": 0.624,
+      "window_steadiness": 0.703,
+      "window_quality": 0.491,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:8328465@10.92",
+      "strip": "kiwi-sliced-01-02",
+      "food": "kiwi",
+      "source": "pexels:8328465",
+      "provider": "pexels",
+      "source_start": 10.92,
+      "source_end": 13.92,
+      "source_seconds": 13.92,
+      "sampled_at": [
+        11.58,
+        12.42,
+        13.26
+      ],
+      "window_sharpness": 0.328,
+      "window_centre_weight": 0.488,
+      "window_steadiness": 0.64,
+      "window_quality": 0.454,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:5864033@0.00",
+      "strip": "kiwi-sliced-02-00",
+      "food": "kiwi",
+      "source": "pexels:5864033",
+      "provider": "pexels",
+      "source_start": 0.0,
+      "source_end": 3.0,
+      "source_seconds": 18.32,
+      "sampled_at": [
+        0.66,
+        1.5,
+        2.34
+      ],
+      "window_sharpness": 0.056,
+      "window_centre_weight": 0.171,
+      "window_steadiness": 1.0,
+      "window_quality": 0.362,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:5864033@9.19",
+      "strip": "kiwi-sliced-02-01",
+      "food": "kiwi",
+      "source": "pexels:5864033",
+      "provider": "pexels",
+      "source_start": 9.192,
+      "source_end": 12.192,
+      "source_seconds": 18.32,
+      "sampled_at": [
+        9.852,
+        10.692,
+        11.532
+      ],
+      "window_sharpness": 0.076,
+      "window_centre_weight": 0.201,
+      "window_steadiness": 1.0,
+      "window_quality": 0.378,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:5864033@15.32",
+      "strip": "kiwi-sliced-02-02",
+      "food": "kiwi",
+      "source": "pexels:5864033",
+      "provider": "pexels",
+      "source_start": 15.32,
+      "source_end": 18.32,
+      "source_seconds": 18.32,
+      "sampled_at": [
+        15.98,
+        16.82,
+        17.66
+      ],
+      "window_sharpness": 0.037,
+      "window_centre_weight": 0.147,
+      "window_steadiness": 1.0,
+      "window_quality": 0.348,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:36508429@0.00",
+      "strip": "kiwi-macro-00-00",
+      "food": "kiwi",
+      "source": "pexels:36508429",
+      "provider": "pexels",
+      "source_start": 0.0,
+      "source_end": 3.0,
+      "source_seconds": 15.28,
+      "sampled_at": [
+        0.66,
+        1.5,
+        2.34
+      ],
+      "window_sharpness": 0.578,
+      "window_centre_weight": 0.755,
+      "window_steadiness": 1.0,
+      "window_quality": 0.74,
+      "segment_grounding_score": 0.333,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "entity"
+      ]
+    },
+    {
+      "window_id": "pexels:36508429@6.14",
+      "strip": "kiwi-macro-00-01",
+      "food": "kiwi",
+      "source": "pexels:36508429",
+      "provider": "pexels",
+      "source_start": 6.14,
+      "source_end": 9.14,
+      "source_seconds": 15.28,
+      "sampled_at": [
+        6.8,
+        7.64,
+        8.48
+      ],
+      "window_sharpness": 0.551,
+      "window_centre_weight": 1.0,
+      "window_steadiness": 0.763,
+      "window_quality": 0.704,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "entity"
+      ]
+    },
+    {
+      "window_id": "pexels:36508429@12.28",
+      "strip": "kiwi-macro-00-02",
+      "food": "kiwi",
+      "source": "pexels:36508429",
+      "provider": "pexels",
+      "source_start": 12.28,
+      "source_end": 15.28,
+      "source_seconds": 15.28,
+      "sampled_at": [
+        12.94,
+        13.78,
+        14.62
+      ],
+      "window_sharpness": 0.535,
+      "window_centre_weight": 1.0,
+      "window_steadiness": 1.0,
+      "window_quality": 0.768,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "entity"
+      ]
+    },
+    {
+      "window_id": "pexels:36508428@0.00",
+      "strip": "kiwi-macro-01-00",
+      "food": "kiwi",
+      "source": "pexels:36508428",
+      "provider": "pexels",
+      "source_start": 0.0,
+      "source_end": 3.0,
+      "source_seconds": 15.52,
+      "sampled_at": [
+        0.66,
+        1.5,
+        2.34
+      ],
+      "window_sharpness": 0.17,
+      "window_centre_weight": 0.366,
+      "window_steadiness": 0.647,
+      "window_quality": 0.352,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "entity",
+        "dominant_subject"
+      ]
+    },
+    {
+      "window_id": "pexels:36508428@6.26",
+      "strip": "kiwi-macro-01-01",
+      "food": "kiwi",
+      "source": "pexels:36508428",
+      "provider": "pexels",
+      "source_start": 6.26,
+      "source_end": 9.26,
+      "source_seconds": 15.52,
+      "sampled_at": [
+        6.92,
+        7.76,
+        8.6
+      ],
+      "window_sharpness": 0.365,
+      "window_centre_weight": 0.524,
+      "window_steadiness": 0.958,
+      "window_quality": 0.575,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "entity",
+        "dominant_subject"
+      ]
+    },
+    {
+      "window_id": "pexels:36508428@12.52",
+      "strip": "kiwi-macro-01-02",
+      "food": "kiwi",
+      "source": "pexels:36508428",
+      "provider": "pexels",
+      "source_start": 12.52,
+      "source_end": 15.52,
+      "source_seconds": 15.52,
+      "sampled_at": [
+        13.18,
+        14.02,
+        14.86
+      ],
+      "window_sharpness": 0.367,
+      "window_centre_weight": 0.522,
+      "window_steadiness": 1.0,
+      "window_quality": 0.588,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "entity",
+        "dominant_subject"
+      ]
+    },
+    {
+      "window_id": "pexels:36508338@0.00",
+      "strip": "kiwi-macro-02-00",
+      "food": "kiwi",
+      "source": "pexels:36508338",
+      "provider": "pexels",
+      "source_start": 0.0,
+      "source_end": 3.0,
+      "source_seconds": 15.88,
+      "sampled_at": [
+        0.66,
+        1.5,
+        2.34
+      ],
+      "window_sharpness": 0.283,
+      "window_centre_weight": 0.493,
+      "window_steadiness": 1.0,
+      "window_quality": 0.54,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "entity",
+        "dominant_subject"
+      ]
+    },
+    {
+      "window_id": "pexels:36508338@6.44",
+      "strip": "kiwi-macro-02-01",
+      "food": "kiwi",
+      "source": "pexels:36508338",
+      "provider": "pexels",
+      "source_start": 6.44,
+      "source_end": 9.44,
+      "source_seconds": 15.88,
+      "sampled_at": [
+        7.1,
+        7.94,
+        8.78
+      ],
+      "window_sharpness": 0.242,
+      "window_centre_weight": 0.478,
+      "window_steadiness": 0.876,
+      "window_quality": 0.479,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "entity",
+        "dominant_subject"
+      ]
+    },
+    {
+      "window_id": "pexels:36508338@12.88",
+      "strip": "kiwi-macro-02-02",
+      "food": "kiwi",
+      "source": "pexels:36508338",
+      "provider": "pexels",
+      "source_start": 12.88,
+      "source_end": 15.88,
+      "source_seconds": 15.88,
+      "sampled_at": [
+        13.54,
+        14.38,
+        15.22
+      ],
+      "window_sharpness": 0.219,
+      "window_centre_weight": 0.466,
+      "window_steadiness": 1.0,
+      "window_quality": 0.503,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "entity",
+        "dominant_subject"
+      ]
+    },
+    {
+      "window_id": "pexels:8212402@0.00",
+      "strip": "manzana-dropped-00-00",
+      "food": "manzana",
+      "source": "pexels:8212402",
+      "provider": "pexels",
+      "source_start": 0.0,
+      "source_end": 3.0,
+      "source_seconds": 9.0,
+      "sampled_at": [
+        0.66,
+        1.5,
+        2.34
+      ],
+      "window_sharpness": 0.0,
+      "window_centre_weight": 0.0,
+      "window_steadiness": 1.0,
+      "window_quality": 0.3,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "entity",
+        "state",
+        "context",
+        "dominant_subject"
+      ]
+    },
+    {
+      "window_id": "pexels:8212402@3.00",
+      "strip": "manzana-dropped-00-01",
+      "food": "manzana",
+      "source": "pexels:8212402",
+      "provider": "pexels",
+      "source_start": 3.001,
+      "source_end": 6.001,
+      "source_seconds": 9.0,
+      "sampled_at": [
+        3.661,
+        4.501,
+        5.341
+      ],
+      "window_sharpness": 0.0,
+      "window_centre_weight": 0.0,
+      "window_steadiness": 1.0,
+      "window_quality": 0.3,
+      "segment_grounding_score": 0.333,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "state"
+      ]
+    },
+    {
+      "window_id": "pexels:8212402@6.00",
+      "strip": "manzana-dropped-00-02",
+      "food": "manzana",
+      "source": "pexels:8212402",
+      "provider": "pexels",
+      "source_start": 6.002,
+      "source_end": 9.002,
+      "source_seconds": 9.0,
+      "sampled_at": [
+        6.662,
+        7.502,
+        8.342
+      ],
+      "window_sharpness": 0.0,
+      "window_centre_weight": 0.0,
+      "window_steadiness": 1.0,
+      "window_quality": 0.3,
+      "segment_grounding_score": 0.333,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "entity"
+      ]
+    },
+    {
+      "window_id": "pexels:7677912@0.00",
+      "strip": "manzana-dropped-01-00",
+      "food": "manzana",
+      "source": "pexels:7677912",
+      "provider": "pexels",
+      "source_start": 0.0,
+      "source_end": 3.0,
+      "source_seconds": 16.76,
+      "sampled_at": [
+        0.66,
+        1.5,
+        2.34
+      ],
+      "window_sharpness": 0.219,
+      "window_centre_weight": 0.304,
+      "window_steadiness": 1.0,
+      "window_quality": 0.47,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "state",
+        "context"
+      ]
+    },
+    {
+      "window_id": "pexels:7677912@6.88",
+      "strip": "manzana-dropped-01-01",
+      "food": "manzana",
+      "source": "pexels:7677912",
+      "provider": "pexels",
+      "source_start": 6.88,
+      "source_end": 9.88,
+      "source_seconds": 16.76,
+      "sampled_at": [
+        7.54,
+        8.38,
+        9.22
+      ],
+      "window_sharpness": 0.429,
+      "window_centre_weight": 0.544,
+      "window_steadiness": 0.746,
+      "window_quality": 0.547,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "state"
+      ]
+    },
+    {
+      "window_id": "pexels:7677912@13.76",
+      "strip": "manzana-dropped-01-02",
+      "food": "manzana",
+      "source": "pexels:7677912",
+      "provider": "pexels",
+      "source_start": 13.76,
+      "source_end": 16.76,
+      "source_seconds": 16.76,
+      "sampled_at": [
+        14.42,
+        15.26,
+        16.1
+      ],
+      "window_sharpness": 0.35,
+      "window_centre_weight": 0.629,
+      "window_steadiness": 0.988,
+      "window_quality": 0.597,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "state"
+      ]
+    },
+    {
+      "window_id": "pexels:7686980@0.00",
+      "strip": "manzana-dropped-02-00",
+      "food": "manzana",
+      "source": "pexels:7686980",
+      "provider": "pexels",
+      "source_start": 0.0,
+      "source_end": 3.0,
+      "source_seconds": 9.24,
+      "sampled_at": [
+        0.66,
+        1.5,
+        2.34
+      ],
+      "window_sharpness": 0.0,
+      "window_centre_weight": 0.0,
+      "window_steadiness": 1.0,
+      "window_quality": 0.3,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "entity",
+        "state"
+      ]
+    },
+    {
+      "window_id": "pexels:7686980@3.12",
+      "strip": "manzana-dropped-02-01",
+      "food": "manzana",
+      "source": "pexels:7686980",
+      "provider": "pexels",
+      "source_start": 3.118,
+      "source_end": 6.118,
+      "source_seconds": 9.24,
+      "sampled_at": [
+        3.778,
+        4.618,
+        5.458
+      ],
+      "window_sharpness": 0.0,
+      "window_centre_weight": 0.081,
+      "window_steadiness": 1.0,
+      "window_quality": 0.316,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "state"
+      ]
+    },
+    {
+      "window_id": "pexels:7686980@6.24",
+      "strip": "manzana-dropped-02-02",
+      "food": "manzana",
+      "source": "pexels:7686980",
+      "provider": "pexels",
+      "source_start": 6.237,
+      "source_end": 9.237,
+      "source_seconds": 9.24,
+      "sampled_at": [
+        6.897,
+        7.737,
+        8.577
+      ],
+      "window_sharpness": 0.0,
+      "window_centre_weight": 0.0,
+      "window_steadiness": 1.0,
+      "window_quality": 0.3,
+      "segment_grounding_score": 0.333,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "entity",
+        "state",
+        "dominant_subject"
+      ]
+    },
+    {
+      "window_id": "pexels:8985053@0.00",
+      "strip": "manzana-hands-00-00",
+      "food": "manzana",
+      "source": "pexels:8985053",
+      "provider": "pexels",
+      "source_start": 0.0,
+      "source_end": 3.0,
+      "source_seconds": 78.0,
+      "sampled_at": [
+        0.66,
+        1.5,
+        2.34
+      ],
+      "window_sharpness": 0.155,
+      "window_centre_weight": 0.333,
+      "window_steadiness": 0.587,
+      "window_quality": 0.32,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:8985053@45.00",
+      "strip": "manzana-hands-00-01",
+      "food": "manzana",
+      "source": "pexels:8985053",
+      "provider": "pexels",
+      "source_start": 45.0,
+      "source_end": 48.0,
+      "source_seconds": 78.0,
+      "sampled_at": [
+        45.66,
+        46.5,
+        47.34
+      ],
+      "window_sharpness": 0.168,
+      "window_centre_weight": 0.389,
+      "window_steadiness": 0.67,
+      "window_quality": 0.362,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:8985053@75.00",
+      "strip": "manzana-hands-00-02",
+      "food": "manzana",
+      "source": "pexels:8985053",
+      "provider": "pexels",
+      "source_start": 75.0,
+      "source_end": 78.0,
+      "source_seconds": 78.0,
+      "sampled_at": [
+        75.66,
+        76.5,
+        77.34
+      ],
+      "window_sharpness": 0.13,
+      "window_centre_weight": 0.35,
+      "window_steadiness": 0.784,
+      "window_quality": 0.37,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:5161866@0.00",
+      "strip": "manzana-hands-01-00",
+      "food": "manzana",
+      "source": "pexels:5161866",
+      "provider": "pexels",
+      "source_start": 0.0,
+      "source_end": 3.0,
+      "source_seconds": 13.48,
+      "sampled_at": [
+        0.66,
+        1.5,
+        2.34
+      ],
+      "window_sharpness": 0.128,
+      "window_centre_weight": 0.224,
+      "window_steadiness": 0.975,
+      "window_quality": 0.402,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "state"
+      ]
+    },
+    {
+      "window_id": "pexels:5161866@6.99",
+      "strip": "manzana-hands-01-01",
+      "food": "manzana",
+      "source": "pexels:5161866",
+      "provider": "pexels",
+      "source_start": 6.988,
+      "source_end": 9.988,
+      "source_seconds": 13.48,
+      "sampled_at": [
+        7.648,
+        8.488,
+        9.328
+      ],
+      "window_sharpness": 0.139,
+      "window_centre_weight": 0.266,
+      "window_steadiness": 1.0,
+      "window_quality": 0.423,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "state"
+      ]
+    },
+    {
+      "window_id": "pexels:5161866@10.48",
+      "strip": "manzana-hands-01-02",
+      "food": "manzana",
+      "source": "pexels:5161866",
+      "provider": "pexels",
+      "source_start": 10.482,
+      "source_end": 13.482,
+      "source_seconds": 13.48,
+      "sampled_at": [
+        11.142,
+        11.982,
+        12.822
+      ],
+      "window_sharpness": 0.145,
+      "window_centre_weight": 0.251,
+      "window_steadiness": 1.0,
+      "window_quality": 0.423,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "state"
+      ]
+    },
+    {
+      "window_id": "pexels:5944590@0.00",
+      "strip": "manzana-hands-02-00",
+      "food": "manzana",
+      "source": "pexels:5944590",
+      "provider": "pexels",
+      "source_start": 0.0,
+      "source_end": 3.0,
+      "source_seconds": 19.37,
+      "sampled_at": [
+        0.66,
+        1.5,
+        2.34
+      ],
+      "window_sharpness": 0.034,
+      "window_centre_weight": 0.407,
+      "window_steadiness": 0.907,
+      "window_quality": 0.37,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "state"
+      ]
+    },
+    {
+      "window_id": "pexels:5944590@9.82",
+      "strip": "manzana-hands-02-01",
+      "food": "manzana",
+      "source": "pexels:5944590",
+      "provider": "pexels",
+      "source_start": 9.822,
+      "source_end": 12.822,
+      "source_seconds": 19.37,
+      "sampled_at": [
+        10.482,
+        11.322,
+        12.162
+      ],
+      "window_sharpness": 0.055,
+      "window_centre_weight": 0.377,
+      "window_steadiness": 1.0,
+      "window_quality": 0.403,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:5944590@16.37",
+      "strip": "manzana-hands-02-02",
+      "food": "manzana",
+      "source": "pexels:5944590",
+      "provider": "pexels",
+      "source_start": 16.37,
+      "source_end": 19.37,
+      "source_seconds": 19.37,
+      "sampled_at": [
+        17.03,
+        17.87,
+        18.71
+      ],
+      "window_sharpness": 0.153,
+      "window_centre_weight": 0.625,
+      "window_steadiness": 1.0,
+      "window_quality": 0.502,
+      "segment_grounding_score": 0.333,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "entity"
+      ]
+    },
+    {
+      "window_id": "pexels:5738522@0.00",
+      "strip": "aguacate-turning-00-00",
+      "food": "aguacate",
+      "source": "pexels:5738522",
+      "provider": "pexels",
+      "source_start": 0.0,
+      "source_end": 3.0,
+      "source_seconds": 11.08,
+      "sampled_at": [
+        0.66,
+        1.5,
+        2.34
+      ],
+      "window_sharpness": 0.434,
+      "window_centre_weight": 0.401,
+      "window_steadiness": 0.575,
+      "window_quality": 0.47,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "entity",
+        "state"
+      ]
+    },
+    {
+      "window_id": "pexels:5738522@4.04",
+      "strip": "aguacate-turning-00-01",
+      "food": "aguacate",
+      "source": "pexels:5738522",
+      "provider": "pexels",
+      "source_start": 4.039,
+      "source_end": 7.039,
+      "source_seconds": 11.08,
+      "sampled_at": [
+        4.699,
+        5.539,
+        6.379
+      ],
+      "window_sharpness": 0.489,
+      "window_centre_weight": 0.565,
+      "window_steadiness": 0.331,
+      "window_quality": 0.457,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:5738522@8.08",
+      "strip": "aguacate-turning-00-02",
+      "food": "aguacate",
+      "source": "pexels:5738522",
+      "provider": "pexels",
+      "source_start": 8.078,
+      "source_end": 11.078,
+      "source_seconds": 11.08,
+      "sampled_at": [
+        8.738,
+        9.578,
+        10.418
+      ],
+      "window_sharpness": 0.417,
+      "window_centre_weight": 0.488,
+      "window_steadiness": 0.622,
+      "window_quality": 0.492,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:5858347@0.00",
+      "strip": "aguacate-turning-01-00",
+      "food": "aguacate",
+      "source": "pexels:5858347",
+      "provider": "pexels",
+      "source_start": 0.0,
+      "source_end": 3.0,
+      "source_seconds": 10.76,
+      "sampled_at": [
+        0.66,
+        1.5,
+        2.34
+      ],
+      "window_sharpness": 0.043,
+      "window_centre_weight": 0.154,
+      "window_steadiness": 0.973,
+      "window_quality": 0.344,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:5858347@3.88",
+      "strip": "aguacate-turning-01-01",
+      "food": "aguacate",
+      "source": "pexels:5858347",
+      "provider": "pexels",
+      "source_start": 3.88,
+      "source_end": 6.88,
+      "source_seconds": 10.76,
+      "sampled_at": [
+        4.54,
+        5.38,
+        6.22
+      ],
+      "window_sharpness": 0.052,
+      "window_centre_weight": 0.139,
+      "window_steadiness": 0.811,
+      "window_quality": 0.297,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:5858347@7.76",
+      "strip": "aguacate-turning-01-02",
+      "food": "aguacate",
+      "source": "pexels:5858347",
+      "provider": "pexels",
+      "source_start": 7.76,
+      "source_end": 10.76,
+      "source_seconds": 10.76,
+      "sampled_at": [
+        8.42,
+        9.26,
+        10.1
+      ],
+      "window_sharpness": 0.044,
+      "window_centre_weight": 0.167,
+      "window_steadiness": 0.747,
+      "window_quality": 0.28,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:5858353@0.00",
+      "strip": "aguacate-turning-02-00",
+      "food": "aguacate",
+      "source": "pexels:5858353",
+      "provider": "pexels",
+      "source_start": 0.0,
+      "source_end": 3.0,
+      "source_seconds": 15.6,
+      "sampled_at": [
+        0.66,
+        1.5,
+        2.34
+      ],
+      "window_sharpness": 0.171,
+      "window_centre_weight": 0.101,
+      "window_steadiness": 1.0,
+      "window_quality": 0.406,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:5858353@6.30",
+      "strip": "aguacate-turning-02-01",
+      "food": "aguacate",
+      "source": "pexels:5858353",
+      "provider": "pexels",
+      "source_start": 6.3,
+      "source_end": 9.3,
+      "source_seconds": 15.6,
+      "sampled_at": [
+        6.96,
+        7.8,
+        8.64
+      ],
+      "window_sharpness": 0.17,
+      "window_centre_weight": 0.137,
+      "window_steadiness": 0.99,
+      "window_quality": 0.409,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:5858353@12.60",
+      "strip": "aguacate-turning-02-02",
+      "food": "aguacate",
+      "source": "pexels:5858353",
+      "provider": "pexels",
+      "source_start": 12.6,
+      "source_end": 15.6,
+      "source_seconds": 15.6,
+      "sampled_at": [
+        13.26,
+        14.1,
+        14.94
+      ],
+      "window_sharpness": 0.142,
+      "window_centre_weight": 0.106,
+      "window_steadiness": 1.0,
+      "window_quality": 0.392,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:4969057@0.00",
+      "strip": "aguacate-scooped-00-00",
+      "food": "aguacate",
+      "source": "pexels:4969057",
+      "provider": "pexels",
+      "source_start": 0.0,
+      "source_end": 3.0,
+      "source_seconds": 14.41,
+      "sampled_at": [
+        0.66,
+        1.5,
+        2.34
+      ],
+      "window_sharpness": 0.148,
+      "window_centre_weight": 0.282,
+      "window_steadiness": 0.686,
+      "window_quality": 0.336,
+      "segment_grounding_score": 0.667,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:4969057@7.61",
+      "strip": "aguacate-scooped-00-01",
+      "food": "aguacate",
+      "source": "pexels:4969057",
+      "provider": "pexels",
+      "source_start": 7.61,
+      "source_end": 10.61,
+      "source_seconds": 14.41,
+      "sampled_at": [
+        8.27,
+        9.11,
+        9.95
+      ],
+      "window_sharpness": 0.073,
+      "window_centre_weight": 0.025,
+      "window_steadiness": 0.458,
+      "window_quality": 0.179,
+      "segment_grounding_score": 0.333,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "entity",
+        "state"
+      ]
+    },
+    {
+      "window_id": "pexels:4969057@11.41",
+      "strip": "aguacate-scooped-00-02",
+      "food": "aguacate",
+      "source": "pexels:4969057",
+      "provider": "pexels",
+      "source_start": 11.414,
+      "source_end": 14.414,
+      "source_seconds": 14.41,
+      "sampled_at": [
+        12.074,
+        12.914,
+        13.754
+      ],
+      "window_sharpness": 0.231,
+      "window_centre_weight": 0.298,
+      "window_steadiness": 0.9,
+      "window_quality": 0.445,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "state"
+      ]
+    },
+    {
+      "window_id": "pexels:5897946@0.00",
+      "strip": "aguacate-scooped-01-00",
+      "food": "aguacate",
+      "source": "pexels:5897946",
+      "provider": "pexels",
+      "source_start": 0.0,
+      "source_end": 3.0,
+      "source_seconds": 25.19,
+      "sampled_at": [
+        0.66,
+        1.5,
+        2.34
+      ],
+      "window_sharpness": 0.137,
+      "window_centre_weight": 0.362,
+      "window_steadiness": 1.0,
+      "window_quality": 0.441,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:5897946@13.31",
+      "strip": "aguacate-scooped-01-01",
+      "food": "aguacate",
+      "source": "pexels:5897946",
+      "provider": "pexels",
+      "source_start": 13.315,
+      "source_end": 16.315,
+      "source_seconds": 25.19,
+      "sampled_at": [
+        13.975,
+        14.815,
+        15.655
+      ],
+      "window_sharpness": 0.145,
+      "window_centre_weight": 0.283,
+      "window_steadiness": 1.0,
+      "window_quality": 0.429,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:5897946@22.19",
+      "strip": "aguacate-scooped-01-02",
+      "food": "aguacate",
+      "source": "pexels:5897946",
+      "provider": "pexels",
+      "source_start": 22.192,
+      "source_end": 25.192,
+      "source_seconds": 25.19,
+      "sampled_at": [
+        22.852,
+        23.692,
+        24.532
+      ],
+      "window_sharpness": 0.15,
+      "window_centre_weight": 0.242,
+      "window_steadiness": 0.732,
+      "window_quality": 0.343,
+      "segment_grounding_score": 1.0,
+      "segment_grounding_passed": true,
+      "failed_on": []
+    },
+    {
+      "window_id": "pexels:4968973@0.00",
+      "strip": "aguacate-scooped-02-00",
+      "food": "aguacate",
+      "source": "pexels:4968973",
+      "provider": "pexels",
+      "source_start": 0.0,
+      "source_end": 3.0,
+      "source_seconds": 25.43,
+      "sampled_at": [
+        0.66,
+        1.5,
+        2.34
+      ],
+      "window_sharpness": 0.259,
+      "window_centre_weight": 0.408,
+      "window_steadiness": 0.03,
+      "window_quality": 0.22,
+      "segment_grounding_score": 0.333,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "entity",
+        "state"
+      ]
+    },
+    {
+      "window_id": "pexels:4968973@13.46",
+      "strip": "aguacate-scooped-02-01",
+      "food": "aguacate",
+      "source": "pexels:4968973",
+      "provider": "pexels",
+      "source_start": 13.455,
+      "source_end": 16.455,
+      "source_seconds": 25.43,
+      "sampled_at": [
+        14.115,
+        14.955,
+        15.795
+      ],
+      "window_sharpness": 0.313,
+      "window_centre_weight": 0.567,
+      "window_steadiness": 0.467,
+      "window_quality": 0.41,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "entity",
+        "state"
+      ]
+    },
+    {
+      "window_id": "pexels:4968973@22.43",
+      "strip": "aguacate-scooped-02-02",
+      "food": "aguacate",
+      "source": "pexels:4968973",
+      "provider": "pexels",
+      "source_start": 22.425,
+      "source_end": 25.425,
+      "source_seconds": 25.43,
+      "sampled_at": [
+        23.085,
+        23.925,
+        24.765
+      ],
+      "window_sharpness": 0.305,
+      "window_centre_weight": 0.253,
+      "window_steadiness": 0.222,
+      "window_quality": 0.27,
+      "segment_grounding_score": 0.0,
+      "segment_grounding_passed": false,
+      "failed_on": [
+        "entity"
+      ]
+    }
+  ],
+  "known_unreadable": {
+    "source": "pexels:37239365",
+    "why": "shipped in run 34331777135 at segment grounding 1.00 over a blurred hand; excluded from choosing the floor",
+    "per_window": [
+      {
+        "window_id": "pexels:37239365@0.00",
+        "strip": "known-manzana-00",
+        "food": "manzana",
+        "source": "pexels:37239365",
+        "provider": "pexels",
+        "source_start": 0.0,
+        "source_end": 3.0,
+        "source_seconds": 14.7,
+        "sampled_at": [
+          0.66,
+          1.5,
+          2.34
+        ],
+        "window_sharpness": 0.007,
+        "window_centre_weight": 0.011,
+        "window_steadiness": 0.829,
+        "window_quality": 0.255,
+        "segment_grounding_score": 0.667,
+        "segment_grounding_passed": true,
+        "failed_on": []
+      },
+      {
+        "window_id": "pexels:37239365@7.80",
+        "strip": "known-manzana-01",
+        "food": "manzana",
+        "source": "pexels:37239365",
+        "provider": "pexels",
+        "source_start": 7.8,
+        "source_end": 10.8,
+        "source_seconds": 14.7,
+        "sampled_at": [
+          8.46,
+          9.3,
+          10.14
+        ],
+        "window_sharpness": 0.006,
+        "window_centre_weight": 0.059,
+        "window_steadiness": 0.888,
+        "window_quality": 0.281,
+        "segment_grounding_score": 0.333,
+        "segment_grounding_passed": false,
+        "failed_on": [
+          "entity",
+          "state"
+        ]
+      },
+      {
+        "window_id": "pexels:37239365@11.70",
+        "strip": "known-manzana-02",
+        "food": "manzana",
+        "source": "pexels:37239365",
+        "provider": "pexels",
+        "source_start": 11.7,
+        "source_end": 14.7,
+        "source_seconds": 14.7,
+        "sampled_at": [
+          12.36,
+          13.2,
+          14.04
+        ],
+        "window_sharpness": 0.0,
+        "window_centre_weight": 0.015,
+        "window_steadiness": 0.854,
+        "window_quality": 0.259,
+        "segment_grounding_score": 0.333,
+        "segment_grounding_passed": false,
+        "failed_on": [
+          "entity"
+        ]
+      }
+    ]
+  }
+}

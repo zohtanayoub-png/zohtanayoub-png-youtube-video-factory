@@ -136,7 +136,7 @@ on:
                   reel-holdout-calibration, reel-holdout-entity,
                   reel-holdout-presentation, reel-holdout-final,
                   reel-apple-state, reel-apple-holdout, reel-apple-final,
-                  reel-sharpness]
+                  reel-sharpness, reel-strips]
       upload_to_youtube:
         description: "Upload to YouTube when it is finished"
         required: false
@@ -1428,6 +1428,75 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: reel-sharpness
+          path: output/holdout/*
+          retention-days: 14
+          if-no-files-found: warn
+
+  # -------------------------------------------------------------------
+  #  Pictures for windows the sharpness run already measured. The log
+  #  API returns ~828KB whatever is asked for, so a run that emits
+  #  ninety-two strips loses eighty-eight of them off the front.
+  # -------------------------------------------------------------------
+  reel-strips:
+    name: Draw the measured windows so they can be labelled
+    if: inputs.task == 'reel-strips'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    # Least privilege: a probe reads the code and writes nothing back.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ffmpeg
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+          pip install onnxruntime
+      - name: Restore the cached model files
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: vidfactory-reel-cache-v1
+      - name: Measure
+        env:
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p output/holdout
+          # The tool prints the summary without its per-clip arrays, which is
+          # what fits in a job log and in a step summary; the full rows go to
+          # the artifact.
+          python tools/reel_holdout_check.py strips --clips 1 \
+            --out output/holdout/strips.json | tee output/holdout/strips-summary.txt
+      - name: Report
+        if: always()
+        run: |
+          # Deliberately not the whole file. The sharpness run pushed 17MB at
+          # a 1MB step summary and GitHub discarded the lot; the strips are
+          # base64 and belong in the log, not in a markdown summary.
+          {
+            echo "## Window strips for labelling"
+            echo '```'
+            grep -c FRAME-BEGIN output/holdout/strips-summary.txt || true
+            echo "strips emitted; the pictures are in the job log"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload the scores
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reel-strips
           path: output/holdout/*
           retention-days: 14
           if-no-files-found: warn

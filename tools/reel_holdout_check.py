@@ -591,6 +591,9 @@ PILES_FOR: dict[str, tuple[Pile, ...]] = {
     "apple-holdout": APPLE_HOLDOUT_PILES,
     "apple-final": APPLE_FINAL_PILES,
     "sharpness": SHARPNESS_PILES,
+    # Pictures for windows already measured. It searches no provider, so it
+    # spends no query and has no pile of its own to freeze.
+    "strips": (),
     "holdout": HOLDOUT_PILES,
 }
 
@@ -1161,6 +1164,93 @@ def measure_windows(analyzer, clip, video: str, seconds: float, requirement,
                 f"{'' if row['segment_grounding_passed'] else ' FAILED'}"
             ))
     return rows
+
+
+WINDOWS_FILE = Path("data/calibration/window_readability_windows.json")
+
+#: How many strips one run may emit. The job-log API returns at most about
+#: 828 KB however many lines are asked for, and the first ``sharpness`` run
+#: emitted ninety-two strips across 78,517 lines - the numbers survived
+#: because they print last, and eighty-eight of the pictures were cut off the
+#: front. A calibration whose evidence cannot be looked at is not one.
+STRIP_BUDGET = 33
+
+
+def stratified(rows: Sequence[dict[str, Any]], count: int) -> list[dict[str, Any]]:
+    """A spread across the sharpness range rather than the first ``count``.
+
+    One threshold is being placed on one axis, so the windows worth looking
+    at are the ones spanning that axis - including both ends, which is where
+    "obviously fine" and "obviously unusable" have to be confirmed rather
+    than assumed.
+    """
+
+    ordered = sorted(rows, key=lambda r: float(r.get("window_sharpness", 0.0)))
+    if len(ordered) <= count:
+        return ordered
+    step = (len(ordered) - 1) / (count - 1)
+    picked = {int(round(i * step)) for i in range(count)}
+    return [ordered[i] for i in sorted(picked)]
+
+
+def run_strips(args, analyzer, providers, downloader, excluded) -> dict[str, Any]:
+    """Re-emit the pictures for windows already measured, small enough to read.
+
+    Nothing is re-measured: the numbers come from
+    ``window_readability_windows.json`` and the sources are fetched by id, so
+    the strip shown is the window scored. Only the picture is new, and only
+    because the first run's pictures did not survive the log.
+    """
+
+    if not WINDOWS_FILE.exists():
+        print(f"no measured windows at {WINDOWS_FILE}")
+        return {"command": "strips", "windows": 0}
+    data = json.loads(WINDOWS_FILE.read_text(encoding="utf-8"))
+    rows = list(data.get("per_window") or [])
+    known = list((data.get("known_unreadable") or {}).get("per_window") or [])
+
+    # The known clip is always shown - it is the case the gate has to reject
+    # and a reviewer has to see it - and it never counts towards the floor.
+    chosen = stratified(rows, max(1, STRIP_BUDGET - len(known))) + known
+    work = Path("output/holdout/strips")
+    work.mkdir(parents=True, exist_ok=True)
+
+    sources: dict[str, str] = {}
+    emitted: list[dict[str, Any]] = []
+    for row in chosen:
+        key = str(row.get("source", ""))
+        if key not in sources:
+            clip = pexels_clip_by_id(key.split(":", 1)[-1])
+            got = downloader.fetch_many([clip], needed=1) if clip is not None else []
+            sources[key] = str(got[0].clip.local_path or got[0].path) if got else ""
+        video = sources[key]
+        if not video:
+            log.warning("could not fetch %s", key)
+            continue
+        name = str(row.get("strip") or row.get("window_id"))
+        strip = work / f"{name}.jpg"
+        if strip_of(video, list(row.get("sampled_at") or []), strip, height=240):
+            emit_strip(name, strip, (
+                f"{row.get('window_id')} food={row.get('food')} "
+                f"sharp={float(row.get('window_sharpness', 0)):.3f} "
+                f"centre={float(row.get('window_centre_weight', 0)):.3f} "
+                f"steady={float(row.get('window_steadiness', 0)):.3f} "
+                f"quality={float(row.get('window_quality', 0)):.3f} "
+                f"grounding={float(row.get('segment_grounding_score', 0)):.2f}"
+                f"{'' if row.get('segment_grounding_passed') else ' GROUNDING-FAILED'}"
+            ))
+            emitted.append({"strip": name, "window_id": row.get("window_id")})
+    return {
+        "command": "strips",
+        "windows": len(emitted),
+        "budget": STRIP_BUDGET,
+        "note": (
+            "Pictures only. The numbers are in "
+            "data/calibration/window_readability_windows.json and nothing here "
+            "re-measures them."
+        ),
+        "emitted": emitted,
+    }
 
 
 def run_sharpness(args, analyzer, providers, downloader, excluded) -> dict[str, Any]:
@@ -1865,7 +1955,8 @@ def main(argv: list[str] | None = None) -> int:
                   "apple-state": run_apple_state,
                   "apple-holdout": run_apple_holdout,
                   "apple-final": run_apple_final,
-                  "sharpness": run_sharpness}[args.command]
+                  "sharpness": run_sharpness,
+                  "strips": run_strips}[args.command]
         report = runner(args, analyzer, providers, downloader, excluded)
 
     report["held_out_from"] = {"clips": len(excluded), "queries": sorted(burned)}
