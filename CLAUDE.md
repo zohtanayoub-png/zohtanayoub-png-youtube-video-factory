@@ -826,6 +826,34 @@ in the report has to come from a measurement - applies here to the **words**.
   character lines sized for a 1920px frame run off both edges of a 1080px
   one.
 
+* **Blur cannot be gated on any single-frame focus statistic, and the label
+  set is what proved it.** ``window_sharpness`` was the first candidate and
+  it cannot carry a floor: a pin-sharp lime window measures 0.000 while a
+  blurred apple one measures 0.007. Four local measures were then computed
+  on the same 92 windows - ``strong_edge_fraction``, high-percentile local
+  gradient energy, contrast-normalised edge energy, and Laplacian variance -
+  at 224x224 and at 480x270, because 224x224 squashes a 16:9 frame and is
+  unsuitable for focus gating whatever else is true.
+
+  On **13** labels ``laplacian_variance@480x270`` looked like the answer:
+  3 of 3 held out, an 8.2x margin, a threshold at 13.77. On **34** labels
+  the separation collapses. WATCHABLE runs **0.63 to 180.83** and
+  UNWATCHABLE, excluding the held-out clip, runs **2.60 to 25.61** - eight
+  watchable windows sit below two unwatchable ones. The sweep has no row
+  that works: at 13.77 it catches four of six blurred windows and loses two
+  of twenty-three watchable ones; at 26 it catches all six and loses eight.
+
+  One clip settles the mechanism rather than the arithmetic. ``pexels:8212402``
+  is green apples falling through water on black - same camera, same
+  lighting, same focus - and its three windows are all sharp, all WATCHABLE,
+  and score **0.63, 18.20 and 29.35**. The measure tracks how much of the
+  frame the subject fills on a plain field. It is not measuring focus.
+
+  **Nothing was shipped.** ``choose_window`` ranks on grounding first and
+  quality as a tiebreak, exactly as it did, and a test asserts that no
+  Laplacian appears in it. The remaining lever is a measure that is not a
+  single-frame statistic at all; the labels are in
+  ``data/calibration/window_readability_labels.json`` for whatever asks next.
 ## Editorial invariants (added after the first production video repeated footage)
 
 * **A provider video ID appears at most once per video.** Not once per scene,

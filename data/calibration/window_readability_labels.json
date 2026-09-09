@@ -4,7 +4,7 @@
     34335671018,
     34337769712
   ],
-  "labelled_by": "the assistant, from the three-frame strips the probe printed",
+  "labelled_by": "the assistant, from the three-frame strips the probe printed (runs 34335671018, 34337769712 and the two window-id batches)",
   "honesty_note": "These are not human labels. They were made by looking at each strip - which is the only way this question can be answered at all - but a person reviewing this file should re-check any label the floor turns on.",
   "scale": {
     "WATCHABLE": "a viewer can see what the food is and the shot is not distracting",
@@ -118,9 +118,135 @@
       "centre": 0.408,
       "label": "WATCHABLE",
       "why": "sharp guacamole; the window spans a cut, which window_steadiness scores 0.030"
+    },
+    {
+      "strip": "manzana-dropped-00-00",
+      "window_id": "pexels:8212402@0.00",
+      "label": "WATCHABLE",
+      "why": "a sharp green apple entering water on black; small and at the frame edge, but unmistakable"
+    },
+    {
+      "strip": "fresas-dropped-02-00",
+      "window_id": "pexels:9022236@0.00",
+      "label": "UNWATCHABLE",
+      "why": "a blank pale grey frame; no food in shot"
+    },
+    {
+      "strip": "kiwi-macro-01-00",
+      "window_id": "pexels:36508428@0.00",
+      "label": "WATCHABLE",
+      "why": "sharp extreme macro of seeds and orange flesh - not kiwi, which is grounding's job, but plainly readable"
+    },
+    {
+      "strip": "manzana-dropped-00-02",
+      "window_id": "pexels:8212402@6.00",
+      "label": "WATCHABLE",
+      "why": "sharp green apple on black, larger in frame than the 0.00 window of the same clip"
+    },
+    {
+      "strip": "manzana-dropped-02-02",
+      "window_id": "pexels:7686980@6.24",
+      "label": "UNWATCHABLE",
+      "why": "almost entirely black with bubbles; a sliver of green at the top corner, nothing readable"
+    },
+    {
+      "strip": "fresas-dropped-00-01",
+      "window_id": "pexels:9022233@25.68",
+      "label": "UNWATCHABLE",
+      "why": "empty grey water with bubbles and a smear of red at the edge; no readable strawberry"
+    },
+    {
+      "strip": "aguacate-scooped-01-02",
+      "window_id": "pexels:5897946@22.19",
+      "label": "WATCHABLE",
+      "why": "sharp halved avocado held in a hand, spoon above"
+    },
+    {
+      "strip": "aguacate-scooped-01-01",
+      "window_id": "pexels:5897946@13.31",
+      "label": "WATCHABLE",
+      "why": "sharp halved avocado being scooped"
+    },
+    {
+      "strip": "kiwi-sliced-02-01",
+      "window_id": "pexels:5864033@9.19",
+      "label": "WATCHABLE",
+      "why": "razor-sharp kiwi macro on white"
+    },
+    {
+      "strip": "fresas-macro-02-02",
+      "window_id": "pexels:4081319@12.47",
+      "label": "BORDERLINE",
+      "why": "extreme strawberry macro; seeds sharp in two frames, the first genuinely soft"
+    },
+    {
+      "strip": "fresas-dropped-00-02",
+      "window_id": "pexels:9022233@42.80",
+      "label": "WATCHABLE",
+      "why": "a single sharp strawberry at the top of an otherwise empty pale frame; small but readable"
+    },
+    {
+      "strip": "frambuesas-picked-02-00",
+      "window_id": "pexels:9021968@0.00",
+      "label": "UNWATCHABLE",
+      "why": "an essentially black frame; nothing visible at all"
+    },
+    {
+      "strip": "aguacate-scooped-00-01",
+      "window_id": "pexels:4969057@7.61",
+      "label": "UNWATCHABLE",
+      "why": "the third frame is a motion smear across a hand; the window spans a move and the food is lost"
+    },
+    {
+      "strip": "manzana-hands-00-00",
+      "window_id": "pexels:8985053@0.00",
+      "label": "WATCHABLE",
+      "why": "sharp red apple held in a hand, shallow depth of field behind it"
+    },
+    {
+      "strip": "manzana-hands-00-01",
+      "window_id": "pexels:8985053@45.00",
+      "label": "WATCHABLE",
+      "why": "sharp red apple in a hand, same clip later"
+    },
+    {
+      "strip": "manzana-hands-00-02",
+      "window_id": "pexels:8985053@75.00",
+      "label": "WATCHABLE",
+      "why": "sharp red apple in a hand, soft background"
+    },
+    {
+      "strip": "manzana-hands-02-00",
+      "window_id": "pexels:5944590@0.00",
+      "label": "WATCHABLE",
+      "why": "a red apple in a glass bowl of water, sharp; a hand withdraws in the first frame"
+    },
+    {
+      "strip": "manzana-hands-02-01",
+      "window_id": "pexels:5944590@9.82",
+      "label": "WATCHABLE",
+      "why": "apple, lemon and green apple in a glass bowl, sharp and readable"
+    },
+    {
+      "strip": "manzana-dropped-00-01",
+      "window_id": "pexels:8212402@3.00",
+      "label": "WATCHABLE",
+      "why": "sharp green apples falling on black"
+    },
+    {
+      "strip": "manzana-dropped-02-01",
+      "window_id": "pexels:7686980@3.12",
+      "label": "WATCHABLE",
+      "why": "sharp green apple on black"
+    },
+    {
+      "strip": "aguacate-scooped-00-00",
+      "window_id": "pexels:4969057@0.00",
+      "label": "WATCHABLE",
+      "why": "sharp lime wedge and avocado bowl on a dark counter"
     }
   ],
-  "finding": "window_sharpness cannot carry a floor. It is mean edge density over the whole frame, so it measures how much of the frame is plain background rather than whether the subject is in focus. The set contains a pin-sharp lime at 0.000 and an unreadable blurred apple at 0.007: sharpness is not monotone in readability, and every floor that rejects the blur also rejects sharp subjects on plain backgrounds. window_centre_weight has the same fault for the same reason.",
+  "finding": "window_sharpness cannot carry a floor, and neither can laplacian_variance. The 13-label set suggested laplacian_variance@480x270 separated; at 34 labels the distributions overlap badly. WATCHABLE runs 0.63 to 180.83 and UNWATCHABLE (excluding the held-out clip) runs 2.60 to 25.61, so eight watchable windows sit below two unwatchable ones.",
   "what_to_measure_instead": "ANSWERED by run 34342326028, recorded in window_focus_metrics.json. laplacian_variance measured at 480x270 is the only candidate that both separates the labelled windows and rejects all three pexels:37239365 windows when the threshold is chosen without them. The same metric at 224x224 - what production decodes today - rejects none of them: the squash to the claim model's input lowpasses away the evidence blur leaves behind. Resolution is part of the answer, not an implementation detail.",
   "candidate_threshold": {
     "metric": "laplacian_variance",
@@ -131,6 +257,45 @@
     "gap_ratio": 8.22,
     "held_out_rejected": "3/3 - chosen without these and rejects them anyway",
     "cost": "4 of the 45 windows that pass segment grounding, one of which is the known bad clip and one the BORDERLINE macro",
-    "not_shipped": "Nothing gates on this. The low side of the gap rests on a single labelled window - a blank grey frame - and that is too thin an anchor to ship a production floor on."
+    "not_shipped": "Nothing gates on this. The low side of the gap rests on a single labelled window - a blank grey frame - and that is too thin an anchor to ship a production floor on.",
+    "superseded": "13.77 was chosen on 13 labels. On 34 it catches 4 of 6 blurred windows, loses 2 watchable ones, and the separation it appeared to have was an artefact of having only one non-held-out UNWATCHABLE example."
+  },
+  "controlled_comparison": "One clip settles the mechanism. pexels:8212402 is green apples falling through water on black - same camera, same lighting, same focus - and its three windows are all sharp and all WATCHABLE. They score 0.63, 18.20 and 29.35. The only thing that differs is how much of the frame the apple fills. laplacian_variance is a subject-size measure on a plain field, not a focus measure, which is the same fault edge_density had.",
+  "threshold_sweep_on_34_labels": {
+    "metric": "laplacian_variance@480x270",
+    "note": "blurred caught is of the 6 non-held-out UNWATCHABLE; watchable lost is of 23",
+    "rows": [
+      {
+        "threshold": 5.0,
+        "blurred_caught": "2/6",
+        "watchable_lost": "1/23",
+        "held_out": "0/3"
+      },
+      {
+        "threshold": 10.0,
+        "blurred_caught": "3/6",
+        "watchable_lost": "1/23",
+        "held_out": "3/3"
+      },
+      {
+        "threshold": 13.77,
+        "blurred_caught": "4/6",
+        "watchable_lost": "2/23",
+        "held_out": "3/3"
+      },
+      {
+        "threshold": 20.0,
+        "blurred_caught": "4/6",
+        "watchable_lost": "6/23",
+        "held_out": "3/3"
+      },
+      {
+        "threshold": 26.0,
+        "blurred_caught": "6/6",
+        "watchable_lost": "8/23",
+        "held_out": "3/3"
+      }
+    ],
+    "verdict": "No row satisfies the success condition. The best detection rate that keeps watchable loss under 10% is 4 of 6, and it still rejects a pin-sharp green apple on black (0.63) - exactly the plain-background shot the gate was required to preserve. 100% detection costs 35% of the watchable windows."
   }
 }

@@ -2063,46 +2063,60 @@ def test_laplacian_variance_orders_every_blurred_case_below_every_sharp_one():
             < focus_statistics(blurred_busy)["normalised_laplacian"])
 
 
-def test_only_one_focus_measure_survives_the_held_out_clip():
-    """The measurement that answers the previous cycle's open question.
+def test_no_focus_measure_separates_once_the_label_set_is_large_enough():
+    """Thirteen labels said Laplacian variance separated. Thirty-four say no.
 
-    Every candidate "separates" the labelled set, because with
-    ``pexels:37239365`` excluded from choosing there is exactly one
-    non-held-out unwatchable window - a blank grey frame - and everything
-    clears it. The column that decides is the held-out one: a threshold
-    placed *without* the known clip either rejects it anyway or does not.
+    The apparent separation was an artefact of the set: with
+    ``pexels:37239365`` excluded from choosing, there was exactly **one**
+    non-held-out unwatchable window - a blank grey frame - and every metric
+    clears one blank frame. Labelling twenty-one more windows put six of them
+    in the blurred class, and the distributions now overlap badly.
 
-    Only ``laplacian_variance`` at 480x270 does, with a margin worth having.
-    The same metric at 224x224 - the size production decodes to - rejects
-    none of its three windows, because squashing a 16:9 frame into the claim
-    model's square input lowpasses away exactly the evidence blur leaves.
+    One clip settles the mechanism. ``pexels:8212402`` is green apples falling
+    through water on black: same camera, same lighting, same focus. Its three
+    windows are all sharp, all watchable, and score **0.63, 18.20 and 29.35** -
+    the only thing that differs is how much of the frame the apple fills.
+    Laplacian variance is a subject-size measure on a plain field, which is
+    the fault ``edge_density`` had. Measuring it locally did not fix it.
     """
 
-    import subprocess
-    import sys
-
-    root = Path(__file__).resolve().parents[1]
-    result = subprocess.run(
-        [sys.executable, str(root / "tools" / "window_focus_report.py")],
-        capture_output=True, text=True, check=True, cwd=root,
+    labels = json.loads(
+        (Path(__file__).resolve().parents[1] / "data" / "calibration"
+         / "window_readability_labels.json").read_text(encoding="utf-8")
     )
-    report = json.loads(result.stdout)
-    by_metric = {c["metric"]: c for c in report["candidates"]}
+    metrics = json.loads(
+        (Path(__file__).resolve().parents[1] / "data" / "calibration"
+         / "window_focus_metrics.json").read_text(encoding="utf-8")
+    )["per_window"]
 
-    winner = by_metric["laplacian_variance@480x270"]
-    assert winner["separates"]
-    assert winner["held_out_rejected"] == "3/3"
-    assert winner["gap_ratio"] > 4.0, "the margin got thin; re-open the question"
-    assert winner["watchable_rejected"] == 0
+    by_id = {r["window_id"]: r for r in metrics}
+    metric = "laplacian_variance@480x270"
+    scored = [
+        (row["label"], by_id[row["window_id"]][metric], by_id[row["window_id"]])
+        for row in labels["labels"] if row["window_id"] in by_id
+    ]
+    assert len(scored) >= 30, "the label set shrank; the finding rests on its size"
 
-    # Resolution is part of the finding, not an incidental.
-    assert by_metric["laplacian_variance@224"]["held_out_rejected"] == "0/3"
+    watchable = [v for label, v, _ in scored if label == "WATCHABLE"]
+    # The held-out clip never counts towards the shape of the classes.
+    blurred = [v for label, v, r in scored
+               if label == "UNWATCHABLE" and not r["held_out"]]
+    assert len(blurred) >= 5, "too few blurred examples to claim anything"
 
-    # And the two that reject the clip on a margin too thin to trust.
-    for thin in ("normalised_p99@224", "normalised_p99@480x270"):
-        assert by_metric[thin]["gap_ratio"] < 2.0
+    assert min(watchable) < max(blurred), (
+        "the classes separated again - re-open the threshold question"
+    )
 
-    # Still nothing shipped: the floor lives in a calibration file, not in code.
+    # And the controlled comparison, pinned by value.
+    same_clip = sorted(
+        v for label, v, r in scored if r["source"] == "pexels:8212402"
+    )
+    assert len(same_clip) == 3
+    assert same_clip[0] < 1.0 and same_clip[-1] > 25.0, (
+        "one clip, one focus, a forty-fold spread in the metric"
+    )
+
+    # Nothing shipped, still.
     from vidfactory.reels import pipeline
     import inspect
     assert "laplacian" not in inspect.getsource(pipeline.choose_window).lower()
