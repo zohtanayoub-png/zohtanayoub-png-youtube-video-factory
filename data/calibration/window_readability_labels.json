@@ -1,6 +1,9 @@
 {
   "purpose": "Whether a viewer can see what the window shows, judged by looking at it.",
-  "runs": [34335671018, 34337769712],
+  "runs": [
+    34335671018,
+    34337769712
+  ],
   "labelled_by": "the assistant, from the three-frame strips the probe printed",
   "honesty_note": "These are not human labels. They were made by looking at each strip - which is the only way this question can be answered at all - but a person reviewing this file should re-check any label the floor turns on.",
   "scale": {
@@ -9,20 +12,125 @@
     "UNWATCHABLE": "blurred, blank, or otherwise unreadable as a picture of food"
   },
   "labels": [
-    {"strip": "fresas-dropped-00-00", "window_id": "pexels:9022233@0.00", "sharpness": 0.0, "centre": 0.0, "label": "UNWATCHABLE", "why": "a blank grey frame; nothing in shot at all"},
-    {"strip": "manzana-dropped-02-00", "window_id": "pexels:7686980@0.00", "sharpness": 0.0, "centre": 0.0, "label": "WATCHABLE", "why": "a pin-sharp lime falling into water on a black background - sharp subject, empty surround"},
-    {"strip": "fresas-macro-02-01", "window_id": "pexels:4081319@6.23", "sharpness": 0.0, "centre": 0.0, "label": "BORDERLINE", "why": "extreme macro of strawberry skin; the seeds read, the shot is abstract"},
-    {"strip": "known-manzana-02", "window_id": "pexels:37239365@11.70", "sharpness": 0.0, "centre": 0.015, "label": "UNWATCHABLE", "why": "out of focus throughout", "held_out": true},
-    {"strip": "known-manzana-01", "window_id": "pexels:37239365@7.80", "sharpness": 0.006, "centre": 0.059, "label": "UNWATCHABLE", "why": "out of focus throughout", "held_out": true},
-    {"strip": "known-manzana-00", "window_id": "pexels:37239365@0.00", "sharpness": 0.007, "centre": 0.011, "label": "UNWATCHABLE", "why": "a blurred hand squeezing a pale yellow object against blurred packaging; no apple a viewer could name", "held_out": true},
-    {"strip": "kiwi-sliced-02-02", "window_id": "pexels:5864033@15.32", "sharpness": 0.037, "centre": 0.147, "label": "WATCHABLE", "why": "razor-sharp kiwi macro on white"},
-    {"strip": "aguacate-turning-01-01", "window_id": "pexels:5858347@3.88", "sharpness": 0.052, "centre": 0.139, "label": "WATCHABLE", "why": "sharp avocado halves, clean studio background"},
-    {"strip": "kiwi-sliced-02-00", "window_id": "pexels:5864033@0.00", "sharpness": 0.056, "centre": 0.171, "label": "WATCHABLE", "why": "razor-sharp kiwi macro on white"},
-    {"strip": "manzana-hands-01-00", "window_id": "pexels:5161866@0.00", "sharpness": 0.128, "centre": 0.224, "label": "WATCHABLE", "why": "sharp, well-composed apple being sliced"},
-    {"strip": "aguacate-scooped-01-00", "window_id": "pexels:5897946@0.00", "sharpness": 0.137, "centre": 0.362, "label": "WATCHABLE", "why": "sharp avocado half being scooped"},
-    {"strip": "frambuesas-picked-01-02", "window_id": "pexels:5944616@6.21", "sharpness": 0.217, "centre": 0.652, "label": "WATCHABLE", "why": "sharp handful of raspberries"},
-    {"strip": "aguacate-scooped-02-00", "window_id": "pexels:4968973@0.00", "sharpness": 0.259, "centre": 0.408, "label": "WATCHABLE", "why": "sharp guacamole; the window spans a cut, which window_steadiness scores 0.030"}
+    {
+      "strip": "fresas-dropped-00-00",
+      "window_id": "pexels:9022233@0.00",
+      "sharpness": 0.0,
+      "centre": 0.0,
+      "label": "UNWATCHABLE",
+      "why": "a blank grey frame; nothing in shot at all"
+    },
+    {
+      "strip": "manzana-dropped-02-00",
+      "window_id": "pexels:7686980@0.00",
+      "sharpness": 0.0,
+      "centre": 0.0,
+      "label": "WATCHABLE",
+      "why": "a pin-sharp lime falling into water on a black background - sharp subject, empty surround"
+    },
+    {
+      "strip": "fresas-macro-02-01",
+      "window_id": "pexels:4081319@6.23",
+      "sharpness": 0.0,
+      "centre": 0.0,
+      "label": "BORDERLINE",
+      "why": "extreme macro of strawberry skin; the seeds read, the shot is abstract"
+    },
+    {
+      "strip": "known-manzana-02",
+      "window_id": "pexels:37239365@11.70",
+      "sharpness": 0.0,
+      "centre": 0.015,
+      "label": "UNWATCHABLE",
+      "why": "out of focus throughout",
+      "held_out": true
+    },
+    {
+      "strip": "known-manzana-01",
+      "window_id": "pexels:37239365@7.80",
+      "sharpness": 0.006,
+      "centre": 0.059,
+      "label": "UNWATCHABLE",
+      "why": "out of focus throughout",
+      "held_out": true
+    },
+    {
+      "strip": "known-manzana-00",
+      "window_id": "pexels:37239365@0.00",
+      "sharpness": 0.007,
+      "centre": 0.011,
+      "label": "UNWATCHABLE",
+      "why": "a blurred hand squeezing a pale yellow object against blurred packaging; no apple a viewer could name",
+      "held_out": true
+    },
+    {
+      "strip": "kiwi-sliced-02-02",
+      "window_id": "pexels:5864033@15.32",
+      "sharpness": 0.037,
+      "centre": 0.147,
+      "label": "WATCHABLE",
+      "why": "razor-sharp kiwi macro on white"
+    },
+    {
+      "strip": "aguacate-turning-01-01",
+      "window_id": "pexels:5858347@3.88",
+      "sharpness": 0.052,
+      "centre": 0.139,
+      "label": "WATCHABLE",
+      "why": "sharp avocado halves, clean studio background"
+    },
+    {
+      "strip": "kiwi-sliced-02-00",
+      "window_id": "pexels:5864033@0.00",
+      "sharpness": 0.056,
+      "centre": 0.171,
+      "label": "WATCHABLE",
+      "why": "razor-sharp kiwi macro on white"
+    },
+    {
+      "strip": "manzana-hands-01-00",
+      "window_id": "pexels:5161866@0.00",
+      "sharpness": 0.128,
+      "centre": 0.224,
+      "label": "WATCHABLE",
+      "why": "sharp, well-composed apple being sliced"
+    },
+    {
+      "strip": "aguacate-scooped-01-00",
+      "window_id": "pexels:5897946@0.00",
+      "sharpness": 0.137,
+      "centre": 0.362,
+      "label": "WATCHABLE",
+      "why": "sharp avocado half being scooped"
+    },
+    {
+      "strip": "frambuesas-picked-01-02",
+      "window_id": "pexels:5944616@6.21",
+      "sharpness": 0.217,
+      "centre": 0.652,
+      "label": "WATCHABLE",
+      "why": "sharp handful of raspberries"
+    },
+    {
+      "strip": "aguacate-scooped-02-00",
+      "window_id": "pexels:4968973@0.00",
+      "sharpness": 0.259,
+      "centre": 0.408,
+      "label": "WATCHABLE",
+      "why": "sharp guacamole; the window spans a cut, which window_steadiness scores 0.030"
+    }
   ],
   "finding": "window_sharpness cannot carry a floor. It is mean edge density over the whole frame, so it measures how much of the frame is plain background rather than whether the subject is in focus. The set contains a pin-sharp lime at 0.000 and an unreadable blurred apple at 0.007: sharpness is not monotone in readability, and every floor that rejects the blur also rejects sharp subjects on plain backgrounds. window_centre_weight has the same fault for the same reason.",
-  "what_to_measure_instead": "Focus is local and this statistic is global. A candidate that could separate these cases is edge energy normalised by the frame's own contrast - a high-percentile local gradient, or strong_edge_fraction, which FrameStats already computes and this probe did not record. That needs measuring on these same 92 windows; it needs no new footage and burns no new query."
+  "what_to_measure_instead": "ANSWERED by run 34342326028, recorded in window_focus_metrics.json. laplacian_variance measured at 480x270 is the only candidate that both separates the labelled windows and rejects all three pexels:37239365 windows when the threshold is chosen without them. The same metric at 224x224 - what production decodes today - rejects none of them: the squash to the claim model's input lowpasses away the evidence blur leaves behind. Resolution is part of the answer, not an implementation detail.",
+  "candidate_threshold": {
+    "metric": "laplacian_variance",
+    "decode": "480x270, native aspect",
+    "aggregation": "the weakest of the window's three sampled frames",
+    "threshold": 13.77,
+    "how_chosen": "geometric midpoint of the gap between the watchable minimum (39.48) and the highest non-held-out unwatchable window (4.81)",
+    "gap_ratio": 8.22,
+    "held_out_rejected": "3/3 - chosen without these and rejects them anyway",
+    "cost": "4 of the 45 windows that pass segment grounding, one of which is the known bad clip and one the BORDERLINE macro",
+    "not_shipped": "Nothing gates on this. The low side of the gap rests on a single labelled window - a blank grey frame - and that is too thin an anchor to ship a production floor on."
+  }
 }

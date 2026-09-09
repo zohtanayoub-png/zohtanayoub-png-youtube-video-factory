@@ -2061,3 +2061,48 @@ def test_laplacian_variance_orders_every_blurred_case_below_every_sharp_one():
             <= focus_statistics(blurred_disc)["p999_gradient"])
     assert (focus_statistics(disc)["normalised_laplacian"]
             < focus_statistics(blurred_busy)["normalised_laplacian"])
+
+
+def test_only_one_focus_measure_survives_the_held_out_clip():
+    """The measurement that answers the previous cycle's open question.
+
+    Every candidate "separates" the labelled set, because with
+    ``pexels:37239365`` excluded from choosing there is exactly one
+    non-held-out unwatchable window - a blank grey frame - and everything
+    clears it. The column that decides is the held-out one: a threshold
+    placed *without* the known clip either rejects it anyway or does not.
+
+    Only ``laplacian_variance`` at 480x270 does, with a margin worth having.
+    The same metric at 224x224 - the size production decodes to - rejects
+    none of its three windows, because squashing a 16:9 frame into the claim
+    model's square input lowpasses away exactly the evidence blur leaves.
+    """
+
+    import subprocess
+    import sys
+
+    root = Path(__file__).resolve().parents[1]
+    result = subprocess.run(
+        [sys.executable, str(root / "tools" / "window_focus_report.py")],
+        capture_output=True, text=True, check=True, cwd=root,
+    )
+    report = json.loads(result.stdout)
+    by_metric = {c["metric"]: c for c in report["candidates"]}
+
+    winner = by_metric["laplacian_variance@480x270"]
+    assert winner["separates"]
+    assert winner["held_out_rejected"] == "3/3"
+    assert winner["gap_ratio"] > 4.0, "the margin got thin; re-open the question"
+    assert winner["watchable_rejected"] == 0
+
+    # Resolution is part of the finding, not an incidental.
+    assert by_metric["laplacian_variance@224"]["held_out_rejected"] == "0/3"
+
+    # And the two that reject the clip on a margin too thin to trust.
+    for thin in ("normalised_p99@224", "normalised_p99@480x270"):
+        assert by_metric[thin]["gap_ratio"] < 2.0
+
+    # Still nothing shipped: the floor lives in a calibration file, not in code.
+    from vidfactory.reels import pipeline
+    import inspect
+    assert "laplacian" not in inspect.getsource(pipeline.choose_window).lower()
