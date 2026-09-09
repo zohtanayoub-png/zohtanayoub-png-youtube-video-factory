@@ -854,6 +854,18 @@ in the report has to come from a measurement - applies here to the **words**.
   Laplacian appears in it. The remaining lever is a measure that is not a
   single-frame statistic at all; the labels are in
   ``data/calibration/window_readability_labels.json`` for whatever asks next.
+* **A topic may pin the CTA it ends on, and may not invent one.**
+  ``cta_for`` varies the ending across a feed on purpose - a stable pick per
+  slug, so two renders of one topic agree and two topics do not. ``Topic.cta``
+  is the exception, for a reel asked for by name with the ending it is meant
+  to have, and it still has to be one of ``CTA_VARIANTS``: the CTA is the one
+  line in a reel that must never become a sale. It is not free. Pinning the
+  nine-word variant onto ``frutas-impacto-moderado`` pushed that script two
+  words past a 45s budget it was already sitting on the edge of, so the reel
+  now builds against 60s and renders at about 47. Six tests were asserting
+  against ``build(..., 45)`` for that topic and are now asserting against the
+  duration the pipeline would actually use.
+
 ## Editorial invariants (added after the first production video repeated footage)
 
 * **A provider video ID appears at most once per video.** Not once per scene,

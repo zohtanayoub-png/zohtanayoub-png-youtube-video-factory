@@ -234,9 +234,13 @@ def cta_for(topic: Topic) -> str:
 
     Stable rather than random so two renders of the same topic do not
     disagree, and varied across topics so a feed of reels does not end with
-    the identical sentence every time.
+    the identical sentence every time. A topic may name the variation it
+    wants; that is still one of the four, so the rule about what a CTA may
+    say holds either way.
     """
 
+    if topic.cta:
+        return topic.cta
     if "glucosa" in topic.title.lower() and "fruta" not in topic.title.lower():
         return CTA_VARIANTS[3]
     return CTA_VARIANTS[_stable_index(topic.slug, len(CTA_VARIANTS))]

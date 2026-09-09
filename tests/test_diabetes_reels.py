@@ -41,6 +41,7 @@ from vidfactory.reels.script import (
     CTA_VARIANTS,
     build,
     build_fitted,
+    cta_for,
 )
 
 
@@ -165,6 +166,52 @@ def test_a_dishonest_hook_cannot_win_on_being_punchy(opener):
 #: The hooks the brief lists under "Prefer hooks like", each with the topic
 #: it belongs to. The bar was read off these: scored against their own topics
 #: they land between 0.491 and 0.692, and a generic opening scores 0.376.
+def test_a_topic_may_name_the_cta_it_ends_on():
+    """Pinned, and still one of the four the safety layer allows.
+
+    The variation across a feed is deliberate, so an override is the
+    exception: a reel asked for by name can be asked for with the ending it
+    is meant to have, without the variation rule being rewritten around it.
+    What an override may not do is invent a sentence - a CTA is the one line
+    in a reel that must never become a sale - so every pinned value has to
+    be a member of ``CTA_VARIANTS``.
+    """
+
+    pinned = [t for t in TOPICS if t.cta]
+    assert pinned, "no topic pins its CTA, so this test proves nothing"
+    for topic in pinned:
+        assert topic.cta in CTA_VARIANTS, topic.slug
+        assert cta_for(topic) == topic.cta
+        assert fitted(topic, 45).cta == topic.cta
+
+    # And a topic that does not pin one still varies.
+    free = [t for t in TOPICS if not t.cta]
+    assert len({cta_for(t) for t in free}) > 1
+
+
+def test_every_breakfast_error_ships_with_what_to_do_instead():
+    """An error reel that only names errors has told nobody anything.
+
+    The fix is the whole value of the format, and it is the first thing a
+    duration trim would reach for, so it is asserted rather than assumed -
+    the same rule the list formats already carry for their reasons.
+    """
+
+    topic = BY_SLUG["errores-desayuno"]
+    assert topic.format == "error_solution"
+    assert topic.required_item_count == len(topic.items) == 3
+    for item in topic.items:
+        assert item.why.strip(), item.key
+        assert item.sources, item.key
+        assert all(key in SOURCES for key in item.sources), item.key
+
+    script = fitted(topic, 45)
+    spoken = script.narration
+    for item in topic.items:
+        assert item.why.rstrip(" .") in spoken, item.key
+    assert not safety.find_risks(spoken)
+
+
 PROBLEM_FIRST = [
     ("frutas-impacto-moderado",
      "Si tienes diabetes y te preocupa que la fruta te dispare la glucosa, escucha esto."),
@@ -262,7 +309,7 @@ def test_the_hook_is_not_the_conclusion_said_twice():
 # ---------------------------------------------------------------------------
 
 def test_the_six_beats_arrive_in_order():
-    script = build(BY_SLUG[FIRST], target_seconds=45)
+    script = fitted(BY_SLUG[FIRST], 45)
     kinds = [b.kind for b in script.beats]
     assert kinds[0] == "hook"
     assert kinds[1] == "answer"
@@ -398,7 +445,7 @@ def test_every_beat_carries_its_own_picture():
     """"Si dice fresas, quiero ver fresas" is decided here: the shot planner
     downstream can only choose from what each beat asked to be searched."""
 
-    script = build(BY_SLUG[FIRST], target_seconds=45)
+    script = fitted(BY_SLUG[FIRST], 45)
     for beat in script.item_beats:
         assert beat.query and beat.search_text
     queries = [b.query for b in script.item_beats]
@@ -489,7 +536,7 @@ def test_the_emoji_survives_where_it_can_be_drawn():
 
     emoji_topics = [t for t in TOPICS if not title_renders(t.top_title)]
     assert emoji_topics, "no topic uses an emoji, so this test proves nothing"
-    script = build(emoji_topics[0], target_seconds=45)
+    script = fitted(emoji_topics[0], 45)
     assert any(ord(c) > 0x1F000 for c in script.top_title)
 
 
@@ -543,7 +590,7 @@ def test_caption_lines_fit_the_narrower_frame(tmp_path):
 # ---------------------------------------------------------------------------
 
 def _report(topic_slug: str = FIRST, seconds: float = 45.0):
-    script = build(BY_SLUG[topic_slug], target_seconds=seconds)
+    script = fitted(BY_SLUG[topic_slug], seconds)
     return script, build_report(
         script,
         actual_seconds=script.estimated_seconds,
@@ -619,7 +666,7 @@ def test_a_reel_with_no_source_is_refused():
 # ---------------------------------------------------------------------------
 
 def test_the_caption_carries_the_sources_and_the_disclaimer():
-    script = build(BY_SLUG[FIRST], target_seconds=45)
+    script = fitted(BY_SLUG[FIRST], 45)
     body = caption(script, bibliography(script.source_keys))
     assert script.hook.hook in body
     assert script.cta in body
@@ -739,7 +786,7 @@ def test_every_beat_kind_the_builder_emits_has_a_delivery(tmp_path):
 def test_the_reel_is_not_read_at_one_pace(tmp_path):
     from vidfactory.reels.narration import BEAT_SPEED, narrate
 
-    script = build(BY_SLUG[FIRST], target_seconds=45)
+    script = fitted(BY_SLUG[FIRST], 45)
     engine = _RecordingEngine()
     result = narrate(
         script.beats, engine, workdir=tmp_path / "w", destination=tmp_path / "n.wav"
@@ -758,7 +805,7 @@ def test_an_engine_without_a_speed_argument_still_works(tmp_path):
 
     from vidfactory.reels.narration import narrate
 
-    script = build(BY_SLUG[FIRST], target_seconds=45)
+    script = fitted(BY_SLUG[FIRST], 45)
     engine = _OnePaceEngine()
     result = narrate(
         script.beats, engine, workdir=tmp_path / "w", destination=tmp_path / "n.wav"
@@ -982,8 +1029,11 @@ def test_the_narration_is_written_in_correct_spanish():
     asserted by hand; the sweep below catches the rest.
     """
 
-    script = fitted(BY_SLUG[FIRST], 45)
-    spoken = script.narration
+    # Over every topic rather than over one. Which accented word lands in
+    # which reel is an accident of that reel's CTA and its retention line -
+    # "dia" left the fruit reel the day its CTA was pinned - and a test that
+    # breaks on that is testing the wording, not the spelling.
+    spoken = " ".join(fitted(topic, 45).narration for topic in TOPICS).lower()
     for word in ("ración", "más", "proteína", "síguenos", "día", "última", "así"):
         assert word in spoken, word
 

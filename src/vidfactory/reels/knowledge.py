@@ -108,6 +108,14 @@ class Topic:
     #: item has been named.
     opening_query: str = "healthy food on a kitchen table"
     opening_search_text: str = "a bowl of fresh fruit on a kitchen counter"
+    #: The closing call to action, when this topic wants a particular one of
+    #: the allowed variations rather than the stable pick. Left empty for
+    #: almost every topic: varying the ending across a feed is the point, and
+    #: an override exists so a named reel can be asked for by name without
+    #: the variation rule being rewritten around it. It still has to be one
+    #: of ``script.CTA_VARIANTS`` - a test checks that - because the CTA is
+    #: the one sentence in the reel that is never allowed to become a sale.
+    cta: str = ""
 
     @property
     def required_item_count(self) -> int:
@@ -368,6 +376,7 @@ TOPICS: tuple[Topic, ...] = (
         ),
         opening_query="fresh fruit assortment on a kitchen table",
         opening_search_text="an assortment of fresh fruit on a table",
+        cta="Síguenos para más consejos claros y sencillos sobre diabetes.",
     ),
     Topic(
         slug="frutas-suben-mas-rapido",
@@ -530,6 +539,104 @@ TOPICS: tuple[Topic, ...] = (
             ),
             "Si la fruta te sube más de lo que esperas, mira estos cinco fallos.",
         ),
+    ),
+    Topic(
+        slug="errores-desayuno",
+        worry="que el desayuno te dispare la glucosa",
+        moment="a media mañana, después de desayunar",
+        title="3 errores en el desayuno que pueden provocar picos de glucosa",
+        format="error_solution",
+        top_title="ERRORES DEL DESAYUNO",
+        accent="ERRORES",
+        promise=(
+            "Tres fallos muy repetidos en el desayuno y que se puede poner "
+            "en su lugar cada mañana"
+        ),
+        conclusion=(
+            "Un desayuno con proteína, grasa buena y fibra suele sostener "
+            "mucho mejor toda la mañana"
+        ),
+        answer=(
+            "Desayunar solo hidratos, empezar por el zumo y comer de pie "
+            "en dos minutos"
+        ),
+        takeaway=(
+            "Elige uno para mañana: añade un huevo o un yogur natural a lo "
+            "que ya desayunas"
+        ),
+        promises_all_items=True,
+        items=(
+            Item(
+                key="solo_hidratos",
+                display="desayunar solo hidratos",
+                claim=(
+                    "Tostada, galletas o cereales solos suelen subir más"
+                ),
+                why="añade huevo, queso fresco o yogur natural",
+                query="scrambled eggs with wholegrain toast on a plate",
+                search_text="a plate of eggs beside wholegrain bread",
+                sources=("ada_nutrition", "harvard_carbs"),
+            ),
+            Item(
+                key="empezar_por_zumo",
+                display="empezar por el zumo",
+                claim=(
+                    "El zumo llega sin fibra y suele entrar muy rápido"
+                ),
+                why="toma la fruta entera y bebe agua",
+                query="glass of orange juice next to whole oranges",
+                search_text="a glass of juice beside whole oranges",
+                sources=("who_diet", "harvard_fiber"),
+            ),
+            Item(
+                key="desayuno_de_pie",
+                display="desayunar de pie en dos minutos",
+                claim=(
+                    "Comer muy rápido puede dar una subida más marcada"
+                ),
+                why="siéntate y dale diez minutos de reloj",
+                query="person sitting at a table having breakfast slowly",
+                search_text="a person seated at a table eating breakfast",
+                sources=("fundacion_diabetes", "redgdps"),
+            ),
+        ),
+        hashtags=("#diabetes", "#glucosa", "#desayuno", "#errores", "#nutricion"),
+        hooks=(
+            (
+                "Si tu glucosa se dispara después del desayuno, mira estos "
+                "tres errores."
+            ),
+            (
+                "Si tu glucosa se dispara después del desayuno, puede que sea "
+                "uno de estos tres errores."
+            ),
+            (
+                "Si te preocupa que el desayuno te dispare la glucosa, suelen "
+                "ser estos tres errores."
+            ),
+            (
+                "Si desayunas y a media mañana ves un pico que no te cuadra, "
+                "mira estos tres fallos."
+            ),
+            (
+                "Si te preocupa que el desayuno te dispare la glucosa, el "
+                "problema suele estar en tres detalles."
+            ),
+            (
+                "Desayunas parecido cada día y la glucosa no acompaña: casi "
+                "siempre es uno de estos tres errores."
+            ),
+            (
+                "Si el desayuno te sube más de lo que esperas, revisa estos "
+                "tres fallos antes que la comida."
+            ),
+            (
+                "Tres errores muy comunes en el desayuno, y que poner en su "
+                "lugar desde mañana."
+            ),
+        ),
+        opening_query="healthy breakfast table with eggs bread and fruit",
+        opening_search_text="a breakfast table with eggs, bread and fruit",
     ),
     Topic(
         slug="desayunos-picos",
@@ -981,6 +1088,18 @@ TOPICS: tuple[Topic, ...] = (
         items=(NARANJA_ENTERA, ZUMO),
         hashtags=("#diabetes", "#glucosa", "#zumo", "#fruta", "#nutricion"),
         hooks=(
+            (
+                "Si te preocupa que el zumo te suba la glucosa: misma fruta, "
+                "distinta respuesta."
+            ),
+            (
+                "Si te preocupa el zumo del desayuno: misma fruta, pero tu "
+                "glucosa no la recibe igual."
+            ),
+            (
+                "Una naranja y un vaso de zumo vienen de la misma fruta, pero "
+                "tu cuerpo no los recibe igual."
+            ),
             (
                 "Si desayunas zumo cada mañana y te preocupa que te suba la "
                 "glucosa, mira esta diferencia."
