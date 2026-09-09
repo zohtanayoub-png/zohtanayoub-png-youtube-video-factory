@@ -42,6 +42,13 @@ Four questions, four commands, and they are deliberately separate runs:
 ``apple-holdout`` the applied apple wording on fresh apple footage, per class.
 ``apple-final`` one named negative prompt against the one that ships, on a
                third apple set, with the accept rule written down first.
+``sharpness``  is a window *readable*, not merely correct? The used-segment
+               gate passed a blurred apple at 1.00 on all four probes, so
+               this measures ``window_quality`` on fresh food footage and
+               prints a three-frame strip of every window beside its numbers.
+               It chooses nothing: the labels are written by a person into
+               ``data/calibration/window_readability_labels.json`` and the
+               floor is read off those.
 ``holdout``    the whole gate on fresh piles: precision and recall, overall
                and per food and per state.
 
@@ -51,7 +58,10 @@ Run them with the ``reel-holdout-check`` task on the video workflow.
 from __future__ import annotations
 
 import argparse
+import base64
 import json
+import os
+import subprocess
 import resource
 import time
 from dataclasses import dataclass, replace
@@ -61,6 +71,7 @@ from typing import Any, Sequence
 from vidfactory.config import load_config
 from vidfactory.downloader import ClipDownloader
 from vidfactory.logging_utils import get_logger, setup_logging
+from vidfactory.reels.pipeline import window_starts
 from vidfactory.reels.foods import (
     BY_NAME,
     WRONG_CONTEXT,
@@ -71,7 +82,14 @@ from vidfactory.reels.foods import (
     score_requirement,
 )
 from vidfactory.stock import build_providers
-from vidfactory.visual_analysis import VisualAnalyzer, crop_center, sample_frames
+from vidfactory.visual_analysis import (
+    VisualAnalyzer,
+    crop_center,
+    sample_frames,
+    segment_frames,
+    segment_positions,
+    window_quality,
+)
 from vidfactory.visual_model import load_model
 
 log = get_logger("HOLDOUT")
@@ -485,6 +503,58 @@ APPLE_FINAL_CANDIDATES: dict[str, dict[str, tuple[str, ...]]] = {
 }
 
 
+#: Readability. The used-segment gate works - run 34331777135 moved four
+#: crops and every one of the ten segments grounded at 1.00 or 0.67 - and it
+#: still shipped an unreadable apple: ``pexels:37239365`` at 9.1-11.7s scores
+#: 1.00 on all four probes over a blurred hand and a yellow smear. CLIP reads
+#: "apple" confidently in a blur a person cannot.
+#:
+#: ``window_quality`` already measured it: sharpness 0.000, the floor, against
+#: 0.21-0.52 for every other segment in that reel. What was missing is a
+#: threshold, and a threshold guessed from the one clip that motivated it is
+#: how a rule gets written that fits exactly one example.
+#:
+#: So: fresh queries over five foods, chosen to span the cinematography this
+#: niche actually returns - macro detail, shallow depth of field, slow motion,
+#: hands in the frame, and things being poured or dropped, which is where the
+#: motion blur lives. Multiple windows per clip, because a single source
+#: contains sharp and blurred moments and the sharp ones are the reason the
+#: window search exists.
+SHARPNESS_PILES: tuple[Pile, ...] = (
+    Pile("strawberry macro", "macro close up of a strawberry surface",
+         "fresas", True, "fresas"),
+    Pile("strawberries dropped", "strawberries falling into water in slow motion",
+         "fresas", True, "fresas"),
+    Pile("raspberry picked", "a hand picking raspberries in slow motion",
+         "frambuesas", True, "frambuesas"),
+    Pile("raspberry turning", "raspberries turning slowly on a dark background",
+         "frambuesas", True, "frambuesas"),
+    Pile("kiwi sliced", "a kiwi being sliced in slow motion",
+         "kiwi", True, "kiwi"),
+    Pile("kiwi macro", "extreme macro of kiwi seeds and green flesh",
+         "kiwi", True, "kiwi"),
+    Pile("apple dropped", "an apple dropping into water in slow motion",
+         "manzana", True, "manzana"),
+    Pile("apple in hands", "hands polishing a red apple",
+         "manzana", True, "manzana"),
+    Pile("avocado turning", "avocado halves turning slowly",
+         "aguacate", True, "aguacate"),
+    Pile("avocado scooped", "a spoon scooping flesh out of an avocado",
+         "aguacate", True, "aguacate"),
+)
+
+#: The window length the calibration measures at. The reel lays 2-4 second
+#: shots and ``choose_window`` grounds whatever the layout asked for; three
+#: seconds is the middle of that and is what ``visual_average_shot_seconds``
+#: has come out at on every render so far.
+SHARPNESS_WINDOW = 3.0
+
+#: The clip that started this, fetched by id and kept *out* of the threshold
+#: choice. Section 7 of the brief: prove the gate rejects it, do not let it
+#: pick the number.
+KNOWN_UNREADABLE = "37239365"
+
+
 #: The held-out set. Every query here is new again: the calibration run
 #: above spent its own, and a pile that decided a rule cannot also grade it.
 HOLDOUT_PILES: tuple[Pile, ...] = (
@@ -519,6 +589,7 @@ PILES_FOR: dict[str, tuple[Pile, ...]] = {
     "apple-state": APPLE_STATE_PILES,
     "apple-holdout": APPLE_HOLDOUT_PILES,
     "apple-final": APPLE_FINAL_PILES,
+    "sharpness": SHARPNESS_PILES,
     "holdout": HOLDOUT_PILES,
 }
 
@@ -956,6 +1027,209 @@ def run_entity(args, analyzer, providers, downloader, excluded) -> dict[str, Any
         report["foods"][food] = {"competitors": list(entity.competitors),
                                  "variants": rows}
     return report
+
+
+# ---------------------------------------------------------------------------
+# sharpness - is this window readable, not just correct
+# ---------------------------------------------------------------------------
+
+def strip_of(video: str, positions: Sequence[float], target: Path,
+             height: int = 640) -> bool:
+    """One JPEG showing the whole window: its three sampled moments, in order.
+
+    A single midpoint frame would hide the half of a window that goes soft,
+    and the label being asked for is about the window rather than about an
+    instant. The three positions are exactly the ones ``window_quality``
+    measured, so the picture and the number describe the same thing.
+    """
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    inputs: list[str] = []
+    for at in positions:
+        inputs += ["-ss", f"{max(0.0, float(at)):.3f}", "-i", str(video)]
+    count = len(positions)
+    chain = "".join(
+        f"[{i}:v]scale=-2:{height},setsar=1[v{i}];" for i in range(count)
+    ) + "".join(f"[v{i}]" for i in range(count)) + f"hstack=inputs={count}[out]"
+    command = [
+        "ffmpeg", "-y", "-loglevel", "error", "-nostdin",
+        *inputs, "-filter_complex", chain, "-map", "[out]",
+        "-frames:v", "1", "-q:v", "4", str(target),
+    ]
+    subprocess.run(command, check=False, timeout=120)
+    return target.exists() and target.stat().st_size > 0
+
+
+def emit_strip(name: str, path: Path, note: str) -> None:
+    """Put the picture in the log, because the artifact store is unreachable.
+
+    The same encoding ``tools/inspect_reel_frames.py`` uses, and read back the
+    same way: blob storage answers 403 from this network, so a frame that
+    only exists in an artifact is a frame nobody can look at.
+    """
+
+    if not path.exists():
+        print(f"::warning::no strip for {name}")
+        return
+    blob = base64.b64encode(path.read_bytes()).decode("ascii")
+    print(f"FRAME-BEGIN {name} at=0.0s bytes={path.stat().st_size}")
+    print(f"FRAME-TEXT {name} {note}")
+    for index in range(0, len(blob), 200):
+        print(f"FRAME-DATA {name} {blob[index:index + 200]}")
+    print(f"FRAME-END {name}")
+
+
+def pexels_clip_by_id(video_id: str) -> Any | None:
+    """One known Pexels video, by id rather than by search.
+
+    ``pexels:37239365`` is the clip the readability gate has to reject, and a
+    search cannot be relied on to return one specific video. Its windows are
+    measured and reported and are deliberately excluded from choosing the
+    threshold - a rule fitted to the example that motivated it fits nothing
+    else.
+    """
+
+    key = os.environ.get("PEXELS_API_KEY", "")
+    if not key:
+        return None
+    try:
+        from vidfactory.http import request_json
+        from vidfactory.stock.pexels import PexelsProvider
+
+        payload = request_json(
+            f"https://api.pexels.com/videos/videos/{video_id}",
+            headers={"Authorization": key}, timeout=30.0,
+        )
+        clips = PexelsProvider.parse({"videos": [payload]}, "known unreadable")
+        return clips[0] if clips else None
+    except Exception as exc:                               # pragma: no cover
+        log.warning("could not fetch pexels:%s: %s", video_id, exc)
+        return None
+
+
+def measure_windows(analyzer, clip, video: str, seconds: float, requirement,
+                    work: Path, label: str) -> list[dict[str, Any]]:
+    """Every window of one source: its numbers, and a picture of it."""
+
+    rows: list[dict[str, Any]] = []
+    # Three windows a clip, not every window a clip offers. Each one has to
+    # be looked at by a person to earn its label, and a set nobody finishes
+    # reading is a set that decides nothing.
+    starts = window_starts(seconds, SHARPNESS_WINDOW)
+    if len(starts) > 3:
+        starts = [starts[0], starts[len(starts) // 2], starts[-1]]
+    for index, start in enumerate(starts):
+        positions = segment_positions(start, SHARPNESS_WINDOW, 3)
+        frames = segment_frames(
+            video, start, SHARPNESS_WINDOW, 3, analyzer.decode_size
+        )
+        if not frames:
+            continue
+        quality = window_quality(frames)
+        grounding = ground_requirement(analyzer, frames, requirement)
+        window_id = f"{clip.key}@{start:.2f}"
+        name = f"{label}-{index:02d}"
+        row = {
+            "window_id": window_id,
+            "strip": name,
+            "food": requirement.required_entity,
+            "source": clip.key,
+            "provider": clip.provider,
+            "source_start": round(start, 3),
+            "source_end": round(start + SHARPNESS_WINDOW, 3),
+            "source_seconds": round(seconds, 2),
+            "sampled_at": positions,
+            "window_sharpness": quality["sharpness"],
+            "window_centre_weight": quality["centre_weight"],
+            "window_steadiness": quality["steadiness"],
+            "window_quality": quality["quality"],
+            "segment_grounding_score": round(grounding.score, 3),
+            "segment_grounding_passed": bool(grounding.passed),
+            "failed_on": list(grounding.failed_on),
+        }
+        rows.append(row)
+        strip = work / f"{name}.jpg"
+        if strip_of(video, positions, strip):
+            emit_strip(name, strip, (
+                f"{window_id} food={row['food']} "
+                f"sharp={row['window_sharpness']:.3f} "
+                f"centre={row['window_centre_weight']:.3f} "
+                f"steady={row['window_steadiness']:.3f} "
+                f"quality={row['window_quality']:.3f} "
+                f"grounding={row['segment_grounding_score']:.2f}"
+                f"{'' if row['segment_grounding_passed'] else ' FAILED'}"
+            ))
+    return rows
+
+
+def run_sharpness(args, analyzer, providers, downloader, excluded) -> dict[str, Any]:
+    """Measure every window, show every window, decide nothing.
+
+    This command does not pick a threshold. It produces the numbers and the
+    pictures they describe, and a person reads the pictures - which is the
+    only way a label like "a viewer can see what this is" gets attached to a
+    window at all. The floor is chosen afterwards, from the labels, in
+    ``data/calibration/window_readability_labels.json``.
+    """
+
+    edge = analyzer.decode_size[0]
+    work = Path("output/holdout/strips")
+    work.mkdir(parents=True, exist_ok=True)
+
+    rows: list[dict[str, Any]] = []
+    for pile in SHARPNESS_PILES:
+        entity = BY_NAME[pile.food]
+        requirement = requirement_for_food(entity)
+        for order, (clip, _frames, _big) in enumerate(
+            collect(providers, downloader, pile, args.clips, excluded, edge, 1)
+        ):
+            video = getattr(clip, "local_path", "") or ""
+            seconds = float(getattr(clip, "duration", 0.0) or 0.0)
+            if not video or seconds <= 0.5:
+                continue
+            label = f"{pile.food}-{pile.name.split()[-1]}-{order:02d}"
+            rows.extend(measure_windows(
+                analyzer, clip, video, seconds, requirement, work, label
+            ))
+
+    # The known failure, measured beside the rest and excluded from the
+    # decision. Fetched by id because a search will not reliably return one
+    # specific video.
+    known: list[dict[str, Any]] = []
+    clip = pexels_clip_by_id(KNOWN_UNREADABLE)
+    if clip is not None:
+        got = downloader.fetch_many([clip], needed=1)
+        if got:
+            result = got[0]
+            video = result.clip.local_path or result.path
+            seconds = float(getattr(result.clip, "duration", 0.0) or 0.0)
+            known = measure_windows(
+                analyzer, result.clip, str(video), seconds,
+                requirement_for_food(BY_NAME["manzana"]), work, "known-manzana",
+            )
+    else:
+        log.warning("pexels:%s could not be fetched", KNOWN_UNREADABLE)
+
+    return {
+        "command": "sharpness",
+        "window_seconds": SHARPNESS_WINDOW,
+        "windows": len(rows),
+        "note": (
+            "No threshold is chosen here. Every window carries its numbers and "
+            "a three-frame strip in the log; the labels live in "
+            "data/calibration/window_readability_labels.json and the floor is "
+            "read off those."
+        ),
+        "per_window": rows,
+        "known_unreadable": {
+            "source": f"pexels:{KNOWN_UNREADABLE}",
+            "why": (
+                "shipped in run 34331777135 at segment grounding 1.00 over a "
+                "blurred hand; excluded from choosing the floor"
+            ),
+            "per_window": known,
+        },
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -1589,7 +1863,8 @@ def main(argv: list[str] | None = None) -> int:
                   "avocado": run_avocado, "holdout": run_holdout,
                   "apple-state": run_apple_state,
                   "apple-holdout": run_apple_holdout,
-                  "apple-final": run_apple_final}[args.command]
+                  "apple-final": run_apple_final,
+                  "sharpness": run_sharpness}[args.command]
         report = runner(args, analyzer, providers, downloader, excluded)
 
     report["held_out_from"] = {"clips": len(excluded), "queries": sorted(burned)}

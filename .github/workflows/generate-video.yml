@@ -135,7 +135,8 @@ on:
                   reel-entity-check, reel-grounding-check, reel-raspberry-check,
                   reel-holdout-calibration, reel-holdout-entity,
                   reel-holdout-presentation, reel-holdout-final,
-                  reel-apple-state, reel-apple-holdout, reel-apple-final]
+                  reel-apple-state, reel-apple-holdout, reel-apple-final,
+                  reel-sharpness]
       upload_to_youtube:
         description: "Upload to YouTube when it is finished"
         required: false
@@ -1362,6 +1363,71 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: reel-apple-final
+          path: output/holdout/*
+          retention-days: 14
+          if-no-files-found: warn
+
+  # -------------------------------------------------------------------
+  #  Readability. The used-segment gate passed a blurred apple at 1.00
+  #  on all four probes; this measures window_quality on fresh food
+  #  footage and prints a strip of every window so it can be labelled.
+  # -------------------------------------------------------------------
+  reel-sharpness:
+    name: Is the window readable, not merely correct
+    if: inputs.task == 'reel-sharpness'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    # Least privilege: a probe reads the code and writes nothing back.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ffmpeg
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+          pip install onnxruntime
+      - name: Restore the cached model files
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: vidfactory-reel-cache-v1
+      - name: Measure
+        env:
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p output/holdout
+          # The tool prints the summary without its per-clip arrays, which is
+          # what fits in a job log and in a step summary; the full rows go to
+          # the artifact.
+          python tools/reel_holdout_check.py sharpness --clips 3 \
+            --out output/holdout/sharpness.json | tee output/holdout/sharpness-summary.txt
+      - name: Report
+        if: always()
+        run: |
+          {
+            echo "## Window readability calibration"
+            echo '```json'
+            cat output/holdout/sharpness-summary.txt || echo "no summary"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload the scores
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reel-sharpness
           path: output/holdout/*
           retention-days: 14
           if-no-files-found: warn
