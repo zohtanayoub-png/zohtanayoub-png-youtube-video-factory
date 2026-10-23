@@ -300,6 +300,19 @@
       "created_at": "2026-10-23T08:28:49+00:00",
       "youtube_id": null,
       "status": "rendered"
+    },
+    {
+      "id": 24,
+      "topic_slug": "20-reglas-de-interiorismo-para-la-paleta-de-tu-casa",
+      "title": "6 reglas de interiorismo para la paleta de tu casa",
+      "filename": "final_video.mp4",
+      "duration": 287.5,
+      "word_count": 832,
+      "scene_count": 36,
+      "clip_count": 90,
+      "created_at": "2026-10-23T08:58:58+00:00",
+      "youtube_id": null,
+      "status": "rendered"
     }
   ]
 }

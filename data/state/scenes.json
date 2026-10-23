@@ -5806,6 +5806,330 @@
       "duration": null,
       "query": "elegant living room morning light",
       "category": "living rooms"
+    },
+    {
+      "id": 646,
+      "video_id": 24,
+      "scene_id": "intro-000-00",
+      "narration": "Se puede gastar una fortuna en una habitación y que siga pareciendo sin terminar, y se puede gastar muy poco y que parezca cuidada.",
+      "duration": null,
+      "query": "styled neutral interior natural light",
+      "category": "colors"
+    },
+    {
+      "id": 647,
+      "video_id": 24,
+      "scene_id": "intro-000-01",
+      "narration": "El color es la decisión que más se sufre y que más se falla, casi siempre porque se elige la primera en lugar de la última.",
+      "duration": null,
+      "query": "beautiful painted room wide shot",
+      "category": "colors"
+    },
+    {
+      "id": 648,
+      "video_id": 24,
+      "scene_id": "intro-000-02",
+      "narration": "En los próximos 5 minutos repasamos seis ideas, y de cada una te cuento por qué funciona y cómo hacerla de verdad. No hace falta hacerlas todas. Con dos o tres ya se nota.",
+      "duration": null,
+      "query": "warm toned interior daylight",
+      "category": "colors"
+    },
+    {
+      "id": 649,
+      "video_id": 24,
+      "scene_id": "item-001-00",
+      "narration": "Número 1. Empieza por aquí: mira el subtono del blanco.",
+      "duration": null,
+      "query": "white paint undertone comparison",
+      "category": "colors"
+    },
+    {
+      "id": 650,
+      "video_id": 24,
+      "scene_id": "item-001-01",
+      "narration": "No existe un blanco neutro: todos tiran a cálido, a frío o a verde, y mezclar dos blancos distintos en la misma pared se nota inmediatamente. Compara la muestra contra un folio.",
+      "duration": null,
+      "query": "warm white interior wall",
+      "category": "colors"
+    },
+    {
+      "id": 651,
+      "video_id": 24,
+      "scene_id": "item-001-02",
+      "narration": "Si al lado del folio se ve amarillo, es un blanco cálido; úsalo también en techo y carpintería.",
+      "duration": null,
+      "query": "off white painted room",
+      "category": "colors"
+    },
+    {
+      "id": 652,
+      "video_id": 24,
+      "scene_id": "item-001-03",
+      "narration": "Pinta una cartulina grande en lugar de una mancha en la pared: verás el color mucho mejor. Nada de esto necesita un profesional. Necesita decidir y estar dispuesto a mover las cosas dos veces.",
+      "duration": null,
+      "query": "neutral white interior",
+      "category": "colors"
+    },
+    {
+      "id": 653,
+      "video_id": 24,
+      "scene_id": "item-001-04",
+      "narration": "Hazlo bien una vez en lugar de mal dos, y ya no tendrás que volver a pensarlo.",
+      "duration": null,
+      "query": "white paint undertone comparison",
+      "category": "colors"
+    },
+    {
+      "id": 654,
+      "video_id": 24,
+      "scene_id": "item-002-00",
+      "narration": "Número 2, y esta me gusta especialmente. Ilumina la cama por los lados, no desde el techo.",
+      "duration": null,
+      "query": "bedside wall sconces bedroom",
+      "category": "colors"
+    },
+    {
+      "id": 655,
+      "video_id": 24,
+      "scene_id": "item-002-01",
+      "narration": "Dos apliques a 60 centímetros por encima del colchón o dos lámparas de mesa iguales, con regulador y bombilla cálida de 2700 kelvin.",
+      "duration": null,
+      "query": "warm bedside lamps interior",
+      "category": "colors"
+    },
+    {
+      "id": 656,
+      "video_id": 24,
+      "scene_id": "item-002-02",
+      "narration": "Una luz cenital sobre la cama es la peor luz posible para leer y para estar: aplasta y crea sombras duras justo donde quieres luz suave. Escrito suena a poco.",
+      "duration": null,
+      "query": "cozy bedroom lighting evening",
+      "category": "colors"
+    },
+    {
+      "id": 657,
+      "video_id": 24,
+      "scene_id": "item-002-03",
+      "narration": "En la habitación no lo es. Si no sabes si está funcionando, haz una foto antes y otra después. La cámara perdona menos que el ojo.",
+      "duration": null,
+      "query": "reading light bedroom wall",
+      "category": "colors"
+    },
+    {
+      "id": 658,
+      "video_id": 24,
+      "scene_id": "item-002-04",
+      "narration": "Pruébalo por la tarde y no a mediodía, porque es cuando más se nota la diferencia.",
+      "duration": null,
+      "query": "bedside wall sconces bedroom",
+      "category": "colors"
+    },
+    {
+      "id": 659,
+      "video_id": 24,
+      "scene_id": "item-002-05",
+      "narration": "Guarda un mes lo que quites antes de deshacerte de ello, por si la habitación te dice otra cosa.",
+      "duration": null,
+      "query": "warm bedside lamps interior",
+      "category": "colors"
+    },
+    {
+      "id": 660,
+      "video_id": 24,
+      "scene_id": "item-003-00",
+      "narration": "Esto nos lleva a la número 3. ¿Quieres la versión que usan de verdad los interioristas? Dos mesillas iguales, aunque sean pequeñas.",
+      "duration": null,
+      "query": "matching nightstands bedroom symmetry",
+      "category": "colors"
+    },
+    {
+      "id": 661,
+      "video_id": 24,
+      "scene_id": "item-003-01",
+      "narration": "La simetría a ambos lados de la cama es lo que hace que un dormitorio se lea como una habitación resuelta y no como un colchón con muebles alrededor.",
+      "duration": null,
+      "query": "bedside tables styled bedroom",
+      "category": "colors"
+    },
+    {
+      "id": 662,
+      "video_id": 24,
+      "scene_id": "item-003-02",
+      "narration": "Iguales en altura y en color, con la superficie a la altura del colchón o dos centímetros por encima. Si no cabe una mesilla, una balda volada del mismo ancho.",
+      "duration": null,
+      "query": "calm symmetrical bedroom interior",
+      "category": "colors"
+    },
+    {
+      "id": 663,
+      "video_id": 24,
+      "scene_id": "item-003-03",
+      "narration": "Usar dos muebles distintos porque uno se heredó es lo que más rompe la calma de un dormitorio. No hay prisa. Las habitaciones mejoran más rápido cuando las decisiones se toman despacio.",
+      "duration": null,
+      "query": "minimal bedroom nightstand",
+      "category": "colors"
+    },
+    {
+      "id": 664,
+      "video_id": 24,
+      "scene_id": "item-003-04",
+      "narration": "Dale una semana antes de juzgarlo, porque el ojo se acostumbra despacio. Merece la pena hacerlo una tarde tranquila y no encajarlo en una tarde ocupada.",
+      "duration": null,
+      "query": "matching nightstands bedroom symmetry",
+      "category": "colors"
+    },
+    {
+      "id": 665,
+      "video_id": 24,
+      "scene_id": "item-004-00",
+      "narration": "Usa acabados mate en las paredes, que es más fácil de lo que suena.",
+      "duration": null,
+      "query": "matte painted wall interior",
+      "category": "colors"
+    },
+    {
+      "id": 666,
+      "video_id": 24,
+      "scene_id": "item-004-01",
+      "narration": "El satinado refleja la luz y marca cualquier irregularidad del yeso; el mate absorbe y da a la pared un aspecto de superficie sólida.",
+      "duration": null,
+      "query": "flat finish wall paint room",
+      "category": "colors"
+    },
+    {
+      "id": 667,
+      "video_id": 24,
+      "scene_id": "item-004-02",
+      "narration": "Mate o velatura en paredes y techo, y satinado solo en carpintería y zonas húmedas, donde hace falta poder limpiar.",
+      "duration": null,
+      "query": "soft matte interior surface",
+      "category": "colors"
+    },
+    {
+      "id": 668,
+      "video_id": 24,
+      "scene_id": "item-004-03",
+      "narration": "Mira el color a las tres de la tarde y a las diez de la noche antes de decidir.",
+      "duration": null,
+      "query": "painted plaster wall detail",
+      "category": "colors"
+    },
+    {
+      "id": 669,
+      "video_id": 24,
+      "scene_id": "item-004-04",
+      "narration": "Es de esos cambios que escritos parecen menores y en la habitación se leen como importantes.",
+      "duration": null,
+      "query": "matte painted wall interior",
+      "category": "colors"
+    },
+    {
+      "id": 670,
+      "video_id": 24,
+      "scene_id": "item-004-05",
+      "narration": "Aquí el coste es tiempo y no dinero, que es justo por lo que se salta tan a menudo.",
+      "duration": null,
+      "query": "flat finish wall paint room",
+      "category": "colors"
+    },
+    {
+      "id": 671,
+      "video_id": 24,
+      "scene_id": "item-005-00",
+      "narration": "Dos habitaciones idénticas a una decisión de distancia. Elige muebles con patas visibles.",
+      "duration": null,
+      "query": "sofa with visible legs living room",
+      "category": "colors"
+    },
+    {
+      "id": 672,
+      "video_id": 24,
+      "scene_id": "item-005-01",
+      "narration": "Cuando ves suelo por debajo del sofá, tu ojo cuenta esos metros cuadrados como espacio disponible; un mueble que apoya en el suelo los borra del recuento.",
+      "duration": null,
+      "query": "mid century furniture legs interior",
+      "category": "colors"
+    },
+    {
+      "id": 673,
+      "video_id": 24,
+      "scene_id": "item-005-02",
+      "narration": "Prioriza sofás, sillones y aparadores con patas de 12 a 18 centímetros. En un salón pequeño, cambiar solo el sofá por uno con patas ya cambia la sensación de amplitud.",
+      "duration": null,
+      "query": "raised furniture visible floor",
+      "category": "colors"
+    },
+    {
+      "id": 674,
+      "video_id": 24,
+      "scene_id": "item-005-03",
+      "narration": "En pocos metros, cada decisión pesa el doble que en una habitación grande. Antes de comprar, dibuja la silueta en el suelo con cinta y vive con ella dos días.",
+      "duration": null,
+      "query": "light modern living room sofa",
+      "category": "colors"
+    },
+    {
+      "id": 675,
+      "video_id": 24,
+      "scene_id": "item-006-00",
+      "narration": "Vamos con la número 6. Pinta el techo del mismo color, un tono más claro.",
+      "duration": null,
+      "query": "painted ceiling matching walls",
+      "category": "colors"
+    },
+    {
+      "id": 676,
+      "video_id": 24,
+      "scene_id": "item-006-01",
+      "narration": "Un techo blanco brillante sobre paredes de color crea un borde duro que baja visualmente la altura de la habitación.",
+      "duration": null,
+      "query": "colour drenched interior room",
+      "category": "colors"
+    },
+    {
+      "id": 677,
+      "video_id": 24,
+      "scene_id": "item-006-02",
+      "narration": "Diluye el color de la pared al 70 u 80 % para el techo, en acabado mate. El límite entre pared y techo se difumina y el volumen crece.",
+      "duration": null,
+      "query": "soft painted ceiling interior",
+      "category": "colors"
+    },
+    {
+      "id": 678,
+      "video_id": 24,
+      "scene_id": "item-006-03",
+      "narration": "Si solo vas a hacer un par de cosas de esta lista, esta es un buen punto de partida. Si vives con más gente, acordad esta antes de empezar a mover nada.",
+      "duration": null,
+      "query": "monochrome painted room",
+      "category": "colors"
+    },
+    {
+      "id": 679,
+      "video_id": 24,
+      "scene_id": "outro-000-00",
+      "narration": "Y hasta aquí la lista. Nada de esto tiene que pasar de golpe.",
+      "duration": null,
+      "query": "styled neutral interior natural light",
+      "category": "colors"
+    },
+    {
+      "id": 680,
+      "video_id": 24,
+      "scene_id": "outro-000-01",
+      "narration": "Elige los dos cambios que más te hayan sonado a tu casa, hazlos bien, y vive con la habitación un par de semanas antes de decidir el siguiente.",
+      "duration": null,
+      "query": "beautiful painted room wide shot",
+      "category": "colors"
+    },
+    {
+      "id": 681,
+      "video_id": 24,
+      "scene_id": "outro-000-02",
+      "narration": "Si tienes una habitación que se te resiste, déjala en los comentarios y puede acabar en un vídeo.",
+      "duration": null,
+      "query": "warm toned interior daylight",
+      "category": "colors"
     }
   ]
 }
