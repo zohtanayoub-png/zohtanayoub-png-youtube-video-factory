@@ -5248,6 +5248,564 @@
       "duration": null,
       "query": "elegant living room morning light",
       "category": "living rooms"
+    },
+    {
+      "id": 584,
+      "video_id": 23,
+      "scene_id": "intro-000-00",
+      "narration": "Entra en cualquier casa bien resuelta y encontrarás las mismas decisiones discretas repetidas una y otra vez, fuera cual fuera el presupuesto.",
+      "duration": null,
+      "query": "bright styled living room natural light",
+      "category": "living rooms"
+    },
+    {
+      "id": 585,
+      "video_id": 23,
+      "scene_id": "intro-000-01",
+      "narration": "El salón suele ser el espacio compartido más grande de la casa y el que sale en las fotos, que es exactamente por lo que sus problemas se ven tanto.",
+      "duration": null,
+      "query": "sunlit living room wide shot",
+      "category": "living rooms"
+    },
+    {
+      "id": 586,
+      "video_id": 23,
+      "scene_id": "intro-000-02",
+      "narration": "Vamos a cubrir doce cambios concretos, por qué los repiten los interioristas y qué hacer si tu casa no acompaña. Varias se hacen en una tarde y sin herramientas especiales.",
+      "duration": null,
+      "query": "elegant living room morning light",
+      "category": "living rooms"
+    },
+    {
+      "id": 587,
+      "video_id": 23,
+      "scene_id": "item-001-00",
+      "narration": "Cambia todos los tiradores de la casa. Es lo que la mano toca y lo que el ojo mira de cerca.",
+      "duration": null,
+      "query": "brass cabinet handles detail interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 588,
+      "video_id": 23,
+      "scene_id": "item-001-01",
+      "narration": "Un tirador de plástico cromado delata el precio del mueble por muy bien resuelto que esté el resto. Latón macizo, acero cepillado o cuero.",
+      "duration": null,
+      "query": "modern kitchen hardware close up",
+      "category": "living rooms"
+    },
+    {
+      "id": 589,
+      "video_id": 23,
+      "scene_id": "item-001-02",
+      "narration": "Mide primero la distancia entre tornillos, casi siempre 96 o 128 milímetros, y compra todos iguales. Si vives con más gente, acordad esta antes de empezar a mover nada.",
+      "duration": null,
+      "query": "leather drawer pull detail",
+      "category": "living rooms"
+    },
+    {
+      "id": 590,
+      "video_id": 23,
+      "scene_id": "item-001-03",
+      "narration": "Dale una semana antes de juzgarlo, porque el ojo se acostumbra despacio. Haz una foto antes y después. La diferencia casi siempre se ve mejor en la pantalla que en persona.",
+      "duration": null,
+      "query": "quality cabinet hardware interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 591,
+      "video_id": 23,
+      "scene_id": "item-002-00",
+      "narration": "Vamos con la número 2. Piensa en qué es lo primero que mira tu ojo al entrar. Y entonces: Baja la temperatura de color a 2700 kelvin.",
+      "duration": null,
+      "query": "warm 2700k lighting interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 592,
+      "video_id": 23,
+      "scene_id": "item-002-01",
+      "narration": "La luz fría de 4000 kelvin es luz de oficina: correcta para trabajar y terrible para una casa, porque hace que la madera parezca gris y la piel apagada.",
+      "duration": null,
+      "query": "warm white bulb living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 593,
+      "video_id": 23,
+      "scene_id": "item-002-02",
+      "narration": "Compra todas las bombillas de la casa a 2700 kelvin. Si mezclas temperaturas en la misma estancia, la diferencia se nota inmediatamente.",
+      "duration": null,
+      "query": "cosy evening interior lighting",
+      "category": "living rooms"
+    },
+    {
+      "id": 594,
+      "video_id": 23,
+      "scene_id": "item-002-03",
+      "narration": "Comprar bombillas por vatios sin mirar los kelvin es lo que deja tantos salones con luz de supermercado. Si no sabes si está funcionando, haz una foto antes y otra después.",
+      "duration": null,
+      "query": "warm lamp glow home",
+      "category": "living rooms"
+    },
+    {
+      "id": 595,
+      "video_id": 23,
+      "scene_id": "item-002-04",
+      "narration": "La cámara perdona menos que el ojo. Si solo vas a hacer un par de cosas de esta lista, esta es un buen punto de partida.",
+      "duration": null,
+      "query": "warm 2700k lighting interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 596,
+      "video_id": 23,
+      "scene_id": "item-002-05",
+      "narration": "Pruébalo por la tarde y no a mediodía, porque es cuando más se nota la diferencia.",
+      "duration": null,
+      "query": "warm white bulb living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 597,
+      "video_id": 23,
+      "scene_id": "item-003-00",
+      "narration": "Seguimos, y esta es rápida. Ilumina bajo los muebles altos de la cocina.",
+      "duration": null,
+      "query": "under cabinet lighting kitchen",
+      "category": "living rooms"
+    },
+    {
+      "id": 598,
+      "video_id": 23,
+      "scene_id": "item-003-01",
+      "narration": "Tira LED cálida bajo los muebles altos, con el perfil orientado hacia el fondo para que no se vea el punto de luz.",
+      "duration": null,
+      "query": "led strip kitchen counter warm",
+      "category": "living rooms"
+    },
+    {
+      "id": 599,
+      "video_id": 23,
+      "scene_id": "item-003-02",
+      "narration": "Sin luz bajo los armarios, tú mismo haces sombra sobre la encimera justo donde cortas, y la cocina se ve más oscura de lo que está.",
+      "duration": null,
+      "query": "kitchen task lighting interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 600,
+      "video_id": 23,
+      "scene_id": "item-003-03",
+      "narration": "Guarda por frecuencia de uso: lo diario a la altura de la mano. Empieza por la encimera. Es lo que más se ve y lo que menos cuesta cambiar.",
+      "duration": null,
+      "query": "bright modern kitchen counter",
+      "category": "living rooms"
+    },
+    {
+      "id": 601,
+      "video_id": 23,
+      "scene_id": "item-003-04",
+      "narration": "Si no sabes si está funcionando, haz una foto antes y otra después. La cámara perdona menos que el ojo.",
+      "duration": null,
+      "query": "under cabinet lighting kitchen",
+      "category": "living rooms"
+    },
+    {
+      "id": 602,
+      "video_id": 23,
+      "scene_id": "item-004-00",
+      "narration": "Número 4. Esta es la que más se falla. Deja una esquina respirando. Llenar las cuatro esquinas satura la habitación.",
+      "duration": null,
+      "query": "empty corner minimal living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 603,
+      "video_id": 23,
+      "scene_id": "item-004-01",
+      "narration": "Una esquina despejada funciona como el silencio en la música: es lo que hace que se note el resto.",
+      "duration": null,
+      "query": "calm styled living room corner",
+      "category": "living rooms"
+    },
+    {
+      "id": 604,
+      "video_id": 23,
+      "scene_id": "item-004-02",
+      "narration": "Elige la esquina con menos función y déjala con una planta y nada más, o completamente vacía. Resiste la tentación de meter ahí lo que no sabes dónde poner.",
+      "duration": null,
+      "query": "negative space interior design",
+      "category": "living rooms"
+    },
+    {
+      "id": 605,
+      "video_id": 23,
+      "scene_id": "item-004-03",
+      "narration": "Guarda un mes lo que quites antes de deshacerte de ello, por si la habitación te dice otra cosa. Haz una foto antes y después.",
+      "duration": null,
+      "query": "airy living room interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 606,
+      "video_id": 23,
+      "scene_id": "item-004-04",
+      "narration": "La diferencia casi siempre se ve mejor en la pantalla que en persona.",
+      "duration": null,
+      "query": "empty corner minimal living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 607,
+      "video_id": 23,
+      "scene_id": "item-005-00",
+      "narration": "Esto nos lleva a la número 5. Deja las superficies despejadas y agrupa lo que quede. Cada objeto suelto sobre una mesa reclama atención por su cuenta.",
+      "duration": null,
+      "query": "styled coffee table tray books",
+      "category": "living rooms"
+    },
+    {
+      "id": 608,
+      "video_id": 23,
+      "scene_id": "item-005-01",
+      "narration": "Una habitación con veinte focos de atención cansa y se lee como más pequeña que la misma con tres. Aplica la regla de agrupar en impares: bandeja con tres cosas, no siete repartidas.",
+      "duration": null,
+      "query": "minimal decor surfaces interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 609,
+      "video_id": 23,
+      "scene_id": "item-005-02",
+      "narration": "Deja al menos la mitad de cada superficie completamente vacía. Ordenar no es esconderlo todo; una habitación sin nada encima se lee como un piso piloto, no como una casa.",
+      "duration": null,
+      "query": "tidy living room styling",
+      "category": "living rooms"
+    },
+    {
+      "id": 610,
+      "video_id": 23,
+      "scene_id": "item-005-03",
+      "narration": "Aquí el coste es tiempo y no dinero, que es justo por lo que se salta tan a menudo.",
+      "duration": null,
+      "query": "curated shelf styling interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 611,
+      "video_id": 23,
+      "scene_id": "item-005-04",
+      "narration": "Es de esos cambios que escritos parecen menores y en la habitación se leen como importantes.",
+      "duration": null,
+      "query": "styled coffee table tray books",
+      "category": "living rooms"
+    },
+    {
+      "id": 612,
+      "video_id": 23,
+      "scene_id": "item-006-00",
+      "narration": "Número 6, y esta me gusta especialmente. Pon regulador en la luz principal. Interruptor regulable y bombillas marcadas como regulables. Cuesta poco y es el cambio de iluminación con mejor relación coste-resultado.",
+      "duration": null,
+      "query": "dimmer switch warm interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 613,
+      "video_id": 23,
+      "scene_id": "item-006-01",
+      "narration": "La misma habitación al 30 % de intensidad es otra habitación. Sin regulador, solo tienes dos estados: apagado o reunión de trabajo.",
+      "duration": null,
+      "query": "dimmed evening living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 614,
+      "video_id": 23,
+      "scene_id": "item-006-02",
+      "narration": "Pruébalo por la tarde y no a mediodía, porque es cuando más se nota la diferencia.",
+      "duration": null,
+      "query": "soft ambient lighting interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 615,
+      "video_id": 23,
+      "scene_id": "item-006-03",
+      "narration": "Fíjate en cómo queda la habitación por la noche además de con luz de día, porque pueden no parecerse.",
+      "duration": null,
+      "query": "adjustable lighting home",
+      "category": "living rooms"
+    },
+    {
+      "id": 616,
+      "video_id": 23,
+      "scene_id": "item-007-00",
+      "narration": "La número 7 de la lista. ¿Te has fijado en que unas casas aciertan con esto y otras no? Separa el sofá unos centímetros de la pared.",
+      "duration": null,
+      "query": "floating sofa living room layout",
+      "category": "living rooms"
+    },
+    {
+      "id": 617,
+      "video_id": 23,
+      "scene_id": "item-007-01",
+      "narration": "Pegar todos los muebles al perímetro deja un vacío muerto en el centro y, aunque parezca lo contrario, hace que la habitación se sienta más vacía y menos generosa.",
+      "duration": null,
+      "query": "console table behind sofa",
+      "category": "living rooms"
+    },
+    {
+      "id": 618,
+      "video_id": 23,
+      "scene_id": "item-007-02",
+      "narration": "Deja entre 8 y 15 centímetros entre el respaldo y la pared y aprovecha ese hueco con una consola estrecha.",
+      "duration": null,
+      "query": "spacious modern living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 619,
+      "video_id": 23,
+      "scene_id": "item-007-03",
+      "narration": "Esa mínima holgura se lee de inmediato como una decisión y no como un descuido. Un mueble bien elegido dura veinte años; uno elegido con prisa dura dos. Mide primero.",
+      "duration": null,
+      "query": "living room furniture arrangement",
+      "category": "living rooms"
+    },
+    {
+      "id": 620,
+      "video_id": 23,
+      "scene_id": "item-007-04",
+      "narration": "Casi todos los arrepentimientos en decoración vienen de una medida que nadie tomó.",
+      "duration": null,
+      "query": "floating sofa living room layout",
+      "category": "living rooms"
+    },
+    {
+      "id": 621,
+      "video_id": 23,
+      "scene_id": "item-008-00",
+      "narration": "Idea número 8. Dos habitaciones idénticas a una decisión de distancia. Compra una alfombra claramente grande antes que una un poco pequeña. La alfombra es lo que dibuja la zona de estar.",
+      "duration": null,
+      "query": "large living room rug sofa",
+      "category": "living rooms"
+    },
+    {
+      "id": 622,
+      "video_id": 23,
+      "scene_id": "item-008-01",
+      "narration": "Cuando se queda corta, los muebles flotan sin anclaje y todo el conjunto se lee como más pequeño y más disperso de lo que realmente es.",
+      "duration": null,
+      "query": "modern living room carpet interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 623,
+      "video_id": 23,
+      "scene_id": "item-008-02",
+      "narration": "Busca una alfombra en la que apoyen al menos las patas delanteras de cada asiento.",
+      "duration": null,
+      "query": "area rug under coffee table",
+      "category": "living rooms"
+    },
+    {
+      "id": 624,
+      "video_id": 23,
+      "scene_id": "item-008-03",
+      "narration": "En la mayoría de salones eso significa 200 por 300 centímetros, no 140 por 200, y que sobresalga unos 20 centímetros por los lados del sofá.",
+      "duration": null,
+      "query": "neutral rug living room design",
+      "category": "living rooms"
+    },
+    {
+      "id": 625,
+      "video_id": 23,
+      "scene_id": "item-008-04",
+      "narration": "El error clásico es una alfombra pequeña centrada solo bajo la mesa de centro: encoge la habitación y hace que un sofá caro parezca colocado por casualidad.",
+      "duration": null,
+      "query": "large living room rug sofa",
+      "category": "living rooms"
+    },
+    {
+      "id": 626,
+      "video_id": 23,
+      "scene_id": "item-008-05",
+      "narration": "Marca el tamaño con cinta de pintor en el suelo antes de comprar nada. Una alfombra de lana aguanta años; una sintética se apelmaza en un par de temporadas.",
+      "duration": null,
+      "query": "modern living room carpet interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 627,
+      "video_id": 23,
+      "scene_id": "item-009-00",
+      "narration": "Número 9. Ilumina el arte. Aplique de cuadro o un foco orientable a 30 grados. Bombilla cálida y de intensidad baja: se trata de separar la obra del fondo, no de deslumbrar.",
+      "duration": null,
+      "query": "picture light above artwork",
+      "category": "living rooms"
+    },
+    {
+      "id": 628,
+      "video_id": 23,
+      "scene_id": "item-009-01",
+      "narration": "Un cuadro sin luz propia es una mancha en la pared por la noche. Con una luz dirigida se convierte en el punto de referencia de la habitación.",
+      "duration": null,
+      "query": "gallery lighting interior wall",
+      "category": "living rooms"
+    },
+    {
+      "id": 629,
+      "video_id": 23,
+      "scene_id": "item-009-02",
+      "narration": "Un marco ancho hace más por una lámina que la propia lámina. Hazlo bien una vez en lugar de mal dos, y ya no tendrás que volver a pensarlo.",
+      "duration": null,
+      "query": "illuminated art living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 630,
+      "video_id": 23,
+      "scene_id": "item-010-00",
+      "narration": "Aquí va algo que cambia una habitación más rápido de lo que la gente espera. No bloquees la ventana con muebles altos.",
+      "duration": null,
+      "query": "furniture blocking window mistake",
+      "category": "living rooms"
+    },
+    {
+      "id": 631,
+      "video_id": 23,
+      "scene_id": "item-010-01",
+      "narration": "Un mueble alto delante del cristal roba luz a toda la habitación y acorta la profundidad justo en el punto donde más se agradece. Muebles altos en las paredes ciegas, bajos bajo la ventana.",
+      "duration": null,
+      "query": "low furniture under window interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 632,
+      "video_id": 23,
+      "scene_id": "item-010-02",
+      "narration": "Si el radiador está ahí, deja el frente libre. Antes de comprar, dibuja la silueta en el suelo con cinta y vive con ella dos días.",
+      "duration": null,
+      "query": "bright unobstructed window room",
+      "category": "living rooms"
+    },
+    {
+      "id": 633,
+      "video_id": 23,
+      "scene_id": "item-010-03",
+      "narration": "Merece la pena hacerlo una tarde tranquila y no encajarlo en una tarde ocupada.",
+      "duration": null,
+      "query": "natural light living room layout",
+      "category": "living rooms"
+    },
+    {
+      "id": 634,
+      "video_id": 23,
+      "scene_id": "item-011-00",
+      "narration": "Cuelga el arte a la altura de los ojos, no justo debajo del techo. El centro del cuadro debe caer a unos 145 centímetros del suelo, que es la altura media de la mirada.",
+      "duration": null,
+      "query": "framed art above sofa living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 635,
+      "video_id": 23,
+      "scene_id": "item-011-01",
+      "narration": "Colgado más arriba, la pared queda partida y la habitación pierde altura visual. Mide 145 centímetros hasta el centro de la pieza.",
+      "duration": null,
+      "query": "gallery wall living room interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 636,
+      "video_id": 23,
+      "scene_id": "item-011-02",
+      "narration": "Sobre un sofá, baja hasta dejar entre 15 y 25 centímetros entre el respaldo y el marco para que se lean como un solo bloque.",
+      "duration": null,
+      "query": "art hung at eye level interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 637,
+      "video_id": 23,
+      "scene_id": "item-011-03",
+      "narration": "Colgar el cuadro a la altura a la que llega el brazo cómodamente es lo que hace que casi todos los salones tengan el arte demasiado alto.",
+      "duration": null,
+      "query": "large artwork above couch",
+      "category": "living rooms"
+    },
+    {
+      "id": 638,
+      "video_id": 23,
+      "scene_id": "item-011-04",
+      "narration": "Sujeta la pieza con las manos en la pared y pide una segunda opinión antes de clavar. No hay prisa. Las habitaciones mejoran más rápido cuando las decisiones se toman despacio.",
+      "duration": null,
+      "query": "framed art above sofa living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 639,
+      "video_id": 23,
+      "scene_id": "item-012-00",
+      "narration": "Número 12, y esta me gusta especialmente. Piensa en la misma habitación fotografiada por una inmobiliaria y por una revista. La diferencia suele ser esta: añade molduras sencillas a una pared.",
+      "duration": null,
+      "query": "wall panelling moulding interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 640,
+      "video_id": 23,
+      "scene_id": "item-012-01",
+      "narration": "Un panelado discreto da a la pared la profundidad y la sombra que tienen las casas antiguas, y es lo que más rápido sube la percepción de calidad.",
+      "duration": null,
+      "query": "picture frame moulding wall",
+      "category": "living rooms"
+    },
+    {
+      "id": 641,
+      "video_id": 23,
+      "scene_id": "item-012-02",
+      "narration": "Listones de MDF de 6 a 9 centímetros formando rectángulos regulares, pegados y pintados del mismo color que la pared. Una tarde y menos de cien euros.",
+      "duration": null,
+      "query": "painted panelled wall living room",
+      "category": "living rooms"
+    },
+    {
+      "id": 642,
+      "video_id": 23,
+      "scene_id": "item-012-03",
+      "narration": "Sepárate y mira desde la puerta, no desde el centro de la habitación. Nada de esto necesita un profesional. Necesita decidir y estar dispuesto a mover las cosas dos veces.",
+      "duration": null,
+      "query": "architectural wall detail interior",
+      "category": "living rooms"
+    },
+    {
+      "id": 643,
+      "video_id": 23,
+      "scene_id": "outro-000-00",
+      "narration": "Ahí lo tienes: doce ideas con las que trabajar. Nada de esto tiene que pasar de golpe.",
+      "duration": null,
+      "query": "bright styled living room natural light",
+      "category": "living rooms"
+    },
+    {
+      "id": 644,
+      "video_id": 23,
+      "scene_id": "outro-000-01",
+      "narration": "Elige los dos cambios que más te hayan sonado a tu casa, hazlos bien, y vive con la habitación un par de semanas antes de decidir el siguiente.",
+      "duration": null,
+      "query": "sunlit living room wide shot",
+      "category": "living rooms"
+    },
+    {
+      "id": 645,
+      "video_id": 23,
+      "scene_id": "outro-000-02",
+      "narration": "Gracias por verlo, y nos vemos en el siguiente.",
+      "duration": null,
+      "query": "elegant living room morning light",
+      "category": "living rooms"
     }
   ]
 }
